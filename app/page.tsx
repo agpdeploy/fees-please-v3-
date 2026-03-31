@@ -90,18 +90,13 @@ export default function Home() {
 
   return (
     <>
+      {/* CLEANED STYLE INJECTION: ONLY SETS THE FONT AND CSS VARIABLE */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --brand-color: ${theme.color};
           --brand-font: '${theme.font}', sans-serif;
         }
         body { font-family: var(--brand-font) !important; }
-        
-        .text-emerald-500, .text-emerald-400, .text-emerald-600 { color: var(--brand-color) !important; }
-        .bg-emerald-500, .bg-emerald-600, .bg-emerald-700 { background-color: var(--brand-color) !important; }
-        .border-emerald-500, .border-emerald-600 { border-color: var(--brand-color) !important; }
-        
-        .shadow-emerald-500\\/30 { --tw-shadow-color: var(--brand-color) !important; }
       `}} />
 
       <div className="flex flex-col min-h-screen max-w-[480px] mx-auto bg-zinc-950 shadow-2xl relative overflow-hidden">
@@ -110,7 +105,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             {theme.logo && <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover bg-zinc-900 border border-zinc-800" alt="Club Logo" />}
             <div>
-              <h1 className="text-xl font-black italic uppercase tracking-tighter text-emerald-500">Fees Please</h1>
+              <h1 className="text-xl font-black italic uppercase tracking-tighter text-brand">Fees Please</h1>
               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none">
                 {session ? 'Admin Portal' : 'Captain Access'}
               </p>
@@ -129,14 +124,14 @@ export default function Home() {
 
         <nav className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-black/95 backdrop-blur-md pb-8 pt-4 z-40">
           <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
-            <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" ? "text-emerald-500" : ""}`}>
+            <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" ? "text-brand" : ""}`}>
               <i className="fa-solid fa-bolt-lightning text-2xl mb-1"></i><span>GameDay</span>
             </button>
-            <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" ? "text-emerald-500" : ""}`}>
+            <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" ? "text-brand" : ""}`}>
               <i className="fa-solid fa-wallet text-2xl mb-1"></i><span>Ledger</span>
             </button>
             {session && (
-              <button onClick={() => handleTabChange("setup")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "setup" ? "text-emerald-500" : ""}`}>
+              <button onClick={() => handleTabChange("setup")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "setup" ? "text-brand" : ""}`}>
                 <i className="fa-solid fa-sliders text-2xl mb-1"></i><span>Setup</span>
               </button>
             )}
@@ -152,7 +147,7 @@ export default function Home() {
               <div className="p-6 flex justify-between items-start border-b border-zinc-800">
                 <div>
                   <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Logged in as</div>
-                  <div className="text-sm font-black text-emerald-500 uppercase tracking-widest">{session ? 'Admin' : 'Captain'}</div>
+                  <div className="text-sm font-black text-brand uppercase tracking-widest">{session ? 'Admin' : 'Captain'}</div>
                 </div>
                 <button onClick={() => setIsSidebarOpen(false)} className="text-zinc-500 hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
               </div>

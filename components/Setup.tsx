@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
+import { useProfile } from "@/lib/useProfile";         // Fixed: Using absolute path
+import { useActiveClub } from "@/contexts/ClubContext";  // Fixed: Using absolute path
 
 export default function Setup() {
   const [activeTab, setActiveTab] = useState<'fixtures' | 'players' | 'teams' | 'config'>('config');
@@ -67,7 +69,13 @@ export default function Setup() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const clubId = typeof window !== 'undefined' ? localStorage.getItem("captainClubId") : null;
+  // --- THE NEW "MAGIC SAUCE" ID ROUTER ---
+  const { profile, loading: profileLoading } = useProfile(); // Added: loading state
+  const { activeClubId } = useActiveClub();
+  
+  // If Super Admin -> use the Switcher. If Org Admin -> use their fenced Profile ID.
+  const clubId = profile?.role === 'super_admin' ? activeClubId : profile?.club_id;
+  // ----------------------------------------
 
   async function loadClubData() {
     setIsLoading(true);
@@ -256,7 +264,18 @@ export default function Setup() {
   
   async function deleteItem(table: string, id: string) { if (!window.confirm("Are you sure?")) return; await supabase.from(table).delete().eq("id", id); showToast("Item deleted."); loadClubData(); }
 
-  if (!clubId) return <div className="p-4 text-center text-zinc-500">Please log in.</div>;
+  // 1. Wait for the profile to finish loading from Supabase
+  if (profileLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 space-y-4">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">Verifying Profile...</p>
+      </div>
+    );
+  }
+
+  // 2. If it loaded, but you still don't have an ID, show the error
+  if (!clubId) return <div className="p-4 text-center text-zinc-500">Please log in or select a club.</div>;
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
