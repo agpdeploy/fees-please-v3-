@@ -143,7 +143,7 @@ export default function GameDay() {
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
       
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-[100] bg-emerald-500 text-black font-black uppercase text-[10px]`}>
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-[100] bg-green-500 text-black font-black uppercase text-[10px]`}>
           <i className="fa-solid fa-check"></i> {toast.msg}
         </div>
       )}
@@ -205,16 +205,16 @@ export default function GameDay() {
                   <div>
                     {/* FIX: Forced text-white instead of text-brand for player name */}
                     <h3 className="text-white font-black text-sm uppercase tracking-wide">{player?.first_name} {player?.last_name}</h3>
-                    <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-emerald-500">Fee: ${player?.is_member ? teamFees.member : teamFees.casual}</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-green-500">Fee: ${player?.is_member ? teamFees.member : teamFees.casual}</div>
                   </div>
                   <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                    <button onClick={() => setPaymentData(p => ({...p, [id]: {...p[id], method: 'cash'}}))} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-money-bill-wave"></i></button>
+                    <button onClick={() => setPaymentData(p => ({...p, [id]: {...p[id], method: 'cash'}}))} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'cash' ? 'bg-green-500 text-black' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-money-bill-wave"></i></button>
                     <button onClick={() => setPaymentData(p => ({...p, [id]: {...p[id], method: 'card'}}))} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'card' ? 'bg-blue-600 text-white' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-credit-card"></i></button>
                   </div>
                 </div>
                 <div className="bg-[#111] border border-zinc-800 rounded-2xl p-3 flex justify-between items-center">
                   <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
-                  <input type="number" value={data.amount} onChange={(e) => setPaymentData(p => ({...p, [id]: {...p[id], amount: Number(e.target.value)}}))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
+                  <input type="number" value={data.amount} onChange={(e) => setPaymentData(p => ({...p, [id]: {...p[id], amount: Number(e.target.value)}}))} className="bg-transparent text-right text-2xl font-black text-green-500 outline-none w-24" />
                 </div>
               </div>
             );
@@ -224,12 +224,12 @@ export default function GameDay() {
             {activeFixture?.umpire_fee > 0 && (
               <div className="bg-[#1A1A1A] border border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer" onClick={() => setPayUmpire(!payUmpire)}>
                 <span className="text-xs font-black uppercase text-zinc-300 flex items-center gap-2"><i className="fa-solid fa-ticket"></i> Pay Umpire (${activeFixture.umpire_fee})</span>
-                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-emerald-500' : 'bg-zinc-800'}`}><div className={`w-4 h-4 rounded-full bg-white transition-transform ${payUmpire ? 'translate-x-4' : ''}`}></div></div>
+                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-green-500' : 'bg-zinc-800'}`}><div className={`w-4 h-4 rounded-full bg-white transition-transform ${payUmpire ? 'translate-x-4' : ''}`}></div></div>
               </div>
             )}
             <div className="flex justify-between items-end px-2">
               <span className="text-xs font-black italic text-zinc-500 uppercase">Cash on Hand:</span>
-              <span className="text-4xl font-black italic text-emerald-500">${grandTotal.toFixed(2)}</span>
+              <span className="text-4xl font-black italic text-green-500">${grandTotal.toFixed(2)}</span>
             </div>
             <button onClick={processBatchPayments} disabled={isProcessing} className="w-full bg-brand text-zinc-950 font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 disabled:opacity-50 transition-all">
               Save {selectedPlayerIds.length} Payments
