@@ -76,25 +76,26 @@ export default function GameDay() {
     fetchNextGame();
   }, [selectedTeamId]);
 
-  // 3. Fetch Match Squad & Available Players (WITH ERROR LOGGING)
+  // 3. Fetch Match Squad & Available Players (FIXED)
   useEffect(() => {
     async function loadSquadData() {
-      if (!nextGame || !selectedTeamId) return;
+      // Added activeClubId to ensure we have the necessary ID before fetching players
+      if (!nextGame || !selectedTeamId || !activeClubId) return;
 
-      // Fetch existing squad
+      // Fetch existing squad - Explicitly declared foreign key join
       const { data: squadData, error: squadError } = await supabase
         .from('match_squads')
-        .select('*, players(*)') 
+        .select('*, players:player_id(*)') 
         .eq('fixture_id', nextGame.id);
       
       if (squadError) console.error("SQUAD FETCH ERROR:", squadError.message);
       if (squadData) setMatchSquad(squadData);
 
-      // Fetch available players
+      // Fetch available players - Fixed to query by club_id
       const { data: playersData, error: playersError } = await supabase
         .from('players') 
         .select('*')
-        .eq('team_id', selectedTeamId); // <-- If this fails, players might be linked by club_id instead!
+        .eq('club_id', activeClubId); 
 
       if (playersError) {
         console.error("PLAYERS FETCH ERROR:", playersError.message);
@@ -104,7 +105,7 @@ export default function GameDay() {
       }
     }
     loadSquadData();
-  }, [nextGame, selectedTeamId]);
+  }, [nextGame, selectedTeamId, activeClubId]); // Added activeClubId to dependency array
 
   const handleAddToSquad = async (player: any) => {
     if (!nextGame) return;
@@ -119,12 +120,24 @@ export default function GameDay() {
     });
   };
 
-  // BULLETPROOF SEARCH LOGIC
+  // BULLETPROOF SEARCH LOGIC (FIXED)
   const filteredPlayers = availablePlayers.filter(p => {
+    // 1. Prevent crashes if a player object is malformed
+    if (!p) return false;
+
+    // 2. Prevent showing players in the search who are ALREADY in the match squad
+    const isAlreadyInSquad = matchSquad.some(squadItem => {
+      const squadPlayer = squadItem.players || squadItem;
+      return squadPlayer.id === p.id;
+    });
+    
+    if (isAlreadyInSquad) return false;
+
+    // 3. Safe string matching
     const firstName = p.first_name || "";
     const lastName = p.last_name || "";
     const email = p.email || "";
-    const searchLower = searchQuery.toLowerCase();
+    const searchLower = (searchQuery || "").toLowerCase();
     
     return (
       (firstName + " " + lastName).toLowerCase().includes(searchLower) ||
