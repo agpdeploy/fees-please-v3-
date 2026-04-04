@@ -67,9 +67,9 @@ export default function GameDay() {
       // Get today's date to ensure we don't show past games
       const today = new Date().toISOString().split('T')[0];
 
-      // WARNING: If your database table is named something other than 'games' (like 'fixtures'), change it here!
+      // UPDATED TO LOOK FOR THE 'fixtures' TABLE
       const { data, error } = await supabase
-        .from('games') 
+        .from('fixtures') 
         .select('*')
         .eq('team_id', selectedTeamId)
         .gte('date', today)
