@@ -12,6 +12,9 @@ export default function GameDay() {
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  
+  // NEW: State to hold the upcoming game
+  const [nextGame, setNextGame] = useState<any>(null);
 
   // Fetch Teams and handle Auto-Select
   useEffect(() => {
@@ -21,11 +24,9 @@ export default function GameDay() {
 
       let query = supabase.from("teams").select("*");
       
-      // If they are a club admin/super admin, show all teams in the active club
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
-        // Otherwise, only show teams they explicitly have captain access to
         const { data: roles } = await supabase.from('user_roles').select('team_id').eq('user_id', profile.id).eq('role', 'team_admin');
         const teamIds = roles?.map(r => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) {
@@ -33,7 +34,7 @@ export default function GameDay() {
         } else {
           setTeams([]);
           setLoading(false);
-          return; // No teams found
+          return; 
         }
       }
 
@@ -41,8 +42,6 @@ export default function GameDay() {
 
       if (!error && data) {
         setTeams(data);
-        
-        // THE AUTO-SELECT LOGIC
         if (data.length === 1) {
           setSelectedTeamId(data[0].id);
         } else if (data.length > 0 && !data.find(t => t.id === selectedTeamId)) {
@@ -55,6 +54,32 @@ export default function GameDay() {
     fetchTeams();
   }, [profile, activeClubId]);
 
+  // NEW: Fetch the next game whenever the selected team changes
+  useEffect(() => {
+    async function fetchNextGame() {
+      if (!selectedTeamId) {
+        setNextGame(null);
+        return;
+      }
+
+      // Get today's date to ensure we don't show past games
+      const today = new Date().toISOString().split('T')[0];
+
+      const { data } = await supabase
+        .from('games') // NOTE: If your table is named 'fixtures', change this word!
+        .select('*')
+        .eq('team_id', selectedTeamId)
+        .gte('date', today)
+        .order('date', { ascending: true })
+        .limit(1)
+        .single();
+
+      setNextGame(data);
+    }
+    
+    fetchNextGame();
+  }, [selectedTeamId]);
+
   if (loading) {
     return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest animate-pulse">Loading GameDay...</div>;
   }
@@ -66,9 +91,6 @@ export default function GameDay() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* CONDITIONAL UI: 
-        Only show the dropdown if the user manages MORE than 1 team 
-      */}
       {teams.length > 1 && (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
           <label className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 block">
@@ -88,18 +110,32 @@ export default function GameDay() {
       )}
 
       {selectedTeamId ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-lg">
-          <div className="w-16 h-16 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-4 border border-brand/20 shadow-inner">
-            <i className="fa-solid fa-trophy text-2xl"></i>
-          </div>
-          <h2 className="text-white font-black italic uppercase tracking-widest text-lg mb-2">Next Fixture</h2>
-          <p className="text-zinc-500 text-xs uppercase font-bold tracking-widest">
-            No upcoming games scheduled.
-          </p>
-          <button className="mt-6 w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs transition-colors border border-zinc-700">
-            <i className="fa-solid fa-plus mr-2"></i> Add Fixture
-          </button>
-        </div>
+        <>
+          {/* DYNAMIC GAME DISPLAY */}
+          {nextGame ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-lg border-t-2 border-t-brand">
+              <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">
+                Next Fixture • {new Date(nextGame.date).toLocaleDateString()}
+              </div>
+              <h2 className="text-white font-black italic uppercase tracking-widest text-2xl mb-6">
+                VS {nextGame.opponent}
+              </h2>
+              <button className="w-full bg-brand hover:bg-emerald-500 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-colors shadow-lg">
+                <i className="fa-solid fa-users mr-2"></i> Pre-Game Squad
+              </button>
+            </div>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-lg">
+              <div className="w-16 h-16 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-4 border border-brand/20 shadow-inner">
+                <i className="fa-solid fa-trophy text-2xl"></i>
+              </div>
+              <h2 className="text-white font-black italic uppercase tracking-widest text-lg mb-2">Next Fixture</h2>
+              <p className="text-zinc-500 text-xs uppercase font-bold tracking-widest">
+                No upcoming games scheduled.
+              </p>
+            </div>
+          )}
+        </>
       ) : (
         teams.length > 1 && (
           <div className="text-center p-10 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">

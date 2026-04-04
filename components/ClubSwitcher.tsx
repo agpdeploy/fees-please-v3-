@@ -34,23 +34,9 @@ export default function ClubSwitcher() {
     return acc;
   }, []);
 
-  // If they only belong to one club (or zero), we don't really need a switcher
+  // If they only belong to one club (or zero), hide the switcher entirely
   if (uniqueClubs.length <= 1) {
-    const singleClub = uniqueClubs[0];
-    if (!singleClub) return null;
-    
-    return (
-      <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-2xl">
-        {singleClub.logo_url ? (
-          <img src={singleClub.logo_url} alt="Logo" className="w-8 h-8 rounded-lg object-cover bg-black" />
-        ) : (
-          <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-500 text-xs font-black">
-            {singleClub.name.substring(0, 2).toUpperCase()}
-          </div>
-        )}
-        <span className="font-black text-white text-sm uppercase tracking-wide">{singleClub.name}</span>
-      </div>
-    );
+    return null;
   }
 
   const activeClub = uniqueClubs.find(c => c.id === activeClubId) || uniqueClubs[0];
