@@ -67,13 +67,13 @@ export default function GameDay() {
       // Get today's date to ensure we don't show past games
       const today = new Date().toISOString().split('T')[0];
 
-      // UPDATED TO LOOK FOR THE 'fixtures' TABLE
+      // UPDATED: Using 'fixtures' table and 'match_date' column
       const { data, error } = await supabase
         .from('fixtures') 
         .select('*')
         .eq('team_id', selectedTeamId)
-        .gte('date', today)
-        .order('date', { ascending: true })
+        .gte('match_date', today)
+        .order('match_date', { ascending: true })
         .limit(1)
         .single();
 
@@ -125,7 +125,8 @@ export default function GameDay() {
           {nextGame ? (
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-lg border-t-2 border-t-brand">
               <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">
-                Next Fixture • {new Date(nextGame.date).toLocaleDateString()}
+                {/* UPDATED: Using match_date */}
+                Next Fixture • {new Date(nextGame.match_date).toLocaleDateString()}
               </div>
               <h2 className="text-white font-black italic uppercase tracking-widest text-2xl mb-6">
                 VS {nextGame.opponent}
