@@ -184,7 +184,11 @@ export default function GameDay() {
   }
 
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
+  
+  // CALCULATE NET OUTLAY (Grand Total minus Umpire Fee if toggled)
   const grandTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0);
+  const netTotal = grandTotal - (payUmpire && activeFixture?.umpire_fee ? activeFixture.umpire_fee : 0);
+  
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
 
@@ -287,17 +291,14 @@ export default function GameDay() {
 
       {selectedTeamId && activeFixture ? (
         <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
-          {/* THEME APPLIED: Left Accent Bar */}
           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
           <div className="flex justify-between items-center">
             <div>
-              {/* THEME APPLIED: Header Text */}
               <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
               <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
                 {new Date(activeFixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               </p>
             </div>
-            {/* THEME APPLIED: Icon Color */}
             <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center transition-colors shadow-inner" style={{ color: themeColor }}>
               <i className="fa-solid fa-user-plus text-lg"></i>
             </button>
@@ -312,7 +313,6 @@ export default function GameDay() {
       {activeFixture && (
         <div className="mb-4">
           <div className="flex justify-between items-center mb-4 px-1">
-             {/* THEME APPLIED: Section Label */}
              <h2 className="text-[11px] font-black uppercase italic tracking-widest" style={{ color: themeColor }}>To Pay ({squadToPay.length})</h2>
              <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-600 hover:text-zinc-400">Clear All</button>
           </div>
@@ -333,7 +333,6 @@ export default function GameDay() {
                   <button 
                     key={player.id} 
                     onClick={() => togglePlayerSelection(player.id)} 
-                    // THEME APPLIED: Player Pill Selected State & Glow
                     className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600'}`}
                     style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
                   >
@@ -378,19 +377,16 @@ export default function GameDay() {
                       <h3 className="text-white font-black text-sm uppercase tracking-wide">{player.first_name} {player.last_name}</h3>
                       <div className="flex items-center gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
                         {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
-                        {/* CONSTANT: Money is Emerald */}
                         <span className="text-emerald-500">Fee: ${matchFee}</span>
                       </div>
                     </div>
                     <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                      {/* CONSTANT: Cash toggle remains Emerald */}
                       <button onClick={() => updatePlayerData(player.id, 'method', 'cash')} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-money-bill-wave"></i></button>
                       
-                      {/* THEME APPLIED: Card toggle uses themeColor */}
+                      {/* CARD TOGGLE: Now locked to bg-blue-500 when active */}
                       <button 
                         onClick={() => updatePlayerData(player.id, 'method', 'card')} 
-                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'card' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}
-                        style={data.method === 'card' ? { backgroundColor: themeColor } : {}}
+                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-white'}`}
                       >
                         <i className="fa-solid fa-credit-card"></i>
                       </button>
@@ -398,7 +394,6 @@ export default function GameDay() {
                   </div>
                   <div className="bg-[#111] border border-zinc-800 rounded-2xl p-3 flex justify-between items-center">
                     <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
-                    {/* CONSTANT: Input amount remains Emerald */}
                     <input type="number" value={data.amount} onChange={(e) => updatePlayerData(player.id, 'amount', Number(e.target.value))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
                   </div>
                 </div>
@@ -410,17 +405,20 @@ export default function GameDay() {
             {activeFixture.umpire_fee > 0 && (
               <div className="bg-[#1A1A1A] border border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer" onClick={() => setPayUmpire(!payUmpire)}>
                 <span className="text-xs font-black uppercase tracking-widest text-zinc-300 flex items-center gap-2"><i className="fa-solid fa-ticket text-zinc-500"></i> Pay Umpire (${activeFixture.umpire_fee})</span>
-                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-emerald-500' : 'bg-zinc-800'}`}>
+                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-800'}`}>
                   <div className={`w-4 h-4 rounded-full bg-white transition-transform ${payUmpire ? 'translate-x-4' : ''}`}></div>
                 </div>
               </div>
             )}
             <div className="flex justify-between items-end px-2">
-              <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">Total Collected:</span>
-              {/* CONSTANT: Total collected remains Emerald */}
-              <span className="text-4xl font-black italic text-emerald-500">${grandTotal.toFixed(2)}</span>
+              {/* DYNAMIC TOTAL: Subtracts Umpire Fee, Turns Red if Negative */}
+              <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">
+                {netTotal < 0 ? 'Net Outlay:' : 'Total Collected:'}
+              </span>
+              <span className={`text-4xl font-black italic ${netTotal < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                {netTotal < 0 ? '-' : ''}${Math.abs(netTotal).toFixed(2)}
+              </span>
             </div>
-            {/* THEME APPLIED: Save Button */}
             <button 
               onClick={processBatchPayments} 
               disabled={isProcessing} 
