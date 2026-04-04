@@ -13,7 +13,7 @@ export default function GameDay() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   
-  // NEW: State to hold the upcoming game
+  // State to hold the upcoming game
   const [nextGame, setNextGame] = useState<any>(null);
 
   // Fetch Teams and handle Auto-Select
@@ -24,6 +24,7 @@ export default function GameDay() {
 
       let query = supabase.from("teams").select("*");
       
+      // Admin vs Captain routing
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
@@ -42,6 +43,7 @@ export default function GameDay() {
 
       if (!error && data) {
         setTeams(data);
+        // AUTO-SELECT LOGIC
         if (data.length === 1) {
           setSelectedTeamId(data[0].id);
         } else if (data.length > 0 && !data.find(t => t.id === selectedTeamId)) {
@@ -54,7 +56,7 @@ export default function GameDay() {
     fetchTeams();
   }, [profile, activeClubId]);
 
-  // NEW: Fetch the next game whenever the selected team changes
+  // Fetch the next game whenever the selected team changes
   useEffect(() => {
     async function fetchNextGame() {
       if (!selectedTeamId) {
@@ -65,8 +67,9 @@ export default function GameDay() {
       // Get today's date to ensure we don't show past games
       const today = new Date().toISOString().split('T')[0];
 
-      const { data } = await supabase
-        .from('games') // NOTE: If your table is named 'fixtures', change this word!
+      // WARNING: If your database table is named something other than 'games' (like 'fixtures'), change it here!
+      const { data, error } = await supabase
+        .from('games') 
         .select('*')
         .eq('team_id', selectedTeamId)
         .gte('date', today)
@@ -74,7 +77,13 @@ export default function GameDay() {
         .limit(1)
         .single();
 
-      setNextGame(data);
+      if (error) {
+        console.error("SUPABASE GAME FETCH ERROR:", error.message);
+        setNextGame(null); // Clear state on error
+      } else {
+        console.log("FOUND NEXT GAME:", data);
+        setNextGame(data);
+      }
     }
     
     fetchNextGame();
@@ -91,6 +100,7 @@ export default function GameDay() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
+      {/* Only show the dropdown if the user manages MORE than 1 team */}
       {teams.length > 1 && (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
           <label className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 block">

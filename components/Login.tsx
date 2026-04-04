@@ -111,8 +111,18 @@ export default function Login() {
                 </button>
               </form>
             </div>
+            
+            <div className="mt-8 text-center">
+              <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">
+                No password required.
+              </p>
+            </div>
           </div>
         )}
+      </div>
+
+      <div className="absolute bottom-4 text-[9px] text-zinc-700 font-black tracking-widest uppercase">
+        v3.3.0
       </div>
     </div>
   );
