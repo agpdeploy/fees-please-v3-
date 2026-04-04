@@ -15,7 +15,6 @@ export default function GameDay() {
   
   const [nextGame, setNextGame] = useState<any>(null);
   
-  // --- RESTORED STATES FOR QUICK ADD & SQUAD ---
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [matchSquad, setMatchSquad] = useState<any[]>([]);
@@ -77,50 +76,61 @@ export default function GameDay() {
     fetchNextGame();
   }, [selectedTeamId]);
 
-  // 3. Fetch Match Squad & Available Players (RESTORED)
+  // 3. Fetch Match Squad & Available Players (WITH ERROR LOGGING)
   useEffect(() => {
     async function loadSquadData() {
       if (!nextGame || !selectedTeamId) return;
 
-      // This fetches the players currently linked to this fixture in match_squads
-      const { data: squadData } = await supabase
+      // Fetch existing squad
+      const { data: squadData, error: squadError } = await supabase
         .from('match_squads')
-        .select('*, players(*)') // Assumes you linked match_squads to a 'players' table
+        .select('*, players(*)') 
         .eq('fixture_id', nextGame.id);
       
+      if (squadError) console.error("SQUAD FETCH ERROR:", squadError.message);
       if (squadData) setMatchSquad(squadData);
 
-      // This fetches everyone in the club/team to populate the Quick Add list
-      const { data: playersData } = await supabase
-        .from('players') // Adjust if you pull from 'profiles' instead
+      // Fetch available players
+      const { data: playersData, error: playersError } = await supabase
+        .from('players') 
         .select('*')
-        .eq('team_id', selectedTeamId);
+        .eq('team_id', selectedTeamId); // <-- If this fails, players might be linked by club_id instead!
 
-      if (playersData) setAvailablePlayers(playersData);
+      if (playersError) {
+        console.error("PLAYERS FETCH ERROR:", playersError.message);
+      } else if (playersData) {
+        console.log("PLAYERS LOADED:", playersData.length);
+        setAvailablePlayers(playersData);
+      }
     }
     loadSquadData();
   }, [nextGame, selectedTeamId]);
 
-  // --- RESTORED ADD FUNCTION ---
   const handleAddToSquad = async (player: any) => {
     if (!nextGame) return;
 
-    // Optimistic UI update so it feels instant
     setMatchSquad([...matchSquad, { players: player }]);
     setShowQuickAdd(false);
     setSearchQuery("");
 
-    // Write to database
     await supabase.from('match_squads').insert({
       fixture_id: nextGame.id,
-      player_id: player.id // Ensure this matches your column name
+      player_id: player.id 
     });
   };
 
-  const filteredPlayers = availablePlayers.filter(p => 
-    (p.first_name + " " + p.last_name).toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.email && p.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // BULLETPROOF SEARCH LOGIC
+  const filteredPlayers = availablePlayers.filter(p => {
+    const firstName = p.first_name || "";
+    const lastName = p.last_name || "";
+    const email = p.email || "";
+    const searchLower = searchQuery.toLowerCase();
+    
+    return (
+      (firstName + " " + lastName).toLowerCase().includes(searchLower) ||
+      email.toLowerCase().includes(searchLower)
+    );
+  });
 
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest animate-pulse">Loading GameDay...</div>;
   if (teams.length === 0) return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest">No teams assigned yet.</div>;
@@ -128,7 +138,6 @@ export default function GameDay() {
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
       
-      {/* Admin View Dropdown */}
       {teams.length > 1 && (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
           <label className="text-[10px] text-brand uppercase font-black block mb-2 ml-1 tracking-widest">
@@ -151,7 +160,6 @@ export default function GameDay() {
         <>
           {nextGame ? (
             <>
-              {/* RESTORED GAME CARD UI (From your HTML snippet) */}
               <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-brand"></div>
                 <div className="flex justify-between items-center">
@@ -172,7 +180,6 @@ export default function GameDay() {
                 </div>
               </div>
 
-              {/* RESTORED "TO PAY" SQUAD LIST */}
               <div className="mb-4">
                 <h2 className="text-[11px] font-black uppercase italic text-brand tracking-widest mb-4 px-1">
                   To Pay ({matchSquad.length})
@@ -180,10 +187,10 @@ export default function GameDay() {
                 <div className="flex flex-wrap gap-2.5">
                   {matchSquad.length > 0 ? (
                     matchSquad.map((squadItem, i) => {
-                      const p = squadItem.players || squadItem; // Fallback depending on DB join
+                      const p = squadItem.players || squadItem; 
                       return (
                         <button key={i} className="px-4 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all relative bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600">
-                          {p.first_name} {p.last_name?.charAt(0) || p.email?.charAt(0)}.
+                          {p.first_name || 'Unknown'} {p.last_name?.charAt(0) || p.email?.charAt(0) || ''}
                         </button>
                       );
                     })
@@ -211,7 +218,6 @@ export default function GameDay() {
         )
       )}
 
-      {/* RESTORED QUICK ADD MODAL (From your screenshot) */}
       {showQuickAdd && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[80vh]">
