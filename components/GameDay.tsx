@@ -13,10 +13,8 @@ export default function GameDay() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   
-  // State to hold the upcoming game
   const [nextGame, setNextGame] = useState<any>(null);
 
-  // Fetch Teams and handle Auto-Select
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
@@ -24,7 +22,6 @@ export default function GameDay() {
 
       let query = supabase.from("teams").select("*");
       
-      // Admin vs Captain routing
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
@@ -43,7 +40,6 @@ export default function GameDay() {
 
       if (!error && data) {
         setTeams(data);
-        // AUTO-SELECT LOGIC
         if (data.length === 1) {
           setSelectedTeamId(data[0].id);
         } else if (data.length > 0 && !data.find(t => t.id === selectedTeamId)) {
@@ -56,7 +52,6 @@ export default function GameDay() {
     fetchTeams();
   }, [profile, activeClubId]);
 
-  // Fetch the next game whenever the selected team changes
   useEffect(() => {
     async function fetchNextGame() {
       if (!selectedTeamId) {
@@ -64,10 +59,8 @@ export default function GameDay() {
         return;
       }
 
-      // Get today's date to ensure we don't show past games
       const today = new Date().toISOString().split('T')[0];
 
-      // UPDATED: Using 'fixtures' table and 'match_date' column
       const { data, error } = await supabase
         .from('fixtures') 
         .select('*')
@@ -78,10 +71,8 @@ export default function GameDay() {
         .single();
 
       if (error) {
-        console.error("SUPABASE GAME FETCH ERROR:", error.message);
-        setNextGame(null); // Clear state on error
+        setNextGame(null); 
       } else {
-        console.log("FOUND NEXT GAME:", data);
         setNextGame(data);
       }
     }
@@ -100,11 +91,10 @@ export default function GameDay() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* Only show the dropdown if the user manages MORE than 1 team */}
       {teams.length > 1 && (
-        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
-          <label className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 block">
-            Managing Team
+        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem]">
+          <label className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 block pl-2">
+            Admin View
           </label>
           <select
             value={selectedTeamId}
@@ -121,25 +111,35 @@ export default function GameDay() {
 
       {selectedTeamId ? (
         <>
-          {/* DYNAMIC GAME DISPLAY */}
           {nextGame ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-lg border-t-2 border-t-brand">
-              <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">
-                {/* UPDATED: Using match_date */}
-                Next Fixture • {new Date(nextGame.match_date).toLocaleDateString()}
+            <div>
+              {/* RESTORED SLEEK UI */}
+              <div className="bg-zinc-900/80 border border-zinc-800 rounded-[2rem] p-5 flex justify-between items-center relative overflow-hidden shadow-lg">
+                
+                {/* Left accent line */}
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-brand"></div>
+
+                <div className="pl-3">
+                  <h2 className="text-brand font-black italic uppercase tracking-widest text-xl mb-1">
+                    VS {nextGame.opponent}
+                  </h2>
+                  <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                    {new Date(nextGame.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()}
+                  </p>
+                </div>
+
+                <button className="w-12 h-12 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-full flex items-center justify-center text-brand transition-colors shadow-inner shrink-0">
+                  <i className="fa-solid fa-user-plus text-lg"></i>
+                </button>
               </div>
-              <h2 className="text-white font-black italic uppercase tracking-widest text-2xl mb-6">
-                VS {nextGame.opponent}
-              </h2>
-              <button className="w-full bg-brand hover:bg-emerald-500 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-colors shadow-lg">
-                <i className="fa-solid fa-users mr-2"></i> Pre-Game Squad
-              </button>
+
+              {/* Restored 'TO PAY' section */}
+              <div className="mt-8 px-4">
+                <h3 className="text-brand font-black italic uppercase tracking-widest text-[11px]">To Pay (0)</h3>
+              </div>
             </div>
           ) : (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-lg">
-              <div className="w-16 h-16 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-4 border border-brand/20 shadow-inner">
-                <i className="fa-solid fa-trophy text-2xl"></i>
-              </div>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 text-center shadow-lg">
               <h2 className="text-white font-black italic uppercase tracking-widest text-lg mb-2">Next Fixture</h2>
               <p className="text-zinc-500 text-xs uppercase font-bold tracking-widest">
                 No upcoming games scheduled.
