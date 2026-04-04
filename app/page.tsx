@@ -7,9 +7,9 @@ import GameDay from "../components/GameDay";
 import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Login from "../components/Login";
+import ClubSwitcher from "../components/ClubSwitcher";
 
 export default function Home() {
-  // Read activeTab from sessionStorage so it survives a reload (Config save)
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('activeTab') || 'gameday';
@@ -21,10 +21,10 @@ export default function Home() {
   const [localAccessId, setLocalAccessId] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  const [theme, setTheme] = useState({ color: '#10b981', font: 'Inter', logo: '' });
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar State
+  // Added "name" to the theme state so we can extract initials
+  const [theme, setTheme] = useState({ name: 'FP', color: '#10b981', font: 'Inter', logo: '' });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Update sessionStorage whenever tab changes
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     sessionStorage.setItem('activeTab', tab);
@@ -46,9 +46,11 @@ export default function Home() {
         }
 
         if (targetClubId) {
-          const { data } = await supabase.from('clubs').select('theme_color, theme_font, logo_url').eq('id', targetClubId).single();
+          // Added 'name' to the select query
+          const { data } = await supabase.from('clubs').select('name, theme_color, theme_font, logo_url').eq('id', targetClubId).single();
           if (data) {
             setTheme({ 
+              name: data.name || 'FP',
               color: data.theme_color || '#10b981', 
               font: data.theme_font || 'Inter',
               logo: data.logo_url || ''
@@ -91,7 +93,6 @@ export default function Home() {
 
   return (
     <>
-      {/* CLEANED STYLE INJECTION: ONLY SETS THE FONT AND CSS VARIABLE */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --brand-color: ${theme.color};
@@ -104,7 +105,14 @@ export default function Home() {
         
         <header className="sticky top-0 p-4 border-b border-zinc-800 flex justify-between items-center bg-black/80 backdrop-blur-md z-40">
           <div className="flex items-center gap-3">
-            {theme.logo && <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover bg-zinc-900 border border-zinc-800" alt="Club Logo" />}
+            {/* LOGO FALLBACK LOGIC ADDED HERE */}
+            {theme.logo ? (
+              <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover bg-zinc-900 border border-zinc-800" alt="Club Logo" />
+            ) : (
+              <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase tracking-tighter shadow-inner">
+                {theme.name.substring(0, 2)}
+              </div>
+            )}
             <div>
               <h1 className="text-xl font-black italic uppercase tracking-tighter text-brand">Fees Please</h1>
               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none">
@@ -118,6 +126,10 @@ export default function Home() {
         </header>
 
         <main className="flex-1 overflow-y-auto pb-24 px-4 pt-4">
+          <div className="mb-6 z-30 relative">
+            <ClubSwitcher />
+          </div>
+
           {activeTab === "gameday" && <GameDay />}
           {activeTab === "ledger" && <Ledger />}
           {activeTab === "setup" && session && <Setup />}
@@ -139,7 +151,6 @@ export default function Home() {
           </div>
         </nav>
 
-        {/* SIDEBAR OVERLAY */}
         {isSidebarOpen && (
           <div className="fixed inset-0 z-[100] flex justify-end">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
@@ -172,11 +183,9 @@ export default function Home() {
                   <i className="fa-solid fa-arrow-right-from-bracket"></i> Log Out
                 </button>
               </div>
-
             </div>
           </div>
         )}
-
       </div>
     </>
   );
