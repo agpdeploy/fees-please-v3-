@@ -9,7 +9,17 @@ export default function Login() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) setError(error.message);
+  };
+
+  const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -60,32 +70,47 @@ export default function Login() {
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-2xl animate-in fade-in duration-300">
             <h2 className="text-white font-black uppercase tracking-widest text-sm mb-6 text-center">Welcome</h2>
             
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-sm text-white outline-none focus:border-emerald-500 transition-colors text-center"
-                />
-              </div>
-              
-              {error && (
-                <div className="text-red-500 text-[10px] uppercase tracking-widest font-black bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-center">
-                  <i className="fa-solid fa-triangle-exclamation mr-1"></i> {error}
-                </div>
-              )}
-
+            <div className="space-y-4">
               <button
-                type="submit"
-                disabled={loading || !email}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50 shadow-lg"
+                onClick={handleGoogleLogin}
+                className="w-full bg-white hover:bg-gray-100 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-lg flex items-center justify-center gap-3"
               >
-                {loading ? "Sending..." : "Continue with Email"}
+                <i className="fa-brands fa-google text-base"></i>
+                Continue with Google
               </button>
-            </form>
+
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-zinc-800"></div></div>
+                <div className="relative flex justify-center"><span className="bg-zinc-900 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-600">Or use email</span></div>
+              </div>
+
+              <form onSubmit={handleMagicLink} className="space-y-4">
+                <div>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-sm text-white outline-none focus:border-emerald-500 transition-colors text-center"
+                  />
+                </div>
+                
+                {error && (
+                  <div className="text-red-500 text-[10px] uppercase tracking-widest font-black bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-center">
+                    <i className="fa-solid fa-triangle-exclamation mr-1"></i> {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || !email}
+                  className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {loading ? "Sending..." : "Send Magic Link"}
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>
