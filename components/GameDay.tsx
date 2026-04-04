@@ -9,6 +9,9 @@ export default function GameDay() {
   const { profile } = useProfile();
   const { activeClubId } = useActiveClub();
 
+  // Theme State
+  const [themeColor, setThemeColor] = useState("#10b981");
+
   // Team Selection State
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
@@ -37,6 +40,15 @@ export default function GameDay() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000); 
   };
+
+  // Fetch Theme Color
+  useEffect(() => {
+    if (activeClubId) {
+      supabase.from('clubs').select('theme_color').eq('id', activeClubId).single().then(({data}) => {
+        if (data?.theme_color) setThemeColor(data.theme_color);
+      });
+    }
+  }, [activeClubId]);
 
   // 1. Fetch Teams (RBAC & Multi-tenant)
   useEffect(() => {
@@ -98,38 +110,53 @@ export default function GameDay() {
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
     
-    // Using the explicit join fix from today to avoid relationship errors
+    // Two-step fetch
     const { data: squadRows, error: squadError } = await supabase
         .from('match_squads')
-        .select('*, players:player_id(*)') 
+        .select('player_id') 
         .eq('fixture_id', activeFixture.id);
     
-    if (squadError) console.error("SQUAD FETCH ERROR:", squadError.message);
+    if (squadError) {
+      console.error("SQUAD FETCH ERROR:", squadError.message);
+      return;
+    }
 
     if (squadRows && squadRows.length > 0) {
-      const playersList = squadRows.map(row => row.players).filter(Boolean);
-      const playerIds = playersList.map(p => p.id);
+      const playerIds = squadRows.map(row => row.player_id);
       
-      setSquad(playersList.sort((a, b) => (a.first_name || "").localeCompare(b.first_name || "")));
+      const { data: playerDetails, error: playersError } = await supabase
+        .from("players")
+        .select("*")
+        .in("id", playerIds);
       
-      // Fetch historical transactions to calculate current session debt/payment status
-      const { data: txData } = await supabase.from("transactions").select("player_id, amount, transaction_type, fixture_id").in("player_id", playerIds);
-      
-      const debts: Record<string, number> = {};
-      const paidToday: string[] = []; 
-      playerIds.forEach(id => debts[id] = 0);
-      
-      if (txData) {
-        txData.forEach(tx => {
-          if (tx.transaction_type === 'fee') debts[tx.player_id] += Number(tx.amount);
-          if (tx.transaction_type === 'payment') {
-            debts[tx.player_id] -= Number(tx.amount);
-            if (tx.fixture_id === activeFixture.id && !paidToday.includes(tx.player_id)) paidToday.push(tx.player_id);
-          }
-        });
+      if (playersError) {
+        console.error("DETAILS FETCH ERROR:", playersError.message);
       }
-      setPlayerDebts(debts);
-      setPaidPlayerIds(paidToday);
+
+      if (playerDetails) {
+        setSquad(playerDetails.sort((a, b) => (a.first_name || "").localeCompare(b.first_name || "")));
+        
+        const { data: txData } = await supabase
+          .from("transactions")
+          .select("player_id, amount, transaction_type, fixture_id")
+          .in("player_id", playerIds);
+        
+        const debts: Record<string, number> = {};
+        const paidToday: string[] = []; 
+        playerIds.forEach(id => debts[id] = 0);
+        
+        if (txData) {
+          txData.forEach(tx => {
+            if (tx.transaction_type === 'fee') debts[tx.player_id] += Number(tx.amount);
+            if (tx.transaction_type === 'payment') {
+              debts[tx.player_id] -= Number(tx.amount);
+              if (tx.fixture_id === activeFixture.id && !paidToday.includes(tx.player_id)) paidToday.push(tx.player_id);
+            }
+          });
+        }
+        setPlayerDebts(debts);
+        setPaidPlayerIds(paidToday);
+      }
     } else { 
       setSquad([]); 
     }
@@ -148,7 +175,6 @@ export default function GameDay() {
       const matchFee = player.is_member ? teamFees.member : teamFees.casual;
       const debt = Math.max(0, playerDebts[id] || 0);
       setSelectedPlayerIds(prev => [...prev, id]);
-      // Default to Cash and full Match Fee + Debt
       setPaymentData(prev => ({ ...prev, [id]: { amount: matchFee + debt, method: 'cash' } }));
     }
   }
@@ -157,13 +183,12 @@ export default function GameDay() {
     setPaymentData(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
   }
 
-  // Calculated Views
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
   const grandTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0);
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
 
-  // Quick Add Logic (Restored)
+  // Quick Add Logic
   async function openQuickAdd() {
     if (!activeClubId) return;
     const { data } = await supabase.from("players").select("*").eq("club_id", activeClubId);
@@ -192,7 +217,6 @@ export default function GameDay() {
         const matchFee = player.is_member ? teamFees.member : teamFees.casual;
         const data = paymentData[player.id];
 
-        // Record the Match Fee Liability
         await supabase.from("transactions").insert([{ 
           player_id: player.id, 
           team_id: selectedTeamId, 
@@ -202,7 +226,6 @@ export default function GameDay() {
           transaction_type: 'fee' 
         }]);
 
-        // Record the Actual Payment if they paid something
         if (data && data.amount > 0) {
           await supabase.from("transactions").insert([{ 
             player_id: player.id, 
@@ -252,10 +275,9 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* Team Selection Dropdown (Admins Only) */}
       {teams.length > 1 && (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
-          <label className="text-[10px] text-emerald-500 uppercase font-black tracking-widest block mb-2 ml-1">Admin View</label>
+          <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
           <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-bold">
             <option value="" disabled>-- Select a Team --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -263,18 +285,20 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* Match Header */}
       {selectedTeamId && activeFixture ? (
-        <div className="bg-[#111] border border-emerald-900/30 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+        <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
+          {/* THEME APPLIED: Left Accent Bar */}
+          <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-black italic text-emerald-500 uppercase tracking-tighter">vs {activeFixture.opponent}</h2>
+              {/* THEME APPLIED: Header Text */}
+              <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
               <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
                 {new Date(activeFixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               </p>
             </div>
-            <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 text-emerald-500 hover:bg-zinc-800 flex items-center justify-center transition-colors shadow-inner">
+            {/* THEME APPLIED: Icon Color */}
+            <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center transition-colors shadow-inner" style={{ color: themeColor }}>
               <i className="fa-solid fa-user-plus text-lg"></i>
             </button>
           </div>
@@ -285,11 +309,11 @@ export default function GameDay() {
         </div>
       ) : null}
 
-      {/* Quick Select Squad Grid */}
       {activeFixture && (
         <div className="mb-4">
           <div className="flex justify-between items-center mb-4 px-1">
-             <h2 className="text-[11px] font-black uppercase italic text-emerald-500 tracking-widest">To Pay ({squadToPay.length})</h2>
+             {/* THEME APPLIED: Section Label */}
+             <h2 className="text-[11px] font-black uppercase italic tracking-widest" style={{ color: themeColor }}>To Pay ({squadToPay.length})</h2>
              <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-600 hover:text-zinc-400">Clear All</button>
           </div>
           
@@ -304,8 +328,15 @@ export default function GameDay() {
                 const isSelected = selectedPlayerIds.includes(player.id);
                 const debt = Math.max(0, playerDebts[player.id] || 0);
                 const displayName = `${player.first_name} ${player.last_name ? player.last_name.charAt(0) + '.' : ''}`;
+                
                 return (
-                  <button key={player.id} onClick={() => togglePlayerSelection(player.id)} className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all relative ${isSelected ? 'bg-emerald-500 text-black shadow-[0_0_15_rgba(16,185,129,0.3)] scale-[1.02]' : 'bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600'}`}>
+                  <button 
+                    key={player.id} 
+                    onClick={() => togglePlayerSelection(player.id)} 
+                    // THEME APPLIED: Player Pill Selected State & Glow
+                    className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600'}`}
+                    style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
+                  >
                     {displayName}
                     {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-zinc-950"></div>}
                   </button>
@@ -314,7 +345,6 @@ export default function GameDay() {
             )}
           </div>
 
-          {/* Paid Section */}
           {squadPaid.length > 0 && (
             <div>
               <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3 px-1 mt-6 border-t border-zinc-800 pt-4">Paid Today ({squadPaid.length})</h2>
@@ -331,7 +361,6 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* Dynamic Payment Cards */}
       {selectedPlayers.length > 0 && (
         <div className="space-y-4 animate-in slide-in-from-bottom-6 duration-300">
           <div className="space-y-3">
@@ -349,18 +378,27 @@ export default function GameDay() {
                       <h3 className="text-white font-black text-sm uppercase tracking-wide">{player.first_name} {player.last_name}</h3>
                       <div className="flex items-center gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
                         {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
+                        {/* CONSTANT: Money is Emerald */}
                         <span className="text-emerald-500">Fee: ${matchFee}</span>
                       </div>
                     </div>
-                    {/* Method Toggle */}
                     <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+                      {/* CONSTANT: Cash toggle remains Emerald */}
                       <button onClick={() => updatePlayerData(player.id, 'method', 'cash')} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-money-bill-wave"></i></button>
-                      <button onClick={() => updatePlayerData(player.id, 'method', 'card')} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'card' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-credit-card"></i></button>
+                      
+                      {/* THEME APPLIED: Card toggle uses themeColor */}
+                      <button 
+                        onClick={() => updatePlayerData(player.id, 'method', 'card')} 
+                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'card' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}
+                        style={data.method === 'card' ? { backgroundColor: themeColor } : {}}
+                      >
+                        <i className="fa-solid fa-credit-card"></i>
+                      </button>
                     </div>
                   </div>
-                  {/* Amount Input */}
                   <div className="bg-[#111] border border-zinc-800 rounded-2xl p-3 flex justify-between items-center">
                     <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
+                    {/* CONSTANT: Input amount remains Emerald */}
                     <input type="number" value={data.amount} onChange={(e) => updatePlayerData(player.id, 'amount', Number(e.target.value))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
                   </div>
                 </div>
@@ -368,7 +406,6 @@ export default function GameDay() {
             })}
           </div>
 
-          {/* Umpire Toggle & Batch Save Button */}
           <div className="pt-4 space-y-4">
             {activeFixture.umpire_fee > 0 && (
               <div className="bg-[#1A1A1A] border border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer" onClick={() => setPayUmpire(!payUmpire)}>
@@ -380,30 +417,36 @@ export default function GameDay() {
             )}
             <div className="flex justify-between items-end px-2">
               <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">Total Collected:</span>
+              {/* CONSTANT: Total collected remains Emerald */}
               <span className="text-4xl font-black italic text-emerald-500">${grandTotal.toFixed(2)}</span>
             </div>
-            <button onClick={processBatchPayments} disabled={isProcessing} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50">
+            {/* THEME APPLIED: Save Button */}
+            <button 
+              onClick={processBatchPayments} 
+              disabled={isProcessing} 
+              className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50"
+              style={{ backgroundColor: themeColor }}
+            >
               {isProcessing ? 'Saving...' : `Save ${selectedPlayers.length} Payments`}
             </button>
           </div>
         </div>
       )}
 
-      {/* Quick Add Modal */}
       {isQuickAddOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
           <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl">
             <div className="p-5 flex justify-between items-center border-b border-zinc-800">
-              <h2 className="text-lg font-black italic text-emerald-500 uppercase tracking-tighter">Add to Squad</h2>
+              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Add to Squad</h2>
               <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500" />
               <div className="space-y-2">
                 {availablePlayers.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
                   <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl hover:bg-zinc-800 transition-colors text-left group">
                     <span className="font-bold text-white text-sm">{p.first_name} {p.last_name}</span>
-                    <i className="fa-solid fa-plus text-emerald-500"></i>
+                    <i className="fa-solid fa-plus" style={{ color: themeColor }}></i>
                   </button>
                 ))}
               </div>

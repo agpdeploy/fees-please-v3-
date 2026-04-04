@@ -9,6 +9,9 @@ export default function Ledger() {
   const { profile } = useProfile();
   const { activeClubId } = useActiveClub();
 
+  // Theme State
+  const [themeColor, setThemeColor] = useState("#10b981");
+
   // --- STATE ---
   const [teams, setTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>("");
@@ -44,6 +47,15 @@ export default function Ledger() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000); 
   };
+
+  // Fetch Theme Color
+  useEffect(() => {
+    if (activeClubId) {
+      supabase.from('clubs').select('theme_color').eq('id', activeClubId).single().then(({data}) => {
+        if (data?.theme_color) setThemeColor(data.theme_color);
+      });
+    }
+  }, [activeClubId]);
 
   // --- 1. LOAD TEAMS (WITH RBAC) ---
   useEffect(() => {
@@ -202,7 +214,7 @@ export default function Ledger() {
       {/* 1. TEAM SELECTOR */}
       {teams.length > 1 && (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
-          <label className="text-[10px] text-emerald-500 uppercase font-black tracking-widest block mb-2 ml-1">Viewing Ledger As</label>
+          <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Viewing Ledger As</label>
           <select value={activeTeamId} onChange={(e) => setActiveTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-bold">
             <option value="" disabled>-- Select a Team --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -214,10 +226,14 @@ export default function Ledger() {
         <>
           {/* 2. SEASON AUDIT CARD */}
           <div className="bg-[#1A1A1A] border border-zinc-800 rounded-3xl p-5 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600"></div>
+            {/* THEME APPLIED: Top Accent Bar */}
+            <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: themeColor }}></div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-black uppercase italic text-emerald-500 tracking-widest">Season Audit</h2>
-              <div className="bg-zinc-800 rounded-xl px-3 py-1.5 text-sm font-black text-white border border-zinc-700">
+              {/* THEME APPLIED: Header Text */}
+              <h2 className="text-sm font-black uppercase italic tracking-widest" style={{ color: themeColor }}>Season Audit</h2>
+              
+              {/* CONSTANT: NET Pill Logic remains Emerald/Red */}
+              <div className={`bg-zinc-800 rounded-xl px-3 py-1.5 text-sm font-black border border-zinc-700 ${overallNet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                 ${overallNet.toFixed(0)} NET
               </div>
             </div>
@@ -237,9 +253,10 @@ export default function Ledger() {
                     <tr key={audit.id} onClick={() => setSelectedFixture(audit)} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-800/50 cursor-pointer transition-colors">
                       <td className="py-4 text-white">{audit.opponent}</td>
                       <td className="py-4 text-center text-zinc-400">${audit.fee}</td>
-                      <td className="py-4 text-center text-emerald-400">${audit.cash}</td>
+                      {/* CONSTANT: Money columns remain Emerald/Blue/Red */}
+                      <td className="py-4 text-center text-emerald-500">${audit.cash}</td>
                       <td className="py-4 text-center text-blue-400">${audit.card}</td>
-                      <td className={`py-4 text-right ${audit.net < 0 ? 'text-red-500' : 'text-emerald-400'}`}>${audit.net}</td>
+                      <td className={`py-4 text-right ${audit.net < 0 ? 'text-red-500' : 'text-emerald-500'}`}>${audit.net}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -257,7 +274,7 @@ export default function Ledger() {
                 <>
                   {displayedDebtors.map((player) => (
                     <button key={player.id} onClick={() => openPlayerDetails(player)} className="w-full flex justify-between items-center bg-zinc-900 border border-zinc-800 hover:border-zinc-700 p-4 rounded-2xl transition-all group">
-                      <span className="text-sm font-bold text-white group-hover:text-emerald-500 transition-colors">{player.name}</span>
+                      <span className="text-sm font-bold text-white group-hover:text-emerald-500 transition-colors" style={{ '--tw-text-opacity': '1' } as any}>{player.name}</span>
                       <span className="text-sm font-black text-red-500">${player.owed.toFixed(2)}</span>
                     </button>
                   ))}
@@ -286,7 +303,7 @@ export default function Ledger() {
                   placeholder="Filter Ledger..." 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-full pl-8 pr-3 py-1.5 text-[10px] text-white outline-none focus:border-emerald-900"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-full pl-8 pr-3 py-1.5 text-[10px] text-white outline-none focus:border-zinc-700"
                 />
               </div>
             </div>
@@ -326,11 +343,11 @@ export default function Ledger() {
           <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8">
             <div className="p-5 flex justify-between items-start border-b border-zinc-800">
               <div>
-                <h2 className="text-xl font-black italic text-emerald-500 uppercase tracking-tighter">VS {selectedFixture.opponent}</h2>
+                <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>VS {selectedFixture.opponent}</h2>
                 <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1 flex gap-3">
                   <span>Cash: ${selectedFixture.cash}</span>
                   <span>Card: ${selectedFixture.card}</span>
-                  <span className={selectedFixture.net < 0 ? 'text-red-500' : 'text-emerald-400'}>Net: ${selectedFixture.net}</span>
+                  <span className={selectedFixture.net < 0 ? 'text-red-500' : 'text-emerald-500'}>Net: ${selectedFixture.net}</span>
                 </div>
               </div>
               <button onClick={() => setSelectedFixture(null)} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -353,7 +370,7 @@ export default function Ledger() {
           <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8">
             <div className="p-5 flex justify-between items-start border-b border-zinc-800">
               <div>
-                <h2 className="text-xl font-black italic text-emerald-500 uppercase tracking-tighter">{selectedPlayer.name}</h2>
+                <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>{selectedPlayer.name}</h2>
                 <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Transaction History</div>
               </div>
               <button onClick={() => {setSelectedPlayer(null); setIsManualModalOpen(false);}} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -362,7 +379,7 @@ export default function Ledger() {
             {isManualModalOpen ? (
               <form onSubmit={handleManualSave} className="p-5 space-y-4 animate-in slide-in-from-right-4">
                 <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                  <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 text-white' : 'text-zinc-500'}`}>Payment (+)</button>
+                  <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'text-white' : 'text-zinc-500'}`} style={manualType === 'payment' ? { backgroundColor: themeColor } : {}}>Payment (+)</button>
                   <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-zinc-800 text-red-500' : 'text-zinc-500'}`}>Charge (-)</button>
                 </div>
 
@@ -373,17 +390,17 @@ export default function Ledger() {
                   ))}
                 </select>
 
-                <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-4 text-center text-xl font-black text-white outline-none focus:border-emerald-500" required />
-                <input type="text" placeholder="Method / Note (e.g. Fine, Cash, Refund)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-4 text-center text-xl font-black text-white outline-none focus:border-zinc-500" required />
+                <input type="text" placeholder="Method / Note (e.g. Fine, Cash, Refund)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500" />
                 
-                <button type="submit" disabled={isSaving} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg disabled:opacity-50">
+                <button type="submit" disabled={isSaving} className="w-full text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg disabled:opacity-50" style={{ backgroundColor: themeColor }}>
                   {isSaving ? 'Saving...' : 'Confirm Transaction'}
                 </button>
                 <button type="button" onClick={() => setIsManualModalOpen(false)} className="w-full text-[10px] text-zinc-500 hover:text-white uppercase font-black py-2 tracking-widest">Back to History</button>
               </form>
             ) : (
               <div className="p-5 overflow-y-auto flex-1 space-y-3">
-                <button onClick={() => setIsManualModalOpen(true)} className="w-full py-4 border border-emerald-900/30 bg-emerald-900/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-500 transition-colors flex items-center justify-center gap-2 mb-2">
+                <button onClick={() => setIsManualModalOpen(true)} className="w-full py-4 border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mb-2" style={{ color: themeColor }}>
                   <i className="fa-solid fa-plus"></i> Add Manual Transaction
                 </button>
                 {transactions.filter(tx => tx.player_id === selectedPlayer.id).map(tx => (
