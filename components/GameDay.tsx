@@ -14,7 +14,14 @@ export default function GameDay() {
   const [loading, setLoading] = useState(true);
   
   const [nextGame, setNextGame] = useState<any>(null);
+  
+  // --- RESTORED STATES FOR QUICK ADD & SQUAD ---
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [matchSquad, setMatchSquad] = useState<any[]>([]);
+  const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
 
+  // 1. Fetch Teams
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
@@ -37,30 +44,24 @@ export default function GameDay() {
       }
 
       const { data, error } = await query;
-
       if (!error && data) {
         setTeams(data);
-        if (data.length === 1) {
-          setSelectedTeamId(data[0].id);
-        } else if (data.length > 0 && !data.find(t => t.id === selectedTeamId)) {
-          setSelectedTeamId(""); 
-        }
+        if (data.length === 1) setSelectedTeamId(data[0].id);
+        else if (data.length > 0 && !data.find(t => t.id === selectedTeamId)) setSelectedTeamId(""); 
       }
       setLoading(false);
     }
-
     fetchTeams();
   }, [profile, activeClubId]);
 
+  // 2. Fetch Fixture
   useEffect(() => {
     async function fetchNextGame() {
       if (!selectedTeamId) {
         setNextGame(null);
         return;
       }
-
       const today = new Date().toISOString().split('T')[0];
-
       const { data, error } = await supabase
         .from('fixtures') 
         .select('*')
@@ -70,38 +71,75 @@ export default function GameDay() {
         .limit(1)
         .single();
 
-      if (error) {
-        setNextGame(null); 
-      } else {
-        setNextGame(data);
-      }
+      if (!error) setNextGame(data);
+      else setNextGame(null);
     }
-    
     fetchNextGame();
   }, [selectedTeamId]);
 
-  if (loading) {
-    return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest animate-pulse">Loading GameDay...</div>;
-  }
+  // 3. Fetch Match Squad & Available Players (RESTORED)
+  useEffect(() => {
+    async function loadSquadData() {
+      if (!nextGame || !selectedTeamId) return;
 
-  if (teams.length === 0) {
-    return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest">No teams assigned yet.</div>;
-  }
+      // This fetches the players currently linked to this fixture in match_squads
+      const { data: squadData } = await supabase
+        .from('match_squads')
+        .select('*, players(*)') // Assumes you linked match_squads to a 'players' table
+        .eq('fixture_id', nextGame.id);
+      
+      if (squadData) setMatchSquad(squadData);
+
+      // This fetches everyone in the club/team to populate the Quick Add list
+      const { data: playersData } = await supabase
+        .from('players') // Adjust if you pull from 'profiles' instead
+        .select('*')
+        .eq('team_id', selectedTeamId);
+
+      if (playersData) setAvailablePlayers(playersData);
+    }
+    loadSquadData();
+  }, [nextGame, selectedTeamId]);
+
+  // --- RESTORED ADD FUNCTION ---
+  const handleAddToSquad = async (player: any) => {
+    if (!nextGame) return;
+
+    // Optimistic UI update so it feels instant
+    setMatchSquad([...matchSquad, { players: player }]);
+    setShowQuickAdd(false);
+    setSearchQuery("");
+
+    // Write to database
+    await supabase.from('match_squads').insert({
+      fixture_id: nextGame.id,
+      player_id: player.id // Ensure this matches your column name
+    });
+  };
+
+  const filteredPlayers = availablePlayers.filter(p => 
+    (p.first_name + " " + p.last_name).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.email && p.email.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest animate-pulse">Loading GameDay...</div>;
+  if (teams.length === 0) return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest">No teams assigned yet.</div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
       
+      {/* Admin View Dropdown */}
       {teams.length > 1 && (
-        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem]">
-          <label className="text-[10px] font-black text-brand uppercase tracking-widest mb-2 block pl-2">
+        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
+          <label className="text-[10px] text-brand uppercase font-black block mb-2 ml-1 tracking-widest">
             Admin View
           </label>
           <select
             value={selectedTeamId}
             onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white font-bold outline-none focus:border-brand transition-colors"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-bold"
           >
-            <option value="" disabled>Select a team...</option>
+            <option value="" disabled>-- Select a Team --</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
@@ -112,34 +150,51 @@ export default function GameDay() {
       {selectedTeamId ? (
         <>
           {nextGame ? (
-            <div>
-              {/* RESTORED SLEEK UI */}
-              <div className="bg-zinc-900/80 border border-zinc-800 rounded-[2rem] p-5 flex justify-between items-center relative overflow-hidden shadow-lg">
-                
-                {/* Left accent line */}
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-brand"></div>
-
-                <div className="pl-3">
-                  <h2 className="text-brand font-black italic uppercase tracking-widest text-xl mb-1">
-                    VS {nextGame.opponent}
-                  </h2>
-                  <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">
-                    {new Date(nextGame.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()}
-                  </p>
+            <>
+              {/* RESTORED GAME CARD UI (From your HTML snippet) */}
+              <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-brand"></div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-black italic text-brand uppercase tracking-tighter">
+                      vs {nextGame.opponent}
+                    </h2>
+                    <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
+                       {new Date(nextGame.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setShowQuickAdd(true)}
+                    className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 text-brand flex items-center justify-center transition-colors hover:bg-zinc-800"
+                  >
+                    <i className="fa-solid fa-user-plus"></i>
+                  </button>
                 </div>
-
-                <button className="w-12 h-12 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-full flex items-center justify-center text-brand transition-colors shadow-inner shrink-0">
-                  <i className="fa-solid fa-user-plus text-lg"></i>
-                </button>
               </div>
 
-              {/* Restored 'TO PAY' section */}
-              <div className="mt-8 px-4">
-                <h3 className="text-brand font-black italic uppercase tracking-widest text-[11px]">To Pay (0)</h3>
+              {/* RESTORED "TO PAY" SQUAD LIST */}
+              <div className="mb-4">
+                <h2 className="text-[11px] font-black uppercase italic text-brand tracking-widest mb-4 px-1">
+                  To Pay ({matchSquad.length})
+                </h2>
+                <div className="flex flex-wrap gap-2.5">
+                  {matchSquad.length > 0 ? (
+                    matchSquad.map((squadItem, i) => {
+                      const p = squadItem.players || squadItem; // Fallback depending on DB join
+                      return (
+                        <button key={i} className="px-4 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all relative bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600">
+                          {p.first_name} {p.last_name?.charAt(0) || p.email?.charAt(0)}.
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="text-zinc-600 text-[10px] font-black uppercase tracking-widest px-1">Squad is empty</div>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           ) : (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 text-center shadow-lg">
+            <div className="bg-[#111] border border-zinc-800 rounded-3xl p-6 text-center shadow-2xl">
               <h2 className="text-white font-black italic uppercase tracking-widest text-lg mb-2">Next Fixture</h2>
               <p className="text-zinc-500 text-xs uppercase font-bold tracking-widest">
                 No upcoming games scheduled.
@@ -151,9 +206,57 @@ export default function GameDay() {
         teams.length > 1 && (
           <div className="text-center p-10 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
             <i className="fa-solid fa-arrow-up text-zinc-600 text-2xl mb-3 animate-bounce"></i>
-            <div className="text-zinc-500 text-xs font-black uppercase tracking-widest">Select a team above to start GameDay</div>
+            <div className="text-zinc-500 text-xs font-black uppercase tracking-widest">Select a team above</div>
           </div>
         )
+      )}
+
+      {/* RESTORED QUICK ADD MODAL (From your screenshot) */}
+      {showQuickAdd && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[80vh]">
+            
+            <div className="flex justify-between items-center p-5 border-b border-zinc-800/50">
+              <h3 className="text-brand font-black italic uppercase tracking-widest text-[11px]">Quick Add</h3>
+              <button onClick={() => setShowQuickAdd(false)} className="text-zinc-500 hover:text-white transition-colors">
+                <i className="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-zinc-800/50">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-brand transition-colors"
+                autoFocus
+              />
+            </div>
+
+            <div className="overflow-y-auto p-4 space-y-2">
+              {filteredPlayers.length > 0 ? (
+                filteredPlayers.map((player) => (
+                  <div key={player.id} className="flex justify-between items-center bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                    <span className="text-white font-bold text-sm">
+                      {player.first_name || player.email} <span className="text-zinc-500 font-normal">({player.role || 'Player'})</span>
+                    </span>
+                    <button 
+                      onClick={() => handleAddToSquad(player)}
+                      className="text-brand text-2xl font-light hover:scale-110 transition-transform"
+                    >
+                      +
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-zinc-500 text-[10px] font-black uppercase tracking-widest">
+                  No players found
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
