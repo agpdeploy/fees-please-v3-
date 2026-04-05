@@ -109,6 +109,18 @@ export default function GameDay() {
     fetchTeams();
   }, [profile, roles, activeClubId]);
 
+  useEffect(() => {
+    if (!selectedTeamId) return;
+    async function loadTeamData() {
+      const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
+      if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
+      const today = new Date().toISOString().split('T')[0];
+      const { data: fixData } = await supabase.from('fixtures').select('*').eq('team_id', selectedTeamId).gte('match_date', today).order('match_date', { ascending: true }).limit(1).maybeSingle();
+      setActiveFixture(fixData || null);
+    }
+    loadTeamData();
+  }, [selectedTeamId]);
+
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
     const { data: squadRows } = await supabase.from('match_squads').select('player_id').eq('fixture_id', activeFixture.id);
@@ -131,6 +143,8 @@ export default function GameDay() {
         }
         setPlayerDebts(debts); setPaidPlayerIds(paidToday);
       }
+    } else {
+      setSquad([]);
     }
   }
   useEffect(() => { loadSquadData(); }, [activeFixture]);
@@ -155,7 +169,6 @@ export default function GameDay() {
 
     const callbackUrl = "https://feesplease.app/gameday";
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
@@ -184,7 +197,6 @@ export default function GameDay() {
     }
 
     // 2. Friendly Missing App Check
-    // If the browser hasn't been backgrounded after 2.5 seconds, it means the app switch failed.
     setTimeout(() => {
       if (!document.hidden) {
         showToast("Square POS App not found. Please install it from the App Store or Google Play.", "error");
@@ -231,6 +243,24 @@ export default function GameDay() {
     } catch (err) { showToast("Error", "error"); } finally { setIsProcessing(false); }
   }
 
+  async function openQuickAdd() {
+    if (!activeClubId) return;
+    const { data } = await supabase.from("players").select("*").eq("club_id", activeClubId);
+    if (data) {
+      const currentIds = squad.map(p => p.id);
+      setAvailablePlayers(data.filter(p => !currentIds.includes(p.id)));
+    }
+    setIsQuickAddOpen(true);
+  }
+
+  async function addPlayerToMatch(playerId: string) {
+    if (!activeFixture) return;
+    await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
+    setIsQuickAddOpen(false);
+    showToast("Player Added to Squad");
+    loadSquadData(); 
+  }
+
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
@@ -241,25 +271,46 @@ export default function GameDay() {
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative overflow-x-hidden">
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-[200] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-[200] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i> {toast.msg}
         </div>
       )}
 
-      {selectedTeamId && activeFixture && (
+      {/* RESTORED: Admin Team Selector */}
+      {teams.length > 1 && (
+        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
+          <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
+          <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-bold">
+            <option value="" disabled>-- Select a Team --</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* RESTORED: Dynamic Fixture Header / Empty State */}
+      {selectedTeamId && activeFixture ? (
         <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-black italic uppercase" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
               <p className="text-xs text-zinc-400 font-bold uppercase">{new Date(activeFixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-              <button onClick={downloadSquadImage} className="mt-3 text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">Export Graphic</button>
+              <button onClick={downloadSquadImage} className="mt-3 text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20">
+                <i className="fa-solid fa-camera mr-2"></i> Export Graphic
+              </button>
             </div>
-            <button onClick={() => setIsQuickAddOpen(true)} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-inner" style={{ color: themeColor }}><i className="fa-solid fa-user-plus text-lg"></i></button>
+            <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
+              <i className="fa-solid fa-user-plus text-lg"></i>
+            </button>
           </div>
         </div>
-      )}
+      ) : selectedTeamId ? (
+        <div className="text-center py-10 bg-zinc-900 rounded-3xl border border-zinc-800">
+          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No upcoming fixtures found.</p>
+        </div>
+      ) : null}
 
+      {/* Hidden Squad Image Target */}
       <div className="absolute top-[-9999px] left-[-9999px]">
         <div ref={squadImageRef} className="w-[1080px] h-[1080px] bg-[#111] p-12 flex flex-col relative" style={{ backgroundImage: 'radial-gradient(circle at 50% 0%, #222 0%, #111 70%)' }}>
           <div className="absolute top-0 left-0 w-full h-4" style={{ backgroundColor: themeColor }}></div>
@@ -271,18 +322,42 @@ export default function GameDay() {
 
       {activeFixture && (
         <div className="mb-4">
-          <h2 className="text-[11px] font-black uppercase italic tracking-widest mb-4 px-1" style={{ color: themeColor }}>To Pay ({squadToPay.length})</h2>
-          <div className="flex flex-wrap gap-2.5 mb-6">
-            {squadToPay.map(player => (
-              <button key={player.id} onClick={() => togglePlayerSelection(player.id)} className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase transition-all ${selectedPlayerIds.includes(player.id) ? 'text-black scale-[1.02]' : 'bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50'}`} style={selectedPlayerIds.includes(player.id) ? { backgroundColor: themeColor } : {}}>
-                {player.first_name} {player.last_name?.charAt(0)}.
-                {Math.max(0, playerDebts[player.id] || 0) > 0 && !selectedPlayerIds.includes(player.id) && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>}
-              </button>
-            ))}
+          <div className="flex justify-between items-center mb-4 px-1">
+             <h2 className="text-[11px] font-black uppercase italic tracking-widest" style={{ color: themeColor }}>To Pay ({squadToPay.length})</h2>
+             <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-600 hover:text-zinc-400">Clear All</button>
           </div>
+          
+          <div className="flex flex-wrap gap-2.5 mb-6">
+            {squadToPay.length === 0 && squadPaid.length > 0 ? (
+              <div className="w-full text-center py-6 border border-dashed border-emerald-900/50 rounded-2xl bg-emerald-900/10">
+                <i className="fa-solid fa-check-double text-2xl text-emerald-500 mb-2"></i>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">All players settled!</p>
+              </div>
+            ) : (
+              squadToPay.map(player => {
+                const isSelected = selectedPlayerIds.includes(player.id);
+                const debt = Math.max(0, playerDebts[player.id] || 0);
+                return (
+                  <button 
+                    key={player.id} 
+                    onClick={() => togglePlayerSelection(player.id)} 
+                    className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600'}`}
+                    style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
+                  >
+                    {player.first_name} {player.last_name?.charAt(0)}.
+                    {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-zinc-950"></div>}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
           {squadPaid.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-4 border-t border-zinc-800">
-               {squadPaid.map(p => (<div key={p.id} className="px-3 py-2 rounded-xl font-bold text-[10px] uppercase bg-zinc-900 text-zinc-600 flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500/50"></i> {p.first_name} {p.last_name?.charAt(0)}.</div>))}
+            <div>
+              <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3 px-1 mt-6 border-t border-zinc-800 pt-4">Paid Today ({squadPaid.length})</h2>
+              <div className="flex flex-wrap gap-2">
+                 {squadPaid.map(p => (<div key={p.id} className="px-3 py-2 rounded-xl font-bold text-[10px] uppercase bg-zinc-900 text-zinc-600 border border-zinc-800/50 flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500/50"></i> {p.first_name} {p.last_name?.charAt(0)}.</div>))}
+              </div>
             </div>
           )}
         </div>
@@ -292,17 +367,24 @@ export default function GameDay() {
         <div className="space-y-4 animate-in slide-in-from-bottom-6">
           {selectedPlayers.map(player => {
             const data = paymentData[player.id];
+            const debt = Math.max(0, playerDebts[player.id] || 0);
+            const matchFee = player.is_member ? teamFees.member : teamFees.casual;
+
             return (
               <div key={player.id} className="bg-[#1A1A1A] border border-zinc-800 rounded-3xl p-5 shadow-lg relative">
+                <button onClick={() => togglePlayerSelection(player.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-zinc-400"><i className="fa-solid fa-xmark"></i></button>
                 <div className="flex justify-between items-start mb-4 pr-6">
                   <div>
                     <h3 className="text-white font-black text-sm uppercase">{player.first_name} {player.last_name}</h3>
-                    <div className="flex gap-2 mt-1 text-[9px] font-black uppercase text-emerald-500">Total Owed: ${data?.amount}</div>
+                    <div className="flex gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
+                      {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
+                      <span className="text-emerald-500">Fee: ${matchFee}</span>
+                    </div>
                   </div>
-                  <div className="flex bg-zinc-900 rounded-xl p-1">
+                  <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
                     <button 
                       onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
-                      className={`w-10 h-8 rounded-lg text-xs ${data?.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500'}`}
+                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-white'}`}
                     >
                       <i className="fa-solid fa-money-bill-wave"></i>
                     </button>
@@ -315,21 +397,62 @@ export default function GameDay() {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         initiateTapToPay(player);
                       }} 
-                      className={`w-10 h-8 rounded-lg text-xs text-zinc-500 hover:bg-blue-500 hover:text-white transition-colors`}
+                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-white'}`}
                     >
                       <i className="fa-solid fa-credit-card"></i>
                     </button>
                   </div>
                 </div>
-                <input type="number" value={data?.amount} onChange={(e) => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], amount: Number(e.target.value)}}))} className="w-full bg-[#111] border border-zinc-800 rounded-2xl p-3 text-right text-2xl font-black text-emerald-500 outline-none" />
+                <div className="bg-[#111] border border-zinc-800 rounded-2xl p-3 flex justify-between items-center">
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
+                    <input type="number" value={data?.amount} onChange={(e) => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], amount: Number(e.target.value)}}))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
+                </div>
               </div>
             );
           })}
+          
           <div className="pt-4 space-y-4">
-            <div className="flex justify-between items-end px-2"><span className="text-xs font-black italic text-zinc-500 uppercase">Cash to Save:</span><span className={`text-4xl font-black italic text-emerald-500`}>${Math.abs(netTotal).toFixed(2)}</span></div>
-            <button onClick={processBatchPayments} disabled={isProcessing || selectedPlayers.filter(p => paymentData[p.id]?.method === 'cash').length === 0} className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm" style={{ backgroundColor: themeColor }}>
+            {activeFixture.umpire_fee > 0 && (
+              <div className="bg-[#1A1A1A] border border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer" onClick={() => setPayUmpire(!payUmpire)}>
+                <span className="text-xs font-black uppercase tracking-widest text-zinc-300 flex items-center gap-2"><i className="fa-solid fa-ticket text-zinc-500"></i> Pay Umpire (${activeFixture.umpire_fee})</span>
+                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-800'}`}>
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${payUmpire ? 'translate-x-4' : ''}`}></div>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-between items-end px-2">
+              <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">
+                {netTotal < 0 ? 'Net Outlay:' : 'Total Collected:'}
+              </span>
+              <span className={`text-4xl font-black italic ${netTotal < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                {netTotal < 0 ? '-' : ''}${Math.abs(netTotal).toFixed(2)}
+              </span>
+            </div>
+            <button onClick={processBatchPayments} disabled={isProcessing || selectedPlayers.filter(p => paymentData[p.id]?.method === 'cash').length === 0} className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
               {isProcessing ? 'Saving...' : `Save ${selectedPlayers.filter(p => paymentData[p.id]?.method === 'cash').length} Cash Payments`}
             </button>
+          </div>
+        </div>
+      )}
+
+      {isQuickAddOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4">
+          <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-800">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Add to Squad</h2>
+              <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500" />
+              <div className="space-y-2">
+                {availablePlayers.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
+                  <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl hover:bg-zinc-800 transition-colors text-left group">
+                    <span className="font-bold text-white text-sm">{p.first_name} {p.last_name}</span>
+                    <i className="fa-solid fa-plus" style={{ color: themeColor }}></i>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
