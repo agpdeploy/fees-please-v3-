@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
+import { toPng } from 'html-to-image';
+import { PaymentForm, CreditCard } from 'react-square-web-payments-sdk';
+import { calculateSquareGross } from '@/lib/fees';
 
 export default function GameDay() {
-  const { profile } = useProfile();
+  const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
+  const squadImageRef = useRef<HTMLDivElement>(null);
 
   // Theme State
   const [themeColor, setThemeColor] = useState("#10b981");
@@ -30,6 +34,9 @@ export default function GameDay() {
   const [payUmpire, setPayUmpire] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // Square Modal State
+  const [activeSquarePlayer, setActiveSquarePlayer] = useState<any>(null);
+
   // Quick Add State
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
@@ -61,8 +68,7 @@ export default function GameDay() {
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
-        const { data: roles } = await supabase.from('user_roles').select('team_id').eq('user_id', profile.id).eq('role', 'team_admin');
-        const teamIds = roles?.map(r => r.team_id).filter(Boolean) || [];
+        const teamIds = roles?.filter((r: any) => r.role === 'team_admin').map((r: any) => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) {
           query = query.in('id', teamIds);
         } else {
@@ -81,7 +87,7 @@ export default function GameDay() {
       setLoading(false);
     }
     fetchTeams();
-  }, [profile, activeClubId]);
+  }, [profile, roles, activeClubId, selectedTeamId]);
 
   // 2. Fetch Team Settings & Current Fixture
   useEffect(() => {
@@ -110,7 +116,6 @@ export default function GameDay() {
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
     
-    // Two-step fetch
     const { data: squadRows, error: squadError } = await supabase
         .from('match_squads')
         .select('player_id') 
@@ -164,6 +169,22 @@ export default function GameDay() {
 
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
+  // Image Generation Logic
+  async function downloadSquadImage() {
+    if (!squadImageRef.current) return;
+    try {
+      showToast("Generating image...");
+      const dataUrl = await toPng(squadImageRef.current, { cacheBust: true, quality: 1 });
+      const link = document.createElement('a');
+      link.download = `Match-Squad-vs-${activeFixture.opponent}.png`;
+      link.href = dataUrl;
+      link.click();
+      showToast("Image Downloaded!");
+    } catch (err) {
+      showToast("Failed to generate image", "error");
+    }
+  }
+
   // Payment Toggles & Selection Logic
   function togglePlayerSelection(id: string) {
     if (selectedPlayerIds.includes(id)) {
@@ -185,7 +206,6 @@ export default function GameDay() {
 
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
   
-  // CALCULATE NET OUTLAY (Grand Total minus Umpire Fee if toggled)
   const grandTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0);
   const netTotal = grandTotal - (payUmpire && activeFixture?.umpire_fee ? activeFixture.umpire_fee : 0);
   
@@ -270,10 +290,10 @@ export default function GameDay() {
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black uppercase tracking-widest animate-pulse">Loading GameDay...</div>;
 
   return (
-    <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
+    <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative overflow-x-hidden">
       
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-[100] animate-in slide-in-from-bottom-5 fade-in ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-[200] animate-in slide-in-from-bottom-5 fade-in ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i>
           {toast.msg}
         </div>
@@ -298,6 +318,9 @@ export default function GameDay() {
               <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
                 {new Date(activeFixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               </p>
+              <button onClick={downloadSquadImage} className="mt-3 text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">
+                <i className="fa-solid fa-camera mr-2"></i> Export Graphic
+              </button>
             </div>
             <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center transition-colors shadow-inner" style={{ color: themeColor }}>
               <i className="fa-solid fa-user-plus text-lg"></i>
@@ -309,6 +332,24 @@ export default function GameDay() {
           <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No upcoming fixtures found.</p>
         </div>
       ) : null}
+
+      {/* Hidden Render Target for the Image */}
+      <div className="absolute top-[-9999px] left-[-9999px]">
+        <div ref={squadImageRef} className="w-[1080px] h-[1080px] bg-[#111] p-12 flex flex-col relative" style={{ backgroundImage: 'radial-gradient(circle at 50% 0%, #222 0%, #111 70%)' }}>
+          <div className="absolute top-0 left-0 w-full h-4" style={{ backgroundColor: themeColor }}></div>
+          <h1 className="text-6xl font-black uppercase italic text-white mb-2">Match Squad</h1>
+          <h2 className="text-4xl font-bold uppercase text-zinc-400 mb-12" style={{ color: themeColor }}>VS {activeFixture?.opponent}</h2>
+          
+          <div className="flex flex-wrap gap-6">
+            {squad.map((player, index) => (
+              <div key={player.id} className="w-[30%] bg-[#1A1A1A] border-l-4 p-6 rounded-xl" style={{ borderColor: themeColor }}>
+                <span className="text-zinc-500 text-2xl font-black mr-4">{index + 1}</span>
+                <span className="text-3xl font-bold text-white uppercase">{player.first_name} {player.last_name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {activeFixture && (
         <div className="mb-4">
@@ -383,10 +424,15 @@ export default function GameDay() {
                     <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
                       <button onClick={() => updatePlayerData(player.id, 'method', 'cash')} className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-white'}`}><i className="fa-solid fa-money-bill-wave"></i></button>
                       
-                      {/* CARD TOGGLE: Now locked to bg-blue-500 when active */}
                       <button 
-                        onClick={() => updatePlayerData(player.id, 'method', 'card')} 
-                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-white'}`}
+                        onClick={() => {
+                          const userRole = roles?.find((r: any) => r.team_id === selectedTeamId || r.club_id === activeClubId);
+                          if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
+                            return showToast("You do not have permission to process card payments.", "error");
+                          }
+                          setActiveSquarePlayer(player);
+                        }} 
+                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors text-zinc-500 hover:text-white hover:bg-blue-500`}
                       >
                         <i className="fa-solid fa-credit-card"></i>
                       </button>
@@ -411,7 +457,6 @@ export default function GameDay() {
               </div>
             )}
             <div className="flex justify-between items-end px-2">
-              {/* DYNAMIC TOTAL: Subtracts Umpire Fee, Turns Red if Negative */}
               <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">
                 {netTotal < 0 ? 'Net Outlay:' : 'Total Collected:'}
               </span>
@@ -452,6 +497,85 @@ export default function GameDay() {
           </div>
         </div>
       )}
+
+      {/* SQUARE PAYMENT MODAL */}
+      {activeSquarePlayer && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-black uppercase italic text-white">Card Payment</h2>
+              <button onClick={() => setActiveSquarePlayer(null)} className="text-zinc-500 hover:text-white">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            
+            <div className="mb-6 p-4 bg-zinc-900 rounded-2xl border border-zinc-800 flex justify-between items-center">
+              <div>
+                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Player</p>
+                <p className="text-white font-bold">{activeSquarePlayer.first_name} {activeSquarePlayer.last_name}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Total to Charge</p>
+                <p className="text-blue-400 font-black text-xl">${calculateSquareGross(paymentData[activeSquarePlayer.id]?.amount || 0)}</p>
+              </div>
+            </div>
+
+            <PaymentForm
+              applicationId={process.env.NEXT_PUBLIC_SQUARE_APP_ID!}
+              locationId={process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!} 
+              cardTokenizeResponseReceived={async (token: any, verifiedBuyer: any) => {
+                if (token.errors) {
+                   showToast("Card Error", "error");
+                   return;
+                }
+                
+                setIsProcessing(true);
+                const grossAmount = calculateSquareGross(paymentData[activeSquarePlayer.id].amount);
+                
+                try {
+                  const res = await fetch('/api/payments/square', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      sourceId: token.token,
+                      amount: grossAmount,
+                      clubId: activeClubId,
+                      playerId: activeSquarePlayer.id,
+                      fixtureId: activeFixture.id
+                    })
+                  });
+                  
+                  if (res.ok) {
+                    await supabase.from("transactions").insert([{ 
+                      player_id: activeSquarePlayer.id, 
+                      team_id: selectedTeamId, 
+                      fixture_id: activeFixture.id, 
+                      club_id: activeClubId,
+                      amount: paymentData[activeSquarePlayer.id].amount, 
+                      transaction_type: 'payment', 
+                      payment_method: 'card' 
+                    }]);
+                    
+                    setPaidPlayerIds(prev => [...prev, activeSquarePlayer.id]);
+                    setSelectedPlayerIds(prev => prev.filter(id => id !== activeSquarePlayer.id));
+                    
+                    showToast("Payment Successful!");
+                    setActiveSquarePlayer(null);
+                  } else {
+                    showToast("Payment Failed", "error");
+                  }
+                } catch (e) {
+                  showToast("Payment Failed", "error");
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
+            >
+              <CreditCard />
+            </PaymentForm>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

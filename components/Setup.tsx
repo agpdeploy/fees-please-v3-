@@ -31,6 +31,11 @@ export default function Setup() {
   const [expenseLabel, setExpenseLabel] = useState("Umpire Fee");
   const [themeColor, setThemeColor] = useState("#10b981");
   const [themeFont, setThemeFont] = useState("Inter");
+  
+  // Square State
+  const [squareAccessToken, setSquareAccessToken] = useState("");
+  const [squareLocationId, setSquareLocationId] = useState("");
+  const [isSquareEnabled, setIsSquareEnabled] = useState(false);
 
   const [fixtureTeamId, setFixtureTeamId] = useState("");
   const [opponent, setOpponent] = useState("");
@@ -114,6 +119,9 @@ export default function Setup() {
       setExpenseLabel(clubData.expense_label || "Umpire Fee");
       setThemeColor(clubData.theme_color || "#10b981");
       setThemeFont(clubData.theme_font || "Inter");
+      setSquareAccessToken(clubData.square_access_token || "");
+      setSquareLocationId(clubData.square_location_id || "");
+      setIsSquareEnabled(clubData.is_square_enabled || false);
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
@@ -190,7 +198,21 @@ export default function Setup() {
  async function saveConfig() {
     setIsSaving(true);
     const generatedSlug = clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    const payload = { name: clubName, logo_url: logoUrl, season_name: seasonName, season_start: seasonStart || null, season_end: seasonEnd || null, default_member_fee: defaultMemberFee, default_casual_fee: defaultCasualFee, expense_label: expenseLabel, theme_color: themeColor, theme_font: themeFont };
+    const payload = { 
+      name: clubName, 
+      logo_url: logoUrl, 
+      season_name: seasonName, 
+      season_start: seasonStart || null, 
+      season_end: seasonEnd || null, 
+      default_member_fee: defaultMemberFee, 
+      default_casual_fee: defaultCasualFee, 
+      expense_label: expenseLabel, 
+      theme_color: themeColor, 
+      theme_font: themeFont,
+      square_access_token: squareAccessToken,
+      square_location_id: squareLocationId,
+      is_square_enabled: isSquareEnabled
+    };
     
     if (clubId && clubId !== 'new') {
       const { error } = await supabase.from("clubs").update(payload).eq("id", clubId);
@@ -236,6 +258,12 @@ export default function Setup() {
     const { error } = await supabase.from("user_roles").delete().eq('id', roleId);
     if (error) showToast(error.message, "error");
     else { showToast("Access revoked."); loadClubData(); }
+  }
+
+  async function togglePaymentPermission(roleId: string, currentStatus: boolean) {
+    const { error } = await supabase.from("user_roles").update({ can_take_payments: !currentStatus }).eq('id', roleId);
+    if (error) showToast(error.message, "error");
+    else { showToast("Payment permission updated."); loadClubData(); }
   }
 
   function resetTeamForm() { setTeamName(""); setEditingTeamId(null); setMemberFee(defaultMemberFee); setCasualFee(defaultCasualFee); setPrimaryColor(themeColor); setTeamSeasonStart(seasonStart); setTeamSeasonEnd(seasonEnd); }
@@ -316,7 +344,7 @@ export default function Setup() {
     );
   }
 
-  // The Onboarding Interceptor (For brand new users with no assigned clubs)
+  // The Onboarding Interceptor
   if (!clubId && profile?.role !== 'super_admin') {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 animate-in zoom-in-95 fade-in duration-500">
@@ -459,6 +487,28 @@ export default function Setup() {
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">Payment Integration (Square)</h2>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-xl border border-zinc-700">
+                <span className="text-xs font-bold text-zinc-300 uppercase">Enable Square</span>
+                <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-600 text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
+              </div>
+              {isSquareEnabled && (
+                <>
+                  <div>
+                    <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Access Token</label>
+                    <input type="password" placeholder="EAAA..." value={squareAccessToken} onChange={(e) => setSquareAccessToken(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Location ID</label>
+                    <input type="text" placeholder="L..." value={squareLocationId} onChange={(e) => setSquareLocationId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">App Appearance</h2>
             <div className="space-y-4">
               <div>
@@ -549,17 +599,27 @@ export default function Setup() {
               </div>
             ) : (
               clubUsers.map(user => (
-                <div key={user.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center group">
-                  <div>
-                    <div className="font-bold text-white text-sm">{user.email}</div>
-                    <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${user.role === 'club_admin' ? 'text-blue-400' : 'text-emerald-500'}`}>
-                      {user.role === 'club_admin' ? 'Club Admin' : 'Team Captain'}
-                      {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
+                <div key={user.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-3 group">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-white text-sm">{user.email}</div>
+                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${user.role === 'club_admin' ? 'text-blue-400' : 'text-emerald-500'}`}>
+                        {user.role === 'club_admin' ? 'Club Admin' : 'Team Captain'}
+                        {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
+                      </div>
                     </div>
+                    <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
+                      <i className="fa-solid fa-trash text-xs"></i>
+                    </button>
                   </div>
-                  <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
-                    <i className="fa-solid fa-trash text-xs"></i>
-                  </button>
+                  {user.role !== 'club_admin' && (
+                    <div className="flex items-center justify-between border-t border-zinc-800 pt-3 mt-1">
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Square Payments</span>
+                      <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg transition-colors ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
+                        {user.can_take_payments ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
