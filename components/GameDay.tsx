@@ -40,7 +40,6 @@ export default function GameDay() {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
     
-    // iOS uses 'data', Android uses specific variables
     const dataString = urlParams.get('data');
     const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); 
     const androidError = urlParams.get('com.squareup.pos.ERROR_CODE');
@@ -48,15 +47,13 @@ export default function GameDay() {
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
       if (!pendingTxStr) {
-        // If there's no pending TX, just clean the URL and abort
-        window.history.replaceState({}, document.title, '/gameday');
+        window.history.replaceState({}, document.title, '/');
         return;
       }
 
       const pendingTx = JSON.parse(pendingTxStr);
       let isSuccess = false;
 
-      // 1. Decode Success/Failure
       if (dataString) {
         try {
           const response = JSON.parse(decodeURIComponent(dataString));
@@ -66,29 +63,27 @@ export default function GameDay() {
         isSuccess = true;
       }
 
-      // 2. Write to Ledger
       if (isSuccess) {
-        // Step A: Insert the Match Fee (Debt)
+        // Double-entry: Log the Fee (Debt) and the Payment (Credit)
         supabase.from("transactions").insert([{ 
           player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
           fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
           amount: pendingTx.fee_amount, transaction_type: 'fee' 
         }]).then(() => {
-          // Step B: Insert the Payment (Credit)
           supabase.from("transactions").insert([{ 
             player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
             fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
             amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card' 
           }]).then(() => {
             localStorage.removeItem('square_pending_tx');
-            // Clean the URL to prevent 404s and re-triggers
-            window.location.href = '/gameday'; 
+            // Hard redirect to clear the URL and resync UI
+            window.location.href = '/'; 
           });
         });
       } else {
         showToast("Payment was cancelled or failed in Square.", "error");
         localStorage.removeItem('square_pending_tx');
-        window.history.replaceState({}, document.title, '/gameday');
+        window.history.replaceState({}, document.title, '/');
       }
     }
   }, []);
@@ -163,31 +158,27 @@ export default function GameDay() {
   }
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
-  // --- THE "TAP TO PAY" ENGINE ---
   const initiateTapToPay = (player: any) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (!isMobile) {
-      return showToast("Tap-to-Pay requires a mobile phone. Please use your phone.", "error");
+      return showToast("Tap-to-Pay requires a mobile phone.", "error");
     }
 
     const netAmount = paymentData[player.id]?.amount || 0;
-    if (netAmount <= 0) return showToast("Amount must be greater than $0", "error");
+    if (netAmount <= 0) return showToast("Amount must be > $0", "error");
 
     const grossAmount = calculateSquareGross(netAmount);
     const amountCents = Math.round(grossAmount * 100);
     const feeAmount = player.is_member ? teamFees.member : teamFees.casual;
 
-    // Save pending info for the double-entry ledger upon return
     localStorage.setItem('square_pending_tx', JSON.stringify({
       player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount, fee_amount: feeAmount 
     }));
 
-    // HARDCODED RETURN URL to prevent 404 mismatches
-    const callbackUrl = "https://feesplease.app/gameday";
+    // FIXED: Root URL callback
+    const callbackUrl = "https://feesplease.app";
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-    
-    // CUSTOM NOTE FOR SQUARE
-    const matchNotes = `${player.first_name} ${player.last_name || ''} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+    const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
 
     const isAndroid = /Android/i.test(navigator.userAgent);
 
@@ -201,7 +192,7 @@ export default function GameDay() {
         `S.com.squareup.pos.API_VERSION=v2.0;` +
         `i.com.squareup.pos.TOTAL_AMOUNT=${amountCents};` +
         `S.com.squareup.pos.CURRENCY_CODE=AUD;` +
-        `S.com.squareup.pos.TENDER_TYPES=com.squareup.pos.TENDER_CARD,com.squareup.pos.TENDER_CARD_ON_FILE,com.squareup.pos.TENDER_CONTACTLESS;` +
+        `S.com.squareup.pos.TENDER_TYPES=com.squareup.pos.TENDER_CARD,com.squareup.pos.TENDER_CONTACTLESS;` +
         `S.com.squareup.pos.NOTE=${encodeURIComponent(matchNotes)};` + 
         `end`;
       window.location.href = androidIntent;
@@ -219,7 +210,7 @@ export default function GameDay() {
 
     setTimeout(() => {
       if (!document.hidden) {
-        showToast("Square POS App not found. Please install it from the App Store or Google Play.", "error");
+        showToast("Square POS App not found.", "error");
       }
     }, 2500);
   };
@@ -286,7 +277,7 @@ export default function GameDay() {
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
   const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? (activeFixture?.umpire_fee || 0) : 0);
 
-  if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse">Loading GameDay...</div>;
+  if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative overflow-x-hidden">
@@ -311,8 +302,8 @@ export default function GameDay() {
           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-black italic uppercase" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
-              <p className="text-xs text-zinc-400 font-bold uppercase">{new Date(activeFixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+              <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
+              <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">{new Date(activeFixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
               <button onClick={downloadSquadImage} className="mt-3 text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20">
                 <i className="fa-solid fa-camera mr-2"></i> Export Graphic
               </button>
@@ -348,7 +339,7 @@ export default function GameDay() {
             {squadToPay.length === 0 && squadPaid.length > 0 ? (
               <div className="w-full text-center py-6 border border-dashed border-emerald-900/50 rounded-2xl bg-emerald-900/10">
                 <i className="fa-solid fa-check-double text-2xl text-emerald-500 mb-2"></i>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">All players settled!</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">All settled!</p>
               </div>
             ) : (
               squadToPay.map(player => {
@@ -392,7 +383,7 @@ export default function GameDay() {
                 <button onClick={() => togglePlayerSelection(player.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-zinc-400"><i className="fa-solid fa-xmark"></i></button>
                 <div className="flex justify-between items-start mb-4 pr-6">
                   <div>
-                    <h3 className="text-white font-black text-sm uppercase">{player.first_name} {player.last_name}</h3>
+                    <h3 className="text-white font-black text-sm uppercase tracking-wide">{player.first_name} {player.last_name}</h3>
                     <div className="flex gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
                       {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
                       <span className="text-emerald-500">Fee: ${matchFee}</span>
