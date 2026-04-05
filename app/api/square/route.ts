@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-// @ts-ignore - Bypassing TS module resolution for Square SDK
+// @ts-ignore - Bypassing strict TS module resolution for Square SDK
 import { Client, Environment } from 'square';
 import { calculatePlatformFee } from '@/lib/fees';
 import { supabase } from '@/lib/supabase';
@@ -15,18 +15,21 @@ export async function POST(req: Request) {
       .eq('id', clubId)
       .single();
 
-    if (!club?.square_access_token) throw new Error("Square not configured for this club");
+    if (!club?.square_access_token || !club?.square_location_id) {
+        throw new Error("Square credentials missing for this organization.");
+    }
 
+    // 2. Initialize Square Client (PRODUCTION)
     const square = new Client({
       accessToken: club.square_access_token,
-      environment: Environment.Production, // or Environment.Sandbox for testing
+      environment: Environment.Production, 
     });
 
-    // 2. Calculate your platform cut (1%)
+    // 3. Calculate your platform cut (1%) and the total
     const platformFeeCents = Math.round(calculatePlatformFee(amount) * 100);
     const totalAmountCents = Math.round(amount * 100);
 
-    // 3. Process Payment via Square
+    // 4. Process Payment via Square
     const { result } = await square.paymentsApi.createPayment({
       sourceId,
       idempotencyKey: crypto.randomUUID(),
@@ -34,15 +37,21 @@ export async function POST(req: Request) {
         amount: BigInt(totalAmountCents),
         currency: 'AUD' 
       },
-      appFeeMoney: { // <--- THIS ROUTES YOUR 1% CLIP TO YOUR MASTER SQUARE DEV ACCOUNT
+      appFeeMoney: { 
         amount: BigInt(platformFeeCents),
         currency: 'AUD'
       },
       locationId: club.square_location_id,
     });
 
-    return NextResponse.json({ success: true, payment: result.payment });
+    // Square returns BigInts which break JSON.stringify, so we convert them
+    const safeResult = JSON.parse(JSON.stringify(result, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+
+    return NextResponse.json({ success: true, payment: safeResult.payment });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("SQUARE API ERROR:", error);
+    return NextResponse.json({ error: error.message || "Payment Failed" }, { status: 400 });
   }
 }

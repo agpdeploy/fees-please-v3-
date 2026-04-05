@@ -13,8 +13,9 @@ export default function GameDay() {
   const { activeClubId } = useActiveClub();
   const squadImageRef = useRef<HTMLDivElement>(null);
 
-  // Theme State
+  // Theme & Config State
   const [themeColor, setThemeColor] = useState("#10b981");
+  const [clubLocationId, setClubLocationId] = useState<string>("");
 
   // Team Selection State
   const [teams, setTeams] = useState<any[]>([]);
@@ -48,11 +49,12 @@ export default function GameDay() {
     setTimeout(() => setToast(null), 3000); 
   };
 
-  // Fetch Theme Color
+  // Fetch Theme Color & Square Location ID
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('clubs').select('theme_color').eq('id', activeClubId).single().then(({data}) => {
+      supabase.from('clubs').select('theme_color, square_location_id').eq('id', activeClubId).single().then(({data}) => {
         if (data?.theme_color) setThemeColor(data.theme_color);
+        if (data?.square_location_id) setClubLocationId(data.square_location_id);
       });
     }
   }, [activeClubId]);
@@ -498,7 +500,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* SQUARE PAYMENT MODAL */}
+      {/* SQUARE PAYMENT MODAL - WITH SAFEGUARDS */}
       {activeSquarePlayer && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
           <div className="bg-[#111] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95">
@@ -520,58 +522,69 @@ export default function GameDay() {
               </div>
             </div>
 
-            <PaymentForm
-              applicationId={process.env.NEXT_PUBLIC_SQUARE_APP_ID!}
-              locationId={process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!} 
-              cardTokenizeResponseReceived={async (token: any, verifiedBuyer: any) => {
-                if (token.errors) {
-                   showToast("Card Error", "error");
-                   return;
-                }
-                
-                setIsProcessing(true);
-                const grossAmount = calculateSquareGross(paymentData[activeSquarePlayer.id].amount);
-                
-                try {
-                  const res = await fetch('/api/payments/square', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                      sourceId: token.token,
-                      amount: grossAmount,
-                      clubId: activeClubId,
-                      playerId: activeSquarePlayer.id,
-                      fixtureId: activeFixture.id
-                    })
-                  });
-                  
-                  if (res.ok) {
-                    await supabase.from("transactions").insert([{ 
-                      player_id: activeSquarePlayer.id, 
-                      team_id: selectedTeamId, 
-                      fixture_id: activeFixture.id, 
-                      club_id: activeClubId,
-                      amount: paymentData[activeSquarePlayer.id].amount, 
-                      transaction_type: 'payment', 
-                      payment_method: 'card' 
-                    }]);
-                    
-                    setPaidPlayerIds(prev => [...prev, activeSquarePlayer.id]);
-                    setSelectedPlayerIds(prev => prev.filter(id => id !== activeSquarePlayer.id));
-                    
-                    showToast("Payment Successful!");
-                    setActiveSquarePlayer(null);
-                  } else {
-                    showToast("Payment Failed", "error");
+            {/* SAFEGUARD: Only Render if we have the App ID and the dynamically fetched Location ID */}
+            {process.env.NEXT_PUBLIC_SQUARE_APP_ID && clubLocationId ? (
+              <PaymentForm
+                applicationId={process.env.NEXT_PUBLIC_SQUARE_APP_ID}
+                locationId={clubLocationId} 
+                cardTokenizeResponseReceived={async (token: any, verifiedBuyer: any) => {
+                  if (token.errors) {
+                     showToast("Card Error", "error");
+                     return;
                   }
-                } catch (e) {
-                  showToast("Payment Failed", "error");
-                } finally {
-                  setIsProcessing(false);
-                }
-              }}
-            >
-              <CreditCard />
-            </PaymentForm>
+                  
+                  setIsProcessing(true);
+                  const grossAmount = calculateSquareGross(paymentData[activeSquarePlayer.id].amount);
+                  
+                  try {
+                    const res = await fetch('/api/payments/square', {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        sourceId: token.token,
+                        amount: grossAmount,
+                        clubId: activeClubId,
+                        playerId: activeSquarePlayer.id,
+                        fixtureId: activeFixture.id
+                      })
+                    });
+                    
+                    if (res.ok) {
+                      await supabase.from("transactions").insert([{ 
+                        player_id: activeSquarePlayer.id, 
+                        team_id: selectedTeamId, 
+                        fixture_id: activeFixture.id, 
+                        club_id: activeClubId,
+                        amount: paymentData[activeSquarePlayer.id].amount, 
+                        transaction_type: 'payment', 
+                        payment_method: 'card' 
+                      }]);
+                      
+                      setPaidPlayerIds(prev => [...prev, activeSquarePlayer.id]);
+                      setSelectedPlayerIds(prev => prev.filter(id => id !== activeSquarePlayer.id));
+                      
+                      showToast("Payment Successful!");
+                      setActiveSquarePlayer(null);
+                    } else {
+                      const errorData = await res.json();
+                      showToast(errorData.error || "Payment Failed", "error");
+                    }
+                  } catch (e) {
+                    showToast("Payment Failed", "error");
+                  } finally {
+                    setIsProcessing(false);
+                  }
+                }}
+              >
+                <CreditCard />
+              </PaymentForm>
+            ) : (
+              <div className="text-center py-10 bg-zinc-900/50 rounded-2xl border border-zinc-800">
+                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Initializing Secure SDK...</p>
+                {!process.env.NEXT_PUBLIC_SQUARE_APP_ID && <p className="text-red-500 text-[10px] mt-2 font-bold">Error: Vercel App ID Missing.</p>}
+                {!clubLocationId && <p className="text-red-500 text-[10px] mt-2 font-bold">Error: Location ID Missing in Club Setup.</p>}
+              </div>
+            )}
           </div>
         </div>
       )}
