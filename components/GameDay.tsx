@@ -40,44 +40,53 @@ export default function GameDay() {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
     
-    // Square returns results as query parameters on Android, or a 'data' string on iOS
+    // iOS uses 'data', Android uses specific variables
     const dataString = urlParams.get('data');
-    const androidStatus = urlParams.get('com.squareup.pos.RESULT_NAME'); 
+    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); 
+    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE');
 
-    if (dataString || androidStatus) {
+    if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
       if (!pendingTxStr) return;
 
       const pendingTx = JSON.parse(pendingTxStr);
       let isSuccess = false;
 
+      // 1. Decode Success/Failure
       if (dataString) {
         try {
           const response = JSON.parse(decodeURIComponent(dataString));
           if (response.status === 'ok' || response.transaction_id) isSuccess = true;
         } catch (e) { console.error("Parse error"); }
-      } else if (androidStatus && androidStatus.includes('SUCCESS')) {
+      } else if (androidTxId) {
         isSuccess = true;
       }
 
+      // 2. Write to Ledger
       if (isSuccess) {
+        // Step A: Insert the Match Fee (Debt)
         supabase.from("transactions").insert([{ 
           player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
           fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
-          amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card' 
+          amount: pendingTx.fee_amount, transaction_type: 'fee' 
         }]).then(() => {
-          showToast("Payment Recorded Successfully!", "success");
-          setPaidPlayerIds(prev => [...prev, pendingTx.player_id]);
-          localStorage.removeItem('square_pending_tx');
+          // Step B: Insert the Payment (Credit)
+          supabase.from("transactions").insert([{ 
+            player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
+            fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
+            amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card' 
+          }]).then(() => {
+            localStorage.removeItem('square_pending_tx');
+            // Clean the URL and do a hard reload to perfectly resync the UI with Supabase
+            window.location.href = window.location.pathname; 
+          });
         });
       } else {
         showToast("Payment was cancelled or failed in Square.", "error");
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
-      
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [activeFixture, selectedTeamId, activeClubId]);
+  }, []);
 
   useEffect(() => {
     if (activeClubId) {
@@ -151,7 +160,6 @@ export default function GameDay() {
 
   // --- THE "TAP TO PAY" ENGINE ---
   const initiateTapToPay = (player: any) => {
-    // 1. Friendly Desktop Check
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (!isMobile) {
       return showToast("Tap-to-Pay requires a mobile phone. Please use your phone.", "error");
@@ -163,12 +171,18 @@ export default function GameDay() {
     const grossAmount = calculateSquareGross(netAmount);
     const amountCents = Math.round(grossAmount * 100);
 
+    const feeAmount = player.is_member ? teamFees.member : teamFees.casual;
+
+    // Added fee_amount so we can correctly log the double-entry transaction
     localStorage.setItem('square_pending_tx', JSON.stringify({
-      player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount 
+      player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount, fee_amount: feeAmount 
     }));
 
-    const callbackUrl = "https://feesplease.app/gameday";
+    const callbackUrl = window.location.origin + window.location.pathname;
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
+    
+    const matchNotes = `${player.first_name} ${player.last_name || ''} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
@@ -182,6 +196,7 @@ export default function GameDay() {
         `i.com.squareup.pos.TOTAL_AMOUNT=${amountCents};` +
         `S.com.squareup.pos.CURRENCY_CODE=AUD;` +
         `S.com.squareup.pos.TENDER_TYPES=com.squareup.pos.TENDER_CARD,com.squareup.pos.TENDER_CARD_ON_FILE,com.squareup.pos.TENDER_CONTACTLESS;` +
+        `S.com.squareup.pos.NOTE=${encodeURIComponent(matchNotes)};` + 
         `end`;
       window.location.href = androidIntent;
     } else {
@@ -190,13 +205,12 @@ export default function GameDay() {
         callback_url: callbackUrl,
         client_id: appId,
         version: "1.3",
-        notes: `Match Fee: ${player.first_name}`,
+        notes: matchNotes,
         options: { supported_tender_types: ["CREDIT_CARD", "APPLE_PAY", "GOOGLE_PAY"] }
       };
       window.location.href = `square-commerce-v1://payment/create?data=${encodeURIComponent(JSON.stringify(data))}`;
     }
 
-    // 2. Friendly Missing App Check
     setTimeout(() => {
       if (!document.hidden) {
         showToast("Square POS App not found. Please install it from the App Store or Google Play.", "error");
@@ -276,7 +290,6 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* RESTORED: Admin Team Selector */}
       {teams.length > 1 && (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
           <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
@@ -287,7 +300,6 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* RESTORED: Dynamic Fixture Header / Empty State */}
       {selectedTeamId && activeFixture ? (
         <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
@@ -310,7 +322,6 @@ export default function GameDay() {
         </div>
       ) : null}
 
-      {/* Hidden Squad Image Target */}
       <div className="absolute top-[-9999px] left-[-9999px]">
         <div ref={squadImageRef} className="w-[1080px] h-[1080px] bg-[#111] p-12 flex flex-col relative" style={{ backgroundImage: 'radial-gradient(circle at 50% 0%, #222 0%, #111 70%)' }}>
           <div className="absolute top-0 left-0 w-full h-4" style={{ backgroundColor: themeColor }}></div>
