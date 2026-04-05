@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareGross } from '@/lib/fees';
-import { uploadSquadGraphic, generateWhatsAppLink } from '@/lib/share-squad';
+import { uploadSquadGraphic, shareSquadGraphic } from '@/lib/share-squad';
 import SquadTemplate from "@/components/SquadTemplate";
 
 export default function GameDay() {
@@ -38,6 +38,7 @@ export default function GameDay() {
   // Announcement States
   const [extraNotes, setExtraNotes] = useState("");
   const [matchTime, setMatchTime] = useState("");
+  const [matchLocation, setMatchLocation] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
@@ -227,24 +228,26 @@ export default function GameDay() {
     }, 2500);
   };
 
-  // --- WHATSAPP & IMAGE GENERATION ---
-  async function handleWhatsAppShare() {
+  // --- SHARE FUNCTION (NATIVE/CLIPBOARD) ---
+  async function handleShare() {
     if (!squadImageRef.current || !activeFixture || !activeClubId) return;
     setIsSharing(true);
     
     try {
       showToast("Generating graphic...");
-      
       const publicUrl = await uploadSquadGraphic(squadImageRef.current, activeFixture.id);
       
-      const waLink = generateWhatsAppLink(squad, activeFixture.opponent, publicUrl, matchTime, extraNotes);
+      const result = await shareSquadGraphic(squad, activeFixture.opponent, publicUrl, matchTime, matchLocation, extraNotes);
 
-      window.open(waLink, '_blank');
-      showToast("Opened WhatsApp!");
+      if (result.method === 'clipboard') {
+        showToast("Copied to clipboard!");
+      } else if (result.method === 'native') {
+        showToast("Share menu opened!");
+      }
       
     } catch (err) {
       console.error(err);
-      showToast("Failed to share graphic", "error");
+      showToast("Failed to share", "error");
     } finally {
       setIsSharing(false);
     }
@@ -348,31 +351,40 @@ export default function GameDay() {
             <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Squad Announcement</h3>
           </div>
           
-          <div className="flex gap-3 mb-3">
-            <input 
-              type="text"
-              placeholder="Match Time (e.g. 1:00 PM)"
-              className="w-1/3 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
-              value={matchTime}
-              onChange={(e) => setMatchTime(e.target.value)}
-            />
+          <div className="space-y-3 mb-4">
+            <div className="flex gap-3">
+              <input 
+                type="text"
+                placeholder="Time (e.g. 7:15 PM)"
+                className="w-1/3 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
+                value={matchTime}
+                onChange={(e) => setMatchTime(e.target.value)}
+              />
+              <input 
+                type="text"
+                placeholder="Location (e.g. 3/104 Gympie Rd)"
+                className="flex-1 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
+                value={matchLocation}
+                onChange={(e) => setMatchLocation(e.target.value)}
+              />
+            </div>
             <input 
               type="text"
               placeholder="Captain's Note (e.g. Meet at 12:15pm)"
-              className="flex-1 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
+              className="w-full bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
               value={extraNotes}
               onChange={(e) => setExtraNotes(e.target.value)}
             />
           </div>
 
           <button 
-            onClick={handleWhatsAppShare} 
+            onClick={handleShare} 
             disabled={isSharing}
-            className="w-full bg-emerald-500 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs flex items-center justify-center gap-3 active:scale-[0.98] transition-transform disabled:opacity-50"
+            className="w-full font-black py-4 rounded-xl uppercase tracking-widest text-xs flex items-center justify-center gap-3 active:scale-[0.98] transition-transform disabled:opacity-50"
             style={{ backgroundColor: themeColor, color: '#000' }}
           >
-            <i className="fa-brands fa-whatsapp text-lg"></i>
-            {isSharing ? 'Generating & Uploading...' : 'Generate & Send to WhatsApp'}
+            <i className="fa-solid fa-share-nodes text-lg"></i>
+            {isSharing ? 'Processing...' : 'Generate & Share Squad'}
           </button>
         </div>
       )}
@@ -385,7 +397,8 @@ export default function GameDay() {
           logo={clubInfo.logo}
           opponent={activeFixture?.opponent}
           matchDate={new Date(activeFixture?.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-          matchTime={matchTime || 'TBA'}
+          matchTime={matchTime}
+          matchLocation={matchLocation}
           squad={squad}
           notes={extraNotes}
           themeColor={themeColor}
