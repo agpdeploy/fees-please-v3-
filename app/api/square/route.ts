@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       .single();
 
     if (!club?.square_access_token || !club?.square_location_id) {
-        throw new Error("Square credentials missing for this organization.");
+        throw new Error("Square credentials missing for this organization in Setup.");
     }
 
     // 2. Initialize Square Client (PRODUCTION)
@@ -25,26 +25,19 @@ export async function POST(req: Request) {
       environment: Environment.Production, 
     });
 
-    // 3. Calculate your platform cut (1%) and the total
+    // 3. Math for the clip
     const platformFeeCents = Math.round(calculatePlatformFee(amount) * 100);
     const totalAmountCents = Math.round(amount * 100);
 
-    // 4. Process Payment via Square
+    // 4. Process Payment
     const { result } = await square.paymentsApi.createPayment({
       sourceId,
       idempotencyKey: crypto.randomUUID(),
-      amountMoney: {
-        amount: BigInt(totalAmountCents),
-        currency: 'AUD' 
-      },
-      appFeeMoney: { 
-        amount: BigInt(platformFeeCents),
-        currency: 'AUD'
-      },
+      amountMoney: { amount: BigInt(totalAmountCents), currency: 'AUD' },
+      appFeeMoney: { amount: BigInt(platformFeeCents), currency: 'AUD' },
       locationId: club.square_location_id,
     });
 
-    // Square returns BigInts which break JSON.stringify, so we convert them
     const safeResult = JSON.parse(JSON.stringify(result, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value
     ));
