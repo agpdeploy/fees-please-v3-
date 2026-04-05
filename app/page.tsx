@@ -10,7 +10,7 @@ import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Login from "../components/Login";
 import ClubSwitcher from "../components/ClubSwitcher";
-import ThemeToggle from "../components/ThemeToggle"; // Added ThemeToggle import
+import ThemeToggle from "../components/ThemeToggle"; 
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -184,7 +184,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Theme Toggle Wrapper */}
               <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800">
                 <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">
                   Appearance

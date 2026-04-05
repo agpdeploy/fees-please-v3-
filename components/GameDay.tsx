@@ -313,9 +313,9 @@ export default function GameDay() {
       )}
 
       {teams.length > 1 && (
-        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-3xl shadow-lg transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
-          <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-bold">
+          <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
@@ -323,27 +323,27 @@ export default function GameDay() {
       )}
 
       {selectedTeamId && activeFixture ? (
-        <div className="bg-[#111] border border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
+        <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden transition-colors">
           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
-              <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">{new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-1">{new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</p>
             </div>
-            <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
+            <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
               <i className="fa-solid fa-user-plus text-lg"></i>
             </button>
           </div>
         </div>
       ) : selectedTeamId ? (
-        <div className="text-center py-10 bg-zinc-900 rounded-3xl border border-zinc-800">
+        <div className="text-center py-10 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 transition-colors">
           <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No upcoming fixtures found.</p>
         </div>
       ) : null}
 
       {/* --- ANNOUNCEMENT DRAFT AREA --- */}
       {activeFixture && squad.length > 0 && (
-        <div className="bg-zinc-900 p-4 rounded-3xl border border-zinc-800 shadow-lg">
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg transition-colors">
           <div className="flex justify-between items-center mb-3 px-1">
             <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Squad Announcement</h3>
           </div>
@@ -352,14 +352,14 @@ export default function GameDay() {
             <input 
               type="text"
               placeholder="Match Time (e.g. 1:00 PM)"
-              className="w-1/3 bg-black border border-zinc-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 outline-none"
+              className="w-1/3 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
               value={matchTime}
               onChange={(e) => setMatchTime(e.target.value)}
             />
             <input 
               type="text"
-              placeholder="Captain's Note (e.g. Meet at 12:15pm at Ferny)"
-              className="flex-1 bg-black border border-zinc-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 outline-none"
+              placeholder="Captain's Note (e.g. Meet at 12:15pm)"
+              className="flex-1 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
               value={extraNotes}
               onChange={(e) => setExtraNotes(e.target.value)}
             />
@@ -394,17 +394,17 @@ export default function GameDay() {
 
       {/* --- PAYMENT & COLLECTION AREA --- */}
       {activeFixture && (
-        <div className="mb-4 mt-8 border-t border-zinc-800/50 pt-6">
+        <div className="mb-4 mt-8 border-t border-zinc-200 dark:border-zinc-800/50 pt-6 transition-colors">
           <div className="flex justify-between items-center mb-4 px-1">
              <h2 className="text-[11px] font-black uppercase italic tracking-widest" style={{ color: themeColor }}>To Pay ({squadToPay.length})</h2>
-             <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-600 hover:text-zinc-400">Clear All</button>
+             <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400">Clear All</button>
           </div>
           
           <div className="flex flex-wrap gap-2.5 mb-6">
             {squadToPay.length === 0 && squadPaid.length > 0 ? (
-              <div className="w-full text-center py-6 border border-dashed border-emerald-900/50 rounded-2xl bg-emerald-900/10">
+              <div className="w-full text-center py-6 border border-dashed border-emerald-500/30 dark:border-emerald-900/50 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 transition-colors">
                 <i className="fa-solid fa-check-double text-2xl text-emerald-500 mb-2"></i>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">All settled!</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">All settled!</p>
               </div>
             ) : (
               squadToPay.map(player => {
@@ -414,11 +414,11 @@ export default function GameDay() {
                   <button 
                     key={player.id} 
                     onClick={() => togglePlayerSelection(player.id)} 
-                    className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-[#1A1A1A] text-zinc-300 border border-zinc-800/50 hover:border-zinc-600'}`}
+                    className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                     style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
                   >
                     {player.first_name} {player.last_name?.charAt(0)}.
-                    {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-zinc-950"></div>}
+                    {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
                   </button>
                 );
               })
@@ -427,9 +427,9 @@ export default function GameDay() {
 
           {squadPaid.length > 0 && (
             <div>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3 px-1 mt-6 border-t border-zinc-800 pt-4">Paid Today ({squadPaid.length})</h2>
+              <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3 px-1 mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4 transition-colors">Paid Today ({squadPaid.length})</h2>
               <div className="flex flex-wrap gap-2">
-                 {squadPaid.map(p => (<div key={p.id} className="px-3 py-2 rounded-xl font-bold text-[10px] uppercase bg-zinc-900 text-zinc-600 border border-zinc-800/50 flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500/50"></i> {p.first_name} {p.last_name?.charAt(0)}.</div>))}
+                 {squadPaid.map(p => (<div key={p.id} className="px-3 py-2 rounded-xl font-bold text-[10px] uppercase bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-800/50 flex items-center gap-2 transition-colors"><i className="fa-solid fa-check text-emerald-500/50"></i> {p.first_name} {p.last_name?.charAt(0)}.</div>))}
               </div>
             </div>
           )}
@@ -444,20 +444,20 @@ export default function GameDay() {
             const matchFee = player.is_member ? teamFees.member : teamFees.casual;
 
             return (
-              <div key={player.id} className="bg-[#1A1A1A] border border-zinc-800 rounded-3xl p-5 shadow-lg relative">
-                <button onClick={() => togglePlayerSelection(player.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-zinc-400"><i className="fa-solid fa-xmark"></i></button>
+              <div key={player.id} className="bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-lg relative transition-colors">
+                <button onClick={() => togglePlayerSelection(player.id)} className="absolute top-4 right-4 text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"><i className="fa-solid fa-xmark"></i></button>
                 <div className="flex justify-between items-start mb-4 pr-6">
                   <div>
-                    <h3 className="text-white font-black text-sm uppercase tracking-wide">{player.first_name} {player.last_name}</h3>
+                    <h3 className="text-zinc-900 dark:text-white font-black text-sm uppercase tracking-wide">{player.first_name} {player.last_name}</h3>
                     <div className="flex gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
                       {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
                       <span className="text-emerald-500">Fee: ${matchFee}</span>
                     </div>
                   </div>
-                  <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+                  <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
                     <button 
                       onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
                       <i className="fa-solid fa-money-bill-wave"></i>
                     </button>
@@ -470,13 +470,13 @@ export default function GameDay() {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         initiateTapToPay(player);
                       }} 
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-white'}`}
+                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
                       <i className="fa-solid fa-credit-card"></i>
                     </button>
                   </div>
                 </div>
-                <div className="bg-[#111] border border-zinc-800 rounded-2xl p-3 flex justify-between items-center">
+                <div className="bg-zinc-50 dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 flex justify-between items-center transition-colors">
                     <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
                     <input type="number" value={data?.amount} onChange={(e) => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], amount: Number(e.target.value)}}))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
                 </div>
@@ -486,9 +486,9 @@ export default function GameDay() {
           
           <div className="pt-4 space-y-4">
             {activeFixture.umpire_fee > 0 && (
-              <div className="bg-[#1A1A1A] border border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer" onClick={() => setPayUmpire(!payUmpire)}>
-                <span className="text-xs font-black uppercase tracking-widest text-zinc-300 flex items-center gap-2"><i className="fa-solid fa-ticket text-zinc-500"></i> Pay Umpire (${activeFixture.umpire_fee})</span>
-                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-800'}`}>
+              <div className="bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer transition-colors" onClick={() => setPayUmpire(!payUmpire)}>
+                <span className="text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300 flex items-center gap-2"><i className="fa-solid fa-ticket text-zinc-500"></i> Pay Umpire (${activeFixture.umpire_fee})</span>
+                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-800'}`}>
                   <div className={`w-4 h-4 rounded-full bg-white transition-transform ${payUmpire ? 'translate-x-4' : ''}`}></div>
                 </div>
               </div>
@@ -509,18 +509,18 @@ export default function GameDay() {
       )}
 
       {isQuickAddOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4">
-          <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-800">
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
               <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Add to Squad</h2>
-              <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
+              <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500" />
+              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
                 {availablePlayers.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
-                  <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl hover:bg-zinc-800 transition-colors text-left group">
-                    <span className="font-bold text-white text-sm">{p.first_name} {p.last_name}</span>
+                  <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
+                    <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name}</span>
                     <i className="fa-solid fa-plus" style={{ color: themeColor }}></i>
                   </button>
                 ))}
