@@ -2,38 +2,53 @@ import { supabase } from './supabase';
 import { toPng } from 'html-to-image';
 
 export async function uploadSquadGraphic(node: HTMLElement, fixtureId: string) {
-  // 1. Generate Blob from the hidden div (with FontAwesome filter)
-  const dataUrl = await toPng(node, { 
-    quality: 0.95, 
-    cacheBust: true,
-    filter: (el: any) => {
-      // Skip external FontAwesome stylesheets to prevent CORS crashes
-      if (el?.tagName === 'LINK' && el?.href?.includes('font-awesome')) {
-        return false;
+  try {
+    // 1. Generate Image with a much safer filter
+    const dataUrl = await toPng(node, { 
+      quality: 0.95, 
+      cacheBust: true,
+      skipFonts: true, // Helps bypass external font CORS issues
+      filter: (el: unknown) => {
+        const element = el as HTMLElement;
+        // Safely ignore FontAwesome or any external CDNs
+        if (element?.tagName === 'LINK') {
+          const href = (element as HTMLLinkElement).href || '';
+          if (href.includes('font-awesome') || href.includes('cdnjs')) {
+            return false;
+          }
+        }
+        return true;
       }
-      return true;
+    });
+
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+
+    const fileName = `squad_${fixtureId}_${Date.now()}.png`;
+
+    // 2. Upload to Supabase Storage
+    const { error } = await supabase.storage
+      .from('squad-graphics')
+      .upload(fileName, blob, { 
+        contentType: 'image/png', 
+        upsert: true 
+      });
+
+    if (error) {
+      console.error("Supabase Error:", error.message);
+      throw error;
     }
-  });
-  
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
 
-  const fileName = `squad_${fixtureId}_${Date.now()}.png`;
-  const filePath = `public/${fileName}`;
+    // 3. Get Public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('squad-graphics')
+      .getPublicUrl(fileName);
 
-  // 2. Upload to Supabase Storage
-  const { error } = await supabase.storage
-    .from('squad-graphics')
-    .upload(filePath, blob, { contentType: 'image/png', upsert: true });
-
-  if (error) throw error;
-
-  // 3. Get Public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('squad-graphics')
-    .getPublicUrl(filePath);
-
-  return publicUrl;
+    return publicUrl;
+  } catch (err) {
+    console.error("Upload/Generate Error:", err);
+    throw err;
+  }
 }
 
 export function generateWhatsAppLink(players: any[], opponent: string, graphicUrl: string, matchTime: string, notes: string) {
