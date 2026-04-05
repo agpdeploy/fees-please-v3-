@@ -47,7 +47,11 @@ export default function GameDay() {
 
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
-      if (!pendingTxStr) return;
+      if (!pendingTxStr) {
+        // If there's no pending TX, just clean the URL and abort
+        window.history.replaceState({}, document.title, '/gameday');
+        return;
+      }
 
       const pendingTx = JSON.parse(pendingTxStr);
       let isSuccess = false;
@@ -77,13 +81,14 @@ export default function GameDay() {
             amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card' 
           }]).then(() => {
             localStorage.removeItem('square_pending_tx');
-            // Clean the URL and do a hard reload to perfectly resync the UI with Supabase
-            window.location.href = window.location.pathname; 
+            // Clean the URL to prevent 404s and re-triggers
+            window.location.href = '/gameday'; 
           });
         });
       } else {
         showToast("Payment was cancelled or failed in Square.", "error");
-        window.history.replaceState({}, document.title, window.location.pathname);
+        localStorage.removeItem('square_pending_tx');
+        window.history.replaceState({}, document.title, '/gameday');
       }
     }
   }, []);
@@ -170,17 +175,18 @@ export default function GameDay() {
 
     const grossAmount = calculateSquareGross(netAmount);
     const amountCents = Math.round(grossAmount * 100);
-
     const feeAmount = player.is_member ? teamFees.member : teamFees.casual;
 
-    // Added fee_amount so we can correctly log the double-entry transaction
+    // Save pending info for the double-entry ledger upon return
     localStorage.setItem('square_pending_tx', JSON.stringify({
       player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount, fee_amount: feeAmount 
     }));
 
-    const callbackUrl = window.location.origin + window.location.pathname;
+    // HARDCODED RETURN URL to prevent 404 mismatches
+    const callbackUrl = "https://feesplease.app/gameday";
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
     
+    // CUSTOM NOTE FOR SQUARE
     const matchNotes = `${player.first_name} ${player.last_name || ''} Match Fees (${activeFixture?.opponent || 'TBA'})`;
 
     const isAndroid = /Android/i.test(navigator.userAgent);
