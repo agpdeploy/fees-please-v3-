@@ -285,9 +285,23 @@ export default function Setup() {
   }
 
   async function togglePaymentPermission(roleId: string, currentStatus: boolean) {
+    // Optimistic Update: Flip the switch in the UI instantly
+    setClubUsers(prev => prev.map(user => 
+      user.id === roleId ? { ...user, can_take_payments: !currentStatus } : user
+    ));
+
+    // Tell the database to update
     const { error } = await supabase.from("user_roles").update({ can_take_payments: !currentStatus }).eq('id', roleId);
-    if (error) showToast(error.message, "error");
-    else { showToast("Payment permission updated."); loadClubData(); }
+    
+    if (error) {
+      // If the database fails, revert the switch back and show error
+      setClubUsers(prev => prev.map(user => 
+        user.id === roleId ? { ...user, can_take_payments: currentStatus } : user
+      ));
+      showToast(error.message, "error");
+    } else {
+      showToast(!currentStatus ? "Payment permission granted." : "Payment permission revoked.");
+    }
   }
 
   function resetTeamForm() { setTeamName(""); setEditingTeamId(null); setMemberFee(defaultMemberFee); setCasualFee(defaultCasualFee); setPrimaryColor(themeColor); setTeamSeasonStart(seasonStart); setTeamSeasonEnd(seasonEnd); }
