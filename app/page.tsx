@@ -1,4 +1,4 @@
-// Deploy version 3.2 - Clean Bottom Nav
+// Deploy version 3.3 - Tap Logo UX
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,7 +9,6 @@ import GameDay from "../components/GameDay";
 import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Login from "../components/Login";
-import ClubSwitcher from "../components/ClubSwitcher";
 import ThemeToggle from "../components/ThemeToggle"; 
 
 export default function Home() {
@@ -23,13 +22,18 @@ export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  const { profile, loading: profileLoading } = useProfile();
+  // Pull "roles" in so we can build the Workspace Switcher array
+  const { profile, roles, loading: profileLoading } = useProfile();
   const { activeClubId, setActiveClubId } = useActiveClub();
   
   const [theme, setTheme] = useState({ name: 'FP', color: '#10b981', font: 'Inter', logo: '' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showClubMenu, setShowClubMenu] = useState(false);
 
   const isAdmin = profile?.role === 'super_admin' || profile?.role === 'club_admin';
+
+  // Build a unique list of clubs this user has access to based on their roles
+  const uniqueClubs = Array.from(new Map(roles?.map((r: any) => [r.club_id, r.clubs])).values()).filter(Boolean);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -96,9 +100,11 @@ export default function Home() {
 
   if (!session) return <Login />;
 
+  // Display role contextual to the CURRENT active club
+  const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role || profile?.role;
   const displayRole = profile?.role === 'super_admin' ? 'God Mode' : 
-                      profile?.role === 'club_admin' ? 'Club Admin' : 
-                      profile?.role === 'team_admin' ? 'Team Captain' : 'Player';
+                      currentClubRole === 'club_admin' ? 'Club Admin' : 
+                      currentClubRole === 'team_admin' ? 'Team Captain' : 'Player';
 
   return (
     <>
@@ -112,32 +118,65 @@ export default function Home() {
 
       <div className="flex flex-col min-h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         
+        {/* --- HEADER: NOW A TAP-TO-SWITCH BUTTON --- */}
         <header className="sticky top-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white/80 dark:bg-black/80 backdrop-blur-md z-40 transition-colors">
-          <div className="flex items-center gap-3">
+          <button onClick={() => setShowClubMenu(true)} className="flex items-center gap-3 text-left group">
             {theme.logo ? (
-              <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" alt="Club Logo" />
+              <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 group-hover:scale-95 transition-transform" alt="Club Logo" />
             ) : (
-              <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase tracking-tighter shadow-inner transition-colors">
+              <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase tracking-tighter shadow-inner transition-colors group-hover:scale-95">
                 {theme.name.substring(0, 2)}
               </div>
             )}
             <div>
-              <h1 className="text-xl font-black italic uppercase tracking-tighter text-brand">Fees Please</h1>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-black italic uppercase tracking-tighter text-brand truncate max-w-[160px]">{theme.name}</h1>
+                {uniqueClubs.length > 1 && <i className="fa-solid fa-caret-down text-zinc-400 text-xs"></i>}
+              </div>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-0.5">
                 {displayRole} Access
               </p>
             </div>
-          </div>
+          </button>
+          
           <button onClick={() => setIsSidebarOpen(true)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-colors">
             <i className="fa-solid fa-bars text-sm"></i>
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto pb-24 px-4 pt-4">
-          <div className="mb-6 z-30 relative">
-            <ClubSwitcher />
+        {/* --- CLUB SWITCHER MODAL --- */}
+        {showClubMenu && uniqueClubs.length > 1 && (
+          <div className="fixed inset-0 z-[200] flex justify-center items-start pt-20 px-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowClubMenu(false)}></div>
+            <div className="w-full max-w-[320px] bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl relative z-10 animate-in slide-in-from-top-4 fade-in duration-200 overflow-hidden">
+              <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50">
+                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Switch Workspace</h3>
+                 <button onClick={() => setShowClubMenu(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>
+              </div>
+              <div className="p-2 max-h-[60vh] overflow-y-auto">
+                 {uniqueClubs.map((club: any) => (
+                    <button
+                       key={club.id}
+                       onClick={() => { setActiveClubId(club.id); setShowClubMenu(false); }}
+                       className={`w-full flex items-center gap-4 p-3 rounded-2xl transition-colors text-left ${activeClubId === club.id ? 'bg-emerald-500/10 dark:bg-emerald-500/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                    >
+                       {club.logo_url ? (
+                         <img src={club.logo_url} className="w-10 h-10 rounded-xl object-cover shadow-sm" alt={club.name} />
+                       ) : (
+                         <div className="w-10 h-10 rounded-xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center font-black text-xs text-zinc-500 uppercase">{club.name.substring(0,2)}</div>
+                       )}
+                       <div className="flex-1">
+                         <div className={`font-black uppercase tracking-wide text-sm ${activeClubId === club.id ? 'text-emerald-600 dark:text-emerald-500' : 'text-zinc-900 dark:text-white'}`}>{club.name}</div>
+                       </div>
+                       {activeClubId === club.id && <i className="fa-solid fa-circle-check text-emerald-500 text-lg"></i>}
+                    </button>
+                 ))}
+              </div>
+            </div>
           </div>
+        )}
 
+        <main className="flex-1 overflow-y-auto pb-24 px-4 pt-4 relative z-30">
           {activeTab === "gameday" && <GameDay />}
           {activeTab === "ledger" && <Ledger />}
           {activeTab === "setup" && isAdmin && <Setup />}
@@ -154,6 +193,7 @@ export default function Home() {
           </div>
         </nav>
 
+        {/* --- SIDEBAR --- */}
         {isSidebarOpen && (
           <div className="fixed inset-0 z-[100] flex justify-end">
             <div className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-colors" onClick={() => setIsSidebarOpen(false)}></div>
@@ -176,7 +216,7 @@ export default function Home() {
                   </button>
                 )}
                 
-                <button onClick={() => { alert('Fees Please v3.2\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
+                <button onClick={() => { alert('Fees Please v3.3\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
                   <i className="fa-solid fa-circle-info text-zinc-500 w-5"></i> About App
                 </button>
                 <button onClick={() => window.location.reload()} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">

@@ -116,22 +116,26 @@ export default function GameDay() {
     }
   }, [activeClubId]);
 
+  // THE CROSS-CLUB BLEED FIX IS HERE
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
       setLoading(true);
       let query = supabase.from("teams").select("*");
+      
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
-        const teamIds = roles?.filter((r: any) => r.role === 'team_admin').map((r: any) => r.team_id).filter(Boolean) || [];
+        // Explicitly filter roles so only teams belonging to the ACTIVE club are loaded
+        const teamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) query = query.in('id', teamIds);
         else { setTeams([]); setLoading(false); return; }
       }
+      
       const { data } = await query;
       if (data) {
         setTeams(data);
-        if (data.length === 1) setSelectedTeamId(data[0].id);
+        if (data.length === 1) setSelectedTeamId(data[0].id); // Auto-selects if only 1 team!
       }
       setLoading(false);
     }
@@ -272,7 +276,6 @@ export default function GameDay() {
     }
   }
 
-  // FIX: Process both cash AND manual card payments. 
   async function processBatchPayments() {
     if (selectedPlayers.length === 0 || !activeFixture || !activeClubId) return;
     setIsProcessing(true);
@@ -280,7 +283,6 @@ export default function GameDay() {
       for (const player of selectedPlayers) {
         const method = paymentData[player.id]?.method || 'cash';
         
-        // If Square is enabled AND they chose 'card', Square handles the DB insert via the redirect callback.
         if (isSquareEnabled && method === 'card') continue;
 
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: player.is_member ? teamFees.member : teamFees.casual, transaction_type: 'fee' }]);
@@ -316,7 +318,6 @@ export default function GameDay() {
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
   const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? (activeFixture?.umpire_fee || 0) : 0);
 
-  // FIX: Calculate how many payments we are actually saving in the batch function
   const processableCount = selectedPlayers.filter(p => {
     const method = paymentData[p.id]?.method || 'cash';
     return !(isSquareEnabled && method === 'card');
@@ -492,13 +493,12 @@ export default function GameDay() {
                       <i className="fa-solid fa-money-bill-wave"></i>
                     </button>
                     
-                    {/* FIX: Card button toggles state. If Square is enabled, it fires the POS switch. */}
                     <button 
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         
                         if (isSquareEnabled) {
-                          const userRole = roles?.find((r: any) => r.team_id === selectedTeamId || r.club_id === activeClubId);
+                          const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
                           if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
                             return showToast("Permission Denied", "error");
                           }
@@ -537,7 +537,6 @@ export default function GameDay() {
               </span>
             </div>
             
-            {/* FIX: Dynamic Save Button Text and Logic */}
             <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
               {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
             </button>
