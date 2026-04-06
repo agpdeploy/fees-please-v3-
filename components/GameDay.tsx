@@ -197,7 +197,7 @@ export default function GameDay() {
       player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount, fee_amount: feeAmount 
     }));
 
-    const callbackUrl = "https://feesplease.app";
+    const callbackUrl = window.location.origin;
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
     const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
 
