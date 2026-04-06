@@ -1,9 +1,35 @@
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import "./globals.css"
 
 const inter = Inter({ subsets: ['latin'] })
+
+// --- PWA & SEO METADATA ---
+export const metadata: Metadata = {
+  title: "Fees Please",
+  description: "Match fee collection for legends.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Fees Please",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+};
+
+// --- VIEWPORT SETTINGS (Makes it feel native) ---
+export const viewport: Viewport = {
+  themeColor: "#10b981",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1, // Prevents annoying zoom on mobile tap
+  userScalable: false,
+};
 
 export default function RootLayout({
   children,
