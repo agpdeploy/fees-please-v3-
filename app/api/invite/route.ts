@@ -62,25 +62,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: roleError.message }, { status: 400 });
     }
 
-    // 3. BONUS: If they are a Team Captain, auto-add them to the Player Roster!
-    if (role === 'team_admin' && team_id) {
-      // Extract a default name from their email (e.g., tony@gmail.com -> Tony)
-      const namePart = cleanEmail.split('@')[0];
-      const firstName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    // 3. The Roster Auto-Merge
+    // Extract a default name from their email (e.g., tony@gmail.com -> Tony)
+    const namePart = cleanEmail.split('@')[0];
+    const firstName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+
+    // Look for an existing player without an assigned user_id matching the first name
+    const { data: existingPlayer } = await supabaseAdmin.from('players')
+      .select('id')
+      .eq('club_id', club_id)
+      .is('user_id', null) 
+      .ilike('first_name', `%${firstName}%`)
+      .limit(1)
+      .single();
       
-      // Check to make sure we don't accidentally add them twice
-      const { data: existingPlayer } = await supabaseAdmin.from('players')
-        .select('id').eq('club_id', club_id).eq('first_name', firstName).eq('default_team_id', team_id).single();
-        
-      if (!existingPlayer) {
-        await supabaseAdmin.from('players').insert({
-          first_name: firstName,
-          last_name: "(Captain)",
-          club_id: club_id,
-          default_team_id: team_id,
-          is_member: true
-        });
-      }
+    if (existingPlayer) {
+      // MATCH FOUND: Link the auth user to this historical player profile
+      await supabaseAdmin.from('players')
+        .update({ 
+          user_id: userId,
+          default_team_id: role === 'team_admin' ? team_id : undefined 
+        })
+        .eq('id', existingPlayer.id);
+    } else if (role === 'team_admin' && team_id) {
+      // NO MATCH: They are brand new. Create a new player record for the captain.
+      await supabaseAdmin.from('players').insert({
+        user_id: userId,
+        first_name: firstName,
+        last_name: "(Captain)",
+        club_id: club_id,
+        default_team_id: team_id,
+        is_member: true
+      });
     }
 
     return NextResponse.json({ 

@@ -16,9 +16,14 @@ export default function Setup() {
   const [allClubs, setAllClubs] = useState<any[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
 
+  // Invite & Edit Role State
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<'club_admin' | 'team_admin'>('club_admin');
   const [inviteTeamId, setInviteTeamId] = useState("");
+  
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [editRoleAssigned, setEditRoleAssigned] = useState<'club_admin' | 'team_admin'>('club_admin');
+  const [editRoleTeamId, setEditRoleTeamId] = useState<string>("");
 
   const [clubName, setClubName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -195,7 +200,7 @@ export default function Setup() {
     finally { setIsUploadingLogo(false); }
   }
 
- async function saveConfig() {
+  async function saveConfig() {
     setIsSaving(true);
     const generatedSlug = clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const payload = { 
@@ -251,6 +256,25 @@ export default function Setup() {
       setInviteEmail(""); setInviteTeamId(""); loadClubData(); 
     } catch (err: any) { showToast(err.message, "error"); } 
     finally { setIsSaving(false); }
+  }
+
+  async function saveRoleUpdate(roleId: string) {
+    setIsSaving(true);
+    const payload = {
+      role: editRoleAssigned,
+      team_id: editRoleAssigned === 'team_admin' ? editRoleTeamId : null
+    };
+    
+    const { error } = await supabase.from('user_roles').update(payload).eq('id', roleId);
+    
+    setIsSaving(false);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Role updated successfully!");
+      setEditingRoleId(null);
+      loadClubData();
+    }
   }
 
   async function handleRemoveRole(roleId: string) {
@@ -608,11 +632,52 @@ export default function Setup() {
                         {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
                       </div>
                     </div>
-                    <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
-                      <i className="fa-solid fa-trash text-xs"></i>
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => {
+                        setEditingRoleId(user.id);
+                        setEditRoleAssigned(user.role);
+                        setEditRoleTeamId(user.team_id || "");
+                      }} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 transition-colors flex items-center justify-center">
+                        <i className="fa-solid fa-pen text-xs"></i>
+                      </button>
+                      <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
+                        <i className="fa-solid fa-trash text-xs"></i>
+                      </button>
+                    </div>
                   </div>
-                  {user.role !== 'club_admin' && (
+
+                  {editingRoleId === user.id && (
+                    <div className="mt-3 pt-3 border-t border-zinc-800 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex gap-2">
+                        <select 
+                          value={editRoleAssigned} 
+                          onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
+                          className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+                        >
+                          <option value="club_admin">Club Admin</option>
+                          <option value="team_admin">Team Captain</option>
+                        </select>
+                        
+                        {editRoleAssigned === 'team_admin' && (
+                          <select 
+                            value={editRoleTeamId} 
+                            onChange={(e) => setEditRoleTeamId(e.target.value)} 
+                            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+                          >
+                            <option value="">-- Select Team --</option>
+                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingRoleId(null)} className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-xs font-black uppercase transition-colors">Cancel</button>
+                        <button onClick={() => saveRoleUpdate(user.id)} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase transition-colors">Save</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {user.role !== 'club_admin' && editingRoleId !== user.id && (
                     <div className="flex items-center justify-between border-t border-zinc-800 pt-3 mt-1">
                       <span className="text-[9px] font-bold text-zinc-400 uppercase">Square Payments</span>
                       <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg transition-colors ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
