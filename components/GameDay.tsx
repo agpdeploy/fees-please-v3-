@@ -30,6 +30,9 @@ export default function GameDay() {
   const [payUmpire, setPayUmpire] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // FIX: Added state to track if Square is active for the current club
+  const [isSquareEnabled, setIsSquareEnabled] = useState(false);
+  
   // Quick Add States
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
@@ -99,14 +102,18 @@ export default function GameDay() {
     }
   }, []);
 
+  // FIX: Re-fetch theme AND Square enablement whenever the activeClubId changes
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('clubs').select('name, logo_url, theme_color').eq('id', activeClubId).single().then(({data}) => {
+      supabase.from('clubs').select('name, logo_url, theme_color, is_square_enabled').eq('id', activeClubId).single().then(({data}) => {
         if (data) {
           if (data.theme_color) setThemeColor(data.theme_color);
           setClubInfo({ name: data.name || 'FP', logo: data.logo_url || '' });
+          setIsSquareEnabled(data.is_square_enabled || false);
         }
       });
+    } else {
+      setIsSquareEnabled(false);
     }
   }, [activeClubId]);
 
@@ -474,19 +481,23 @@ export default function GameDay() {
                     >
                       <i className="fa-solid fa-money-bill-wave"></i>
                     </button>
-                    <button 
-                      onClick={() => {
-                        const userRole = roles?.find((r: any) => r.team_id === selectedTeamId || r.club_id === activeClubId);
-                        if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
-                          return showToast("Permission Denied", "error");
-                        }
-                        setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
-                        initiateTapToPay(player);
-                      }} 
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                    >
-                      <i className="fa-solid fa-credit-card"></i>
-                    </button>
+                    
+                    {/* FIX: Conditionally render the Square Card button */}
+                    {isSquareEnabled && (
+                      <button 
+                        onClick={() => {
+                          const userRole = roles?.find((r: any) => r.team_id === selectedTeamId || r.club_id === activeClubId);
+                          if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
+                            return showToast("Permission Denied", "error");
+                          }
+                          setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
+                          initiateTapToPay(player);
+                        }} 
+                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      >
+                        <i className="fa-solid fa-credit-card"></i>
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="bg-zinc-50 dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 flex justify-between items-center transition-colors">
