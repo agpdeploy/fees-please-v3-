@@ -1,4 +1,4 @@
-// Deploy version 3.3 - Tap Logo UX
+// Deploy version 3.4 - Workspace Switcher Fix & Header UI
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,7 +22,6 @@ export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  // Pull "roles" in so we can build the Workspace Switcher array
   const { profile, roles, loading: profileLoading } = useProfile();
   const { activeClubId, setActiveClubId } = useActiveClub();
   
@@ -30,10 +29,24 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showClubMenu, setShowClubMenu] = useState(false);
 
+  // God Mode Switcher State
+  const [allClubs, setAllClubs] = useState<any[]>([]);
+
   const isAdmin = profile?.role === 'super_admin' || profile?.role === 'club_admin';
 
-  // Build a unique list of clubs this user has access to based on their roles
-  const uniqueClubs = Array.from(new Map(roles?.map((r: any) => [r.club_id, r.clubs])).values()).filter(Boolean);
+  // Fetch all clubs if user is super_admin
+  useEffect(() => {
+    if (profile?.role === 'super_admin') {
+      supabase.from('clubs').select('id, name, logo_url').order('name').then(({ data }) => {
+        if (data) setAllClubs(data);
+      });
+    }
+  }, [profile]);
+
+  // Build the list of clubs to show in the dropdown based on role
+  const uniqueClubs = profile?.role === 'super_admin' 
+    ? allClubs 
+    : Array.from(new Map(roles?.map((r: any) => [r.club_id, r.clubs])).values()).filter(Boolean);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -54,16 +67,16 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- THE FIX: RESPECT THE SWITCHER ---
   useEffect(() => {
-    const targetClubId = profile?.role === 'super_admin' ? activeClubId : (profile?.club_id || activeClubId);
-    
-    if (targetClubId && targetClubId !== activeClubId) {
-      setActiveClubId(targetClubId);
+    // Only set a default if one isn't currently active
+    if (!activeClubId && profile?.club_id && profile?.role !== 'super_admin') {
+      setActiveClubId(profile.club_id);
     }
 
-    if (targetClubId) {
+    if (activeClubId) {
       const fetchTheme = async () => {
-        const { data } = await supabase.from('clubs').select('name, theme_color, theme_font, logo_url').eq('id', targetClubId).single();
+        const { data } = await supabase.from('clubs').select('name, theme_color, theme_font, logo_url').eq('id', activeClubId).single();
         if (data) {
           setTheme({ 
             name: data.name || 'FP',
@@ -98,9 +111,6 @@ export default function Home() {
     );
   }
 
-  if (!session) return <Login />;
-
-  // Display role contextual to the CURRENT active club
   const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role || profile?.role;
   const displayRole = profile?.role === 'super_admin' ? 'God Mode' : 
                       currentClubRole === 'club_admin' ? 'Club Admin' : 
@@ -118,24 +128,25 @@ export default function Home() {
 
       <div className="flex flex-col min-h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         
-        {/* --- HEADER: NOW A TAP-TO-SWITCH BUTTON --- */}
+        {/* --- HEADER UI UPDATED --- */}
         <header className="sticky top-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white/80 dark:bg-black/80 backdrop-blur-md z-40 transition-colors">
-          <button onClick={() => setShowClubMenu(true)} className="flex items-center gap-3 text-left group">
+          <button 
+            onClick={() => uniqueClubs.length > 1 && setShowClubMenu(true)} 
+            className={`flex items-center gap-3 text-left ${uniqueClubs.length > 1 ? 'group cursor-pointer' : 'cursor-default'}`}
+          >
             {theme.logo ? (
-              <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 group-hover:scale-95 transition-transform" alt="Club Logo" />
+              <img src={theme.logo} className={`w-9 h-9 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-transform ${uniqueClubs.length > 1 ? 'group-hover:scale-95' : ''}`} alt="Club Logo" />
             ) : (
-              <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase tracking-tighter shadow-inner transition-colors group-hover:scale-95">
+              <div className={`w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase tracking-tighter shadow-inner transition-transform ${uniqueClubs.length > 1 ? 'group-hover:scale-95' : ''}`}>
                 {theme.name.substring(0, 2)}
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black italic uppercase tracking-tighter text-brand truncate max-w-[160px]">{theme.name}</h1>
-                {uniqueClubs.length > 1 && <i className="fa-solid fa-caret-down text-zinc-400 text-xs"></i>}
+              <h1 className="text-xl font-black italic uppercase tracking-tighter text-brand">Fees Please</h1>
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-0.5">
+                <span className="truncate max-w-[160px]">{theme.name || 'Select Workspace'}</span>
+                {uniqueClubs.length > 1 && <i className="fa-solid fa-caret-down text-zinc-400"></i>}
               </div>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-0.5">
-                {displayRole} Access
-              </p>
             </div>
           </button>
           
@@ -193,7 +204,6 @@ export default function Home() {
           </div>
         </nav>
 
-        {/* --- SIDEBAR --- */}
         {isSidebarOpen && (
           <div className="fixed inset-0 z-[100] flex justify-end">
             <div className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-colors" onClick={() => setIsSidebarOpen(false)}></div>
@@ -216,7 +226,7 @@ export default function Home() {
                   </button>
                 )}
                 
-                <button onClick={() => { alert('Fees Please v3.3\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
+                <button onClick={() => { alert('Fees Please v3.4\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
                   <i className="fa-solid fa-circle-info text-zinc-500 w-5"></i> About App
                 </button>
                 <button onClick={() => window.location.reload()} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">

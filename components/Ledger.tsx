@@ -6,7 +6,7 @@ import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 
 export default function Ledger() {
-  const { profile } = useProfile();
+  const { profile, roles } = useProfile(); // Brought roles in for filtering
   const { activeClubId } = useActiveClub();
 
   // Theme State
@@ -57,22 +57,23 @@ export default function Ledger() {
     }
   }, [activeClubId]);
 
-  // --- 1. LOAD TEAMS (WITH RBAC) ---
+  // --- 1. LOAD TEAMS (WITH WORKSPACE ISOLATION) ---
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
-      
+      setIsLoading(true);
       let query = supabase.from("teams").select("*");
       
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
-        const { data: roles } = await supabase.from('user_roles').select('team_id').eq('user_id', profile.id).eq('role', 'team_admin');
-        const teamIds = roles?.map(r => r.team_id).filter(Boolean) || [];
+        // Explicitly filter roles so only teams belonging to the ACTIVE club are loaded
+        const teamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) {
           query = query.in('id', teamIds);
         } else {
           setTeams([]);
+          setIsLoading(false);
           return; 
         }
       }
@@ -83,9 +84,10 @@ export default function Ledger() {
         if (data.length === 1) setActiveTeamId(data[0].id);
         else if (data.length > 0 && !data.find(t => t.id === activeTeamId)) setActiveTeamId(""); 
       }
+      setIsLoading(false);
     }
     fetchTeams();
-  }, [profile, activeClubId]);
+  }, [profile, roles, activeClubId]);
 
   // --- 2. LOAD LEDGER DATA ---
   async function fetchLedger() {
