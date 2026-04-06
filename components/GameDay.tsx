@@ -272,14 +272,19 @@ export default function GameDay() {
     }
   }
 
+  // FIX: Process both cash AND manual card payments. 
   async function processBatchPayments() {
     if (selectedPlayers.length === 0 || !activeFixture || !activeClubId) return;
     setIsProcessing(true);
     try {
       for (const player of selectedPlayers) {
-        if (paymentData[player.id]?.method !== 'cash') continue;
+        const method = paymentData[player.id]?.method || 'cash';
+        
+        // If Square is enabled AND they chose 'card', Square handles the DB insert via the redirect callback.
+        if (isSquareEnabled && method === 'card') continue;
+
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: player.is_member ? teamFees.member : teamFees.casual, transaction_type: 'fee' }]);
-        await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: paymentData[player.id].amount, transaction_type: 'payment', payment_method: 'cash' }]);
+        await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: paymentData[player.id].amount, transaction_type: 'payment', payment_method: method }]);
       }
       if (payUmpire && activeFixture.umpire_fee > 0) {
         await supabase.from("transactions").insert([{ team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: activeFixture.umpire_fee, transaction_type: 'expense', payment_method: 'cash', description: 'Umpire Payment' }]);
@@ -310,6 +315,12 @@ export default function GameDay() {
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
   const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? (activeFixture?.umpire_fee || 0) : 0);
+
+  // FIX: Calculate how many payments we are actually saving in the batch function
+  const processableCount = selectedPlayers.filter(p => {
+    const method = paymentData[p.id]?.method || 'cash';
+    return !(isSquareEnabled && method === 'card');
+  }).length;
 
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
@@ -481,20 +492,18 @@ export default function GameDay() {
                       <i className="fa-solid fa-money-bill-wave"></i>
                     </button>
                     
-                    {/* Square Card button - Always visible, checks status on click */}
+                    {/* FIX: Card button toggles state. If Square is enabled, it fires the POS switch. */}
                     <button 
                       onClick={() => {
-                        // Check if enabled first!
-                        if (!isSquareEnabled) {
-                          return showToast("Square is not enabled. Go to Setup to link your account.", "error");
-                        }
-
-                        const userRole = roles?.find((r: any) => r.team_id === selectedTeamId || r.club_id === activeClubId);
-                        if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
-                          return showToast("Permission Denied", "error");
-                        }
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
-                        initiateTapToPay(player);
+                        
+                        if (isSquareEnabled) {
+                          const userRole = roles?.find((r: any) => r.team_id === selectedTeamId || r.club_id === activeClubId);
+                          if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
+                            return showToast("Permission Denied", "error");
+                          }
+                          initiateTapToPay(player);
+                        }
                       }} 
                       className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
@@ -527,8 +536,10 @@ export default function GameDay() {
                 {netTotal < 0 ? '-' : ''}${Math.abs(netTotal).toFixed(2)}
               </span>
             </div>
-            <button onClick={processBatchPayments} disabled={isProcessing || selectedPlayers.filter(p => paymentData[p.id]?.method === 'cash').length === 0} className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
-              {isProcessing ? 'Saving...' : `Save ${selectedPlayers.filter(p => paymentData[p.id]?.method === 'cash').length} Cash Payments`}
+            
+            {/* FIX: Dynamic Save Button Text and Logic */}
+            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
+              {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
             </button>
           </div>
         </div>
