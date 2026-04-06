@@ -48,9 +48,11 @@ export default function Setup() {
   const [umpireFee, setUmpireFee] = useState<number>(70);
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
 
+  // --- PLAYER STATE UPDATED WITH EMAIL ---
   const [playerTeamId, setPlayerTeamId] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [playerEmail, setPlayerEmail] = useState("");
   const [isMember, setIsMember] = useState(true);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
 
@@ -285,23 +287,12 @@ export default function Setup() {
   }
 
   async function togglePaymentPermission(roleId: string, currentStatus: boolean) {
-    // Optimistic Update: Flip the switch in the UI instantly
-    setClubUsers(prev => prev.map(user => 
-      user.id === roleId ? { ...user, can_take_payments: !currentStatus } : user
-    ));
-
-    // Tell the database to update
+    setClubUsers(prev => prev.map(user => user.id === roleId ? { ...user, can_take_payments: !currentStatus } : user));
     const { error } = await supabase.from("user_roles").update({ can_take_payments: !currentStatus }).eq('id', roleId);
-    
     if (error) {
-      // If the database fails, revert the switch back and show error
-      setClubUsers(prev => prev.map(user => 
-        user.id === roleId ? { ...user, can_take_payments: currentStatus } : user
-      ));
+      setClubUsers(prev => prev.map(user => user.id === roleId ? { ...user, can_take_payments: currentStatus } : user));
       showToast(error.message, "error");
-    } else {
-      showToast(!currentStatus ? "Payment permission granted." : "Payment permission revoked.");
-    }
+    } else { showToast(!currentStatus ? "Payment permission granted." : "Payment permission revoked."); }
   }
 
   function resetTeamForm() { setTeamName(""); setEditingTeamId(null); setMemberFee(defaultMemberFee); setCasualFee(defaultCasualFee); setPrimaryColor(themeColor); setTeamSeasonStart(seasonStart); setTeamSeasonEnd(seasonEnd); }
@@ -326,11 +317,24 @@ export default function Setup() {
     if (error) showToast(error.message, "error"); else { showToast("Fixture saved!"); resetFixtureForm(); loadClubData(); }
   }
 
-  function resetPlayerForm() { setPlayerTeamId(""); setFirstName(""); setLastName(""); setIsMember(true); setEditingPlayerId(null); }
-  function startEditingPlayer(p: any) { setPlayerTeamId(p.default_team_id || ""); setFirstName(p.first_name); setLastName(p.last_name); setIsMember(p.is_member); setEditingPlayerId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  // --- PLAYER FUNCTIONS UPDATED WITH EMAIL ---
+  function resetPlayerForm() { setPlayerTeamId(""); setFirstName(""); setLastName(""); setPlayerEmail(""); setIsMember(true); setEditingPlayerId(null); }
+  function startEditingPlayer(p: any) { setPlayerTeamId(p.default_team_id || ""); setFirstName(p.first_name); setLastName(p.last_name); setPlayerEmail(p.email || ""); setIsMember(p.is_member); setEditingPlayerId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   async function savePlayer() {
     if (!firstName || !lastName) return showToast("Please enter player name.", "error");
-    const payload = { first_name: firstName, last_name: lastName, is_member: isMember, default_team_id: playerTeamId || null, club_id: clubId };
+    
+    // Clean the email if they entered one so it perfectly matches the invite process
+    const cleanEmail = playerEmail ? playerEmail.toLowerCase().trim() : null;
+    
+    const payload = { 
+      first_name: firstName, 
+      last_name: lastName, 
+      email: cleanEmail,
+      is_member: isMember, 
+      default_team_id: playerTeamId || null, 
+      club_id: clubId 
+    };
+    
     let error;
     if (editingPlayerId) { const res = await supabase.from("players").update(payload).eq("id", editingPlayerId); error = res.error; } 
     else { const res = await supabase.from("players").insert([payload]); error = res.error; }
@@ -769,6 +773,7 @@ export default function Setup() {
         </div>
       )}
 
+      {/* --- PLAYERS TAB UPDATED WITH EMAIL --- */}
       {clubId && clubId !== 'new' && activeTab === 'players' && (
         <div className="space-y-6 animate-in fade-in">
           <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
@@ -776,16 +781,23 @@ export default function Setup() {
               <h2 className="text-[11px] font-black uppercase italic text-emerald-500">{editingPlayerId ? 'Edit Player' : (isBulkMode ? 'Bulk Import' : 'Add Player')}</h2>
               {!editingPlayerId && <button onClick={() => {setIsBulkMode(!isBulkMode); setParsedPlayers([]);}} className="text-[10px] font-bold text-zinc-400 hover:text-white uppercase tracking-widest underline decoration-zinc-700">{isBulkMode ? 'Single Add' : 'Bulk Paste'}</button>}
             </div>
+            
             <select value={playerTeamId} onChange={(e) => setPlayerTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 mb-3">
               <option value="">-- No Default Team (Casual) --</option>
               {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
+            
             {!isBulkMode ? (
               <>
                 <div className="flex gap-2 mb-3">
                   <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
                   <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
                 </div>
+                
+                <div className="mb-3">
+                  <input type="email" placeholder="Email Address (Optional - For App Link)" value={playerEmail} onChange={(e) => setPlayerEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 placeholder:text-zinc-500" />
+                </div>
+
                 <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-xl mb-4 border border-zinc-700">
                   <span className="text-xs font-bold text-zinc-300 uppercase">Status</span>
                   <button onClick={() => setIsMember(!isMember)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-600 text-zinc-300'}`}>{isMember ? 'Member' : 'Casual'}</button>
@@ -802,14 +814,19 @@ export default function Setup() {
           </div>
           <div className="space-y-2">
             {players.map(p => (
-              <div key={p.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center group">
-                <div>
-                  <div className="font-bold text-white">{p.first_name} {p.last_name}</div>
-                  <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1">{teams.find(t => t.id === p.default_team_id)?.name || "Casual"}</div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => startEditingPlayer(p)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                  <button onClick={() => deleteItem('players', p.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
+              <div key={p.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-2 group">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-white">{p.first_name} {p.last_name}</div>
+                    <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1">
+                      {teams.find(t => t.id === p.default_team_id)?.name || "Casual"} 
+                      {p.email && ` • ${p.email}`}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => startEditingPlayer(p)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
+                    <button onClick={() => deleteItem('players', p.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
+                  </div>
                 </div>
               </div>
             ))}

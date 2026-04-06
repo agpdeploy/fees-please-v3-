@@ -62,17 +62,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: roleError.message }, { status: 400 });
     }
 
-    // 3. The Roster Auto-Merge
-    // Extract a default name from their email (e.g., tony@gmail.com -> Tony)
+    // 3. The BULLETPROOF Roster Auto-Merge
     const namePart = cleanEmail.split('@')[0];
-    const firstName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    const firstNameFallback = namePart.charAt(0).toUpperCase() + namePart.slice(1);
 
-    // Look for an existing player without an assigned user_id matching the first name
+    // Look for an existing player matching the exact email OR the first name fallback
     const { data: existingPlayer } = await supabaseAdmin.from('players')
       .select('id')
       .eq('club_id', club_id)
       .is('user_id', null) 
-      .ilike('first_name', `%${firstName}%`)
+      .or(`email.eq.${cleanEmail},first_name.ilike.%${firstNameFallback}%`)
       .limit(1)
       .single();
       
@@ -88,7 +87,8 @@ export async function POST(req: Request) {
       // NO MATCH: They are brand new. Create a new player record for the captain.
       await supabaseAdmin.from('players').insert({
         user_id: userId,
-        first_name: firstName,
+        email: cleanEmail,
+        first_name: firstNameFallback,
         last_name: "(Captain)",
         club_id: club_id,
         default_team_id: team_id,
