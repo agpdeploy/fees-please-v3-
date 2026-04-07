@@ -43,7 +43,7 @@ export default function Login() {
         <div className="text-center mb-10">
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-emerald-500 mb-2">Fees Please</h1>
           <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
-            Sports team management, simplified.
+           Less chasing. More playing.
           </p>
         </div>
 
@@ -122,7 +122,7 @@ export default function Login() {
       </div>
 
       <div className="absolute bottom-4 text-[9px] text-zinc-700 font-black tracking-widest uppercase">
-        v3.3.0
+       
       </div>
     </div>
   );

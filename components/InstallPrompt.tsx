@@ -78,8 +78,13 @@ export default function InstallPrompt() {
     <div className="fixed bottom-24 left-4 right-4 z-[150] animate-in slide-in-from-bottom-5 fade-in duration-300">
       <div className="bg-zinc-900 border border-zinc-700 shadow-2xl rounded-2xl p-4 flex items-center gap-4">
         
-        <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center shrink-0">
-          <i className="fa-solid fa-download text-lg"></i>
+        {/* UPDATED ICON CONTAINER */}
+        <div className="w-10 h-10 shrink-0">
+          <img 
+            src="/icon-192x192.png" /* <-- Change this to match the actual file name in your public folder */
+            alt="Fees Please App Icon"
+            className="w-full h-full object-cover rounded-xl shadow-sm"
+          />
         </div>
         
         <div className="flex-1">
