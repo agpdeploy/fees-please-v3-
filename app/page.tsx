@@ -1,4 +1,4 @@
-// Deploy version 3.6 - PWA Install Prompt Added
+// Deploy version 3.7 - Clean Page (No Install Prompt Imports)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,7 +10,6 @@ import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
-import InstallPrompt from "../components/InstallPrompt"; // <-- IMPORTED HERE
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -97,17 +96,14 @@ export default function Home() {
 
   // --- ROBUST LOGOUT ---
   const handleLogout = async () => {
-    // 1. Immediately close the sidebar and show the loading screen
     setIsSidebarOpen(false);
     setIsCheckingAuth(true); 
     
     try {
-      // 2. Tell Supabase to destroy the token
       await supabase.auth.signOut();
     } catch (error) {
       console.error("Logout Error:", error);
     } finally {
-      // 3. Guarantee a clean wipe and redirect, even if the network hangs
       sessionStorage.clear();
       window.location.href = '/'; 
     }
@@ -204,9 +200,6 @@ export default function Home() {
           {activeTab === "setup" && isAdmin && <Setup />}
         </main>
 
-        {/* --- INSTALL PROMPT ADDED HERE --- */}
-        <InstallPrompt />
-
         <nav className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-black/95 backdrop-blur-md pb-8 pt-4 z-40 transition-colors">
           <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
             <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" ? "text-brand" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
@@ -240,7 +233,7 @@ export default function Home() {
                   </button>
                 )}
                 
-                <button onClick={() => { alert('Fees Please v3.6\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
+                <button onClick={() => { alert('Fees Please v3.7\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
                   <i className="fa-solid fa-circle-info text-zinc-500 w-5"></i> About App
                 </button>
                 <button onClick={() => window.location.reload()} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">

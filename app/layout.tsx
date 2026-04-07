@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import InstallPrompt from '@/components/InstallPrompt' // <-- IMPORTED HERE
 import "./globals.css"
 
 const inter = Inter({ subsets: ['latin'] })
@@ -50,6 +51,8 @@ export default function RootLayout({
         >
           <ClubProvider>
             {children}
+            {/* --- ADDED RIGHT HERE SO IT FLOATS OVER EVERYTHING --- */}
+            <InstallPrompt /> 
           </ClubProvider>
         </ThemeProvider>
       </body>

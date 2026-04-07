@@ -9,6 +9,11 @@ export default function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+    
     // 1. Check if they are already using the installed app
     const checkStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     setIsStandalone(checkStandalone);
@@ -53,7 +58,6 @@ export default function InstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Optional: Save to localStorage here so you don't bug them again for 7 days
   };
 
   if (isStandalone || !showPrompt) return null;
