@@ -2,10 +2,20 @@
 
 import { useState, useEffect } from 'react';
 
+// Define the native browser event for TypeScript
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: Array<string>;
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed',
+    platform: string
+  }>;
+  prompt(): Promise<void>;
+}
+
 export default function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(true); // Default to true to prevent flash
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
@@ -34,7 +44,9 @@ export default function InstallPrompt() {
     // 3. Android Detection (Intersects the native install prompt)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault(); // Stop Chrome from showing the ugly default banner
-      setDeferredPrompt(e);
+      // Cast the event to our custom interface
+      const promptEvent = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(promptEvent);
       setShowPrompt(true);
     };
 
