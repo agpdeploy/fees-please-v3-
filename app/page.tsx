@@ -1,4 +1,4 @@
-// Deploy version 3.4 - Workspace Switcher Fix & Header UI
+// Deploy version 3.5 - Robust Logout Fix
 "use client";
 
 import { useState, useEffect } from "react";
@@ -67,9 +67,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- THE FIX: RESPECT THE SWITCHER ---
   useEffect(() => {
-    // Only set a default if one isn't currently active
     if (!activeClubId && profile?.club_id && profile?.role !== 'super_admin') {
       setActiveClubId(profile.club_id);
     }
@@ -96,10 +94,22 @@ export default function Home() {
     }
   }, [profile, isAdmin, activeTab]);
 
+  // --- THE FIX: ROBUST LOGOUT ---
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    sessionStorage.removeItem("activeTab");
-    window.location.reload(); 
+    // 1. Immediately close the sidebar and show the loading screen
+    setIsSidebarOpen(false);
+    setIsCheckingAuth(true); 
+    
+    try {
+      // 2. Tell Supabase to destroy the token
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Logout Error:", error);
+    } finally {
+      // 3. Guarantee a clean wipe and redirect, even if the network hangs
+      sessionStorage.clear();
+      window.location.href = '/'; 
+    }
   };
 
   if (isCheckingAuth || profileLoading) {
@@ -110,6 +120,8 @@ export default function Home() {
       </div>
     );
   }
+
+  if (!session) return <Login />;
 
   const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role || profile?.role;
   const displayRole = profile?.role === 'super_admin' ? 'God Mode' : 
@@ -128,7 +140,6 @@ export default function Home() {
 
       <div className="flex flex-col min-h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         
-        {/* --- HEADER UI UPDATED --- */}
         <header className="sticky top-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white/80 dark:bg-black/80 backdrop-blur-md z-40 transition-colors">
           <button 
             onClick={() => uniqueClubs.length > 1 && setShowClubMenu(true)} 
@@ -155,7 +166,6 @@ export default function Home() {
           </button>
         </header>
 
-        {/* --- CLUB SWITCHER MODAL --- */}
         {showClubMenu && uniqueClubs.length > 1 && (
           <div className="fixed inset-0 z-[200] flex justify-center items-start pt-20 px-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowClubMenu(false)}></div>
@@ -226,7 +236,7 @@ export default function Home() {
                   </button>
                 )}
                 
-                <button onClick={() => { alert('Fees Please v3.4\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
+                <button onClick={() => { alert('Fees Please v3.5\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
                   <i className="fa-solid fa-circle-info text-zinc-500 w-5"></i> About App
                 </button>
                 <button onClick={() => window.location.reload()} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
