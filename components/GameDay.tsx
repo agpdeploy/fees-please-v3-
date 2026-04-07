@@ -217,7 +217,7 @@ export default function GameDay() {
         `S.com.squareup.pos.API_VERSION=v2.0;` +
         `i.com.squareup.pos.TOTAL_AMOUNT=${amountCents};` +
         `S.com.squareup.pos.CURRENCY_CODE=AUD;` +
-        `S.com.squareup.pos.TENDER_TYPES=com.squareup.pos.TENDER_CARD,com.squareup.pos.TENDER_CONTACTLESS;` +
+        `S.com.squareup.pos.TENDER_TYPES=com.squareup.pos.TENDER_CARD;` +
         `S.com.squareup.pos.NOTE=${encodeURIComponent(matchNotes)};` + 
         `end`;
       window.location.href = androidIntent;
