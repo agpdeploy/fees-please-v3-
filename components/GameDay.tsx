@@ -1,17 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareGross } from '@/lib/fees';
-import { uploadSquadGraphic, shareSquadGraphic } from '@/lib/share-squad';
-import SquadTemplate from "@/components/SquadTemplate";
 
 export default function GameDay() {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
-  const squadImageRef = useRef<HTMLDivElement>(null);
 
   const [themeColor, setThemeColor] = useState("#10b981");
   const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '' });
@@ -37,12 +34,6 @@ export default function GameDay() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
-  
-  // Announcement States
-  const [extraNotes, setExtraNotes] = useState("");
-  const [matchTime, setMatchTime] = useState("");
-  const [matchLocation, setMatchLocation] = useState("");
-  const [isSharing, setIsSharing] = useState(false);
   
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -238,31 +229,6 @@ export default function GameDay() {
     }, 2500);
   };
 
-  // --- SHARE FUNCTION (NATIVE/CLIPBOARD) ---
-  async function handleShare() {
-    if (!squadImageRef.current || !activeFixture || !activeClubId) return;
-    setIsSharing(true);
-    
-    try {
-      showToast("Generating graphic...");
-      const publicUrl = await uploadSquadGraphic(squadImageRef.current, activeFixture.id);
-      
-      const result = await shareSquadGraphic(squad, activeFixture.opponent, publicUrl, matchTime, matchLocation, extraNotes);
-
-      if (result.method === 'clipboard') {
-        showToast("Copied to clipboard!");
-      } else if (result.method === 'native') {
-        showToast("Share menu opened!");
-      }
-      
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to share", "error");
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
   function togglePlayerSelection(id: string) {
     if (selectedPlayerIds.includes(id)) {
       setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
@@ -346,10 +312,17 @@ export default function GameDay() {
       {selectedTeamId && activeFixture ? (
         <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden transition-colors">
           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-start">
             <div>
               <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-1">{new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-1">
+                {activeFixture.start_time && `${activeFixture.start_time} • `}
+                {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                {activeFixture.location && ` • ${activeFixture.location}`}
+              </p>
+              {activeFixture.notes && (
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1.5 italic font-bold">{activeFixture.notes}</p>
+              )}
             </div>
             <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
               <i className="fa-solid fa-user-plus text-lg"></i>
@@ -361,67 +334,6 @@ export default function GameDay() {
           <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No upcoming fixtures found.</p>
         </div>
       ) : null}
-
-      {/* --- ANNOUNCEMENT DRAFT AREA --- */}
-      {activeFixture && squad.length > 0 && (
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg transition-colors">
-          <div className="flex justify-between items-center mb-3 px-1">
-            <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Squad Announcement</h3>
-          </div>
-          
-          <div className="space-y-3 mb-4">
-            <div className="flex gap-3">
-              <input 
-                type="text"
-                placeholder="Time (e.g. 7:15 PM)"
-                className="w-1/3 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
-                value={matchTime}
-                onChange={(e) => setMatchTime(e.target.value)}
-              />
-              <input 
-                type="text"
-                placeholder="Location (e.g. 3/104 Gympie Rd)"
-                className="flex-1 bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
-                value={matchLocation}
-                onChange={(e) => setMatchLocation(e.target.value)}
-              />
-            </div>
-            <input 
-              type="text"
-              placeholder="Captain's Note (e.g. Meet at 12:15pm)"
-              className="w-full bg-zinc-50 dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl p-3 text-sm text-zinc-900 dark:text-white focus:border-emerald-500 outline-none transition-colors"
-              value={extraNotes}
-              onChange={(e) => setExtraNotes(e.target.value)}
-            />
-          </div>
-
-          <button 
-            onClick={handleShare} 
-            disabled={isSharing}
-            className="w-full font-black py-4 rounded-xl uppercase tracking-widest text-xs flex items-center justify-center gap-3 active:scale-[0.98] transition-transform disabled:opacity-50"
-            style={{ backgroundColor: themeColor, color: '#000' }}
-          >
-            <i className="fa-solid fa-share-nodes text-lg"></i>
-            {isSharing ? 'Processing...' : 'Generate & Share Squad'}
-          </button>
-        </div>
-      )}
-
-      {/* --- THE HIDDEN TEMPLATE --- */}
-      <div className="absolute top-[-9999px] left-[-9999px]">
-        <SquadTemplate 
-          innerRef={squadImageRef}
-          clubName={clubInfo.name}
-          logo={clubInfo.logo}
-          opponent={activeFixture?.opponent}
-          matchDate={new Date(activeFixture?.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-          matchTime={matchTime}
-          matchLocation={matchLocation}
-          squad={squad}
-          notes={extraNotes}
-          themeColor={themeColor}
-        />
-      </div>
 
       {/* --- PAYMENT & COLLECTION AREA --- */}
       {activeFixture && (
@@ -448,7 +360,7 @@ export default function GameDay() {
                     className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                     style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
                   >
-                    {player.first_name} {player.last_name?.charAt(0)}.
+                    {player.nickname || `${player.first_name} ${player.last_name?.charAt(0)}.`}
                     {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
                   </button>
                 );
@@ -460,7 +372,7 @@ export default function GameDay() {
             <div>
               <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3 px-1 mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4 transition-colors">Paid Today ({squadPaid.length})</h2>
               <div className="flex flex-wrap gap-2">
-                 {squadPaid.map(p => (<div key={p.id} className="px-3 py-2 rounded-xl font-bold text-[10px] uppercase bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-800/50 flex items-center gap-2 transition-colors"><i className="fa-solid fa-check text-emerald-500/50"></i> {p.first_name} {p.last_name?.charAt(0)}.</div>))}
+                 {squadPaid.map(p => (<div key={p.id} className="px-3 py-2 rounded-xl font-bold text-[10px] uppercase bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-800/50 flex items-center gap-2 transition-colors"><i className="fa-solid fa-check text-emerald-500/50"></i> {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}</div>))}
               </div>
             </div>
           )}
@@ -479,7 +391,9 @@ export default function GameDay() {
                 <button onClick={() => togglePlayerSelection(player.id)} className="absolute top-4 right-4 text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"><i className="fa-solid fa-xmark"></i></button>
                 <div className="flex justify-between items-start mb-4 pr-6">
                   <div>
-                    <h3 className="text-zinc-900 dark:text-white font-black text-sm uppercase tracking-wide">{player.first_name} {player.last_name}</h3>
+                    <h3 className="text-zinc-900 dark:text-white font-black text-sm uppercase tracking-wide">
+                      {player.nickname || `${player.first_name} ${player.last_name}`}
+                    </h3>
                     <div className="flex gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
                       {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
                       <span className="text-emerald-500">Fee: ${matchFee}</span>
@@ -554,9 +468,9 @@ export default function GameDay() {
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
-                {availablePlayers.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
+                {availablePlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
                   <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
-                    <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name}</span>
+                    <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
                     <i className="fa-solid fa-plus" style={{ color: themeColor }}></i>
                   </button>
                 ))}

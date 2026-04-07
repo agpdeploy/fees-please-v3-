@@ -42,16 +42,22 @@ export default function Setup() {
   const [squareLocationId, setSquareLocationId] = useState("");
   const [isSquareEnabled, setIsSquareEnabled] = useState(false);
 
+  // --- FIXTURE STATE UPDATED ---
   const [fixtureTeamId, setFixtureTeamId] = useState("");
   const [opponent, setOpponent] = useState("");
   const [matchDate, setMatchDate] = useState("");
+  const [fixtureTime, setFixtureTime] = useState(""); 
+  const [fixtureLocation, setFixtureLocation] = useState(""); 
+  const [fixtureNotes, setFixtureNotes] = useState(""); 
   const [umpireFee, setUmpireFee] = useState<number>(70);
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
 
-  // --- PLAYER STATE UPDATED WITH EMAIL ---
+  // --- PLAYER STATE UPDATED ---
   const [playerTeamId, setPlayerTeamId] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [playerNickname, setPlayerNickname] = useState(""); 
+  const [playerMobile, setPlayerMobile] = useState(""); 
   const [playerEmail, setPlayerEmail] = useState("");
   const [isMember, setIsMember] = useState(true);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
@@ -307,28 +313,36 @@ export default function Setup() {
     if (error) showToast(error.message, "error"); else { showToast("Team saved successfully!"); resetTeamForm(); loadClubData(); }
   }
 
-  function resetFixtureForm() { setFixtureTeamId(""); setOpponent(""); setMatchDate(""); setUmpireFee(70); setEditingFixtureId(null); }
-  function startEditingFixture(f: any) { setFixtureTeamId(f.team_id); setOpponent(f.opponent); setMatchDate(f.match_date); setUmpireFee(f.umpire_fee || 0); setEditingFixtureId(f.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function resetFixtureForm() { setFixtureTeamId(""); setOpponent(""); setMatchDate(""); setFixtureTime(""); setFixtureLocation(""); setFixtureNotes(""); setUmpireFee(70); setEditingFixtureId(null); }
+  
+  function startEditingFixture(f: any) { setFixtureTeamId(f.team_id); setOpponent(f.opponent); setMatchDate(f.match_date); setFixtureTime(f.start_time || ""); setFixtureLocation(f.location || ""); setFixtureNotes(f.notes || ""); setUmpireFee(f.umpire_fee || 0); setEditingFixtureId(f.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  
   async function saveFixture() {
     if (!opponent || !matchDate || !fixtureTeamId) return showToast("Please fill all match fields.", "error");
+    
+    const payload = { team_id: fixtureTeamId, opponent, match_date: matchDate, start_time: fixtureTime, location: fixtureLocation, notes: fixtureNotes, umpire_fee: umpireFee };
+
     let error;
-    if (editingFixtureId) { const res = await supabase.from("fixtures").update({ team_id: fixtureTeamId, opponent, match_date: matchDate, umpire_fee: umpireFee }).eq("id", editingFixtureId); error = res.error; } 
-    else { const res = await supabase.from("fixtures").insert([{ team_id: fixtureTeamId, opponent, match_date: matchDate, umpire_fee: umpireFee }]); error = res.error; }
+    if (editingFixtureId) { const res = await supabase.from("fixtures").update(payload).eq("id", editingFixtureId); error = res.error; } 
+    else { const res = await supabase.from("fixtures").insert([payload]); error = res.error; }
     if (error) showToast(error.message, "error"); else { showToast("Fixture saved!"); resetFixtureForm(); loadClubData(); }
   }
 
-  // --- PLAYER FUNCTIONS UPDATED WITH EMAIL ---
-  function resetPlayerForm() { setPlayerTeamId(""); setFirstName(""); setLastName(""); setPlayerEmail(""); setIsMember(true); setEditingPlayerId(null); }
-  function startEditingPlayer(p: any) { setPlayerTeamId(p.default_team_id || ""); setFirstName(p.first_name); setLastName(p.last_name); setPlayerEmail(p.email || ""); setIsMember(p.is_member); setEditingPlayerId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  // --- PLAYER FUNCTIONS UPDATED ---
+  function resetPlayerForm() { setPlayerTeamId(""); setFirstName(""); setLastName(""); setPlayerNickname(""); setPlayerMobile(""); setPlayerEmail(""); setIsMember(true); setEditingPlayerId(null); }
+  
+  function startEditingPlayer(p: any) { setPlayerTeamId(p.default_team_id || ""); setFirstName(p.first_name); setLastName(p.last_name); setPlayerNickname(p.nickname || ""); setPlayerMobile(p.mobile_number || ""); setPlayerEmail(p.email || ""); setIsMember(p.is_member); setEditingPlayerId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  
   async function savePlayer() {
     if (!firstName || !lastName) return showToast("Please enter player name.", "error");
     
-    // Clean the email if they entered one so it perfectly matches the invite process
     const cleanEmail = playerEmail ? playerEmail.toLowerCase().trim() : null;
     
     const payload = { 
       first_name: firstName, 
       last_name: lastName, 
+      nickname: playerNickname || null,
+      mobile_number: playerMobile || null,
       email: cleanEmail,
       is_member: isMember, 
       default_team_id: playerTeamId || null, 
@@ -773,7 +787,7 @@ export default function Setup() {
         </div>
       )}
 
-      {/* --- PLAYERS TAB UPDATED WITH EMAIL --- */}
+      {/* --- PLAYERS TAB UPDATED --- */}
       {clubId && clubId !== 'new' && activeTab === 'players' && (
         <div className="space-y-6 animate-in fade-in">
           <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
@@ -792,6 +806,11 @@ export default function Setup() {
                 <div className="flex gap-2 mb-3">
                   <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
                   <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                </div>
+                
+                <div className="flex gap-2 mb-3">
+                  <input type="text" placeholder="Nickname (e.g. Aitcho)" value={playerNickname} onChange={(e) => setPlayerNickname(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                  <input type="tel" placeholder="Mobile Number" value={playerMobile} onChange={(e) => setPlayerMobile(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
                 </div>
                 
                 <div className="mb-3">
@@ -817,7 +836,9 @@ export default function Setup() {
               <div key={p.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-2 group">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-white">{p.first_name} {p.last_name}</div>
+                    <div className="font-bold text-white">
+                      {p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic">"{p.nickname}"</span>}
+                    </div>
                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1">
                       {teams.find(t => t.id === p.default_team_id)?.name || "Casual"} 
                       {p.email && ` • ${p.email}`}
@@ -834,6 +855,7 @@ export default function Setup() {
         </div>
       )}
 
+      {/* --- FIXTURES TAB UPDATED --- */}
       {clubId && clubId !== 'new' && activeTab === 'fixtures' && (
         <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
           <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
@@ -846,6 +868,12 @@ export default function Setup() {
             <div className="space-y-3 mb-4">
               <input type="text" placeholder="Opponent" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
               <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 color-scheme-dark" />
+              
+              <div className="flex gap-2">
+                <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+              </div>
+              <input type="text" placeholder="Match Notes" value={fixtureNotes} onChange={(e) => setFixtureNotes(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
             </div>
             <button onClick={saveFixture} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white ${editingFixtureId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingFixtureId ? 'Update Fixture' : 'Save Fixture'}</button>
           </div>
@@ -854,7 +882,7 @@ export default function Setup() {
               <div key={f.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-3 group">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">{new Date(f.match_date).toLocaleDateString()}</div>
+                    <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">{new Date(f.match_date).toLocaleDateString()} {f.start_time && `• ${f.start_time}`}</div>
                     <div className="font-bold text-white flex items-center gap-2">{f.teams?.name} vs {f.opponent}</div>
                   </div>
                   <div className="flex gap-2">
@@ -884,11 +912,11 @@ export default function Setup() {
               <div>
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3">Core Team</h3>
                 <div className="space-y-2">
-                  {players.filter(p => p.default_team_id === activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
+                  {players.filter(p => p.default_team_id === activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                     const isSelected = squadPlayerIds.includes(p.id);
                     return (
                       <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-colors">
-                        <span className="font-bold text-white text-sm">{p.first_name} {p.last_name}</span>
+                        <span className="font-bold text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${isSelected ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
                       </div>
                     );
@@ -898,11 +926,11 @@ export default function Setup() {
               <div>
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3">Other Members</h3>
                 <div className="space-y-2">
-                  {players.filter(p => p.default_team_id !== activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
+                  {players.filter(p => p.default_team_id !== activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                     const isSelected = squadPlayerIds.includes(p.id);
                     return (
                       <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-colors">
-                        <span className="font-bold text-white text-sm">{p.first_name} {p.last_name}</span>
+                        <span className="font-bold text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${isSelected ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
                       </div>
                     );
@@ -928,7 +956,7 @@ export default function Setup() {
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
               <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
               <div className="space-y-2">
-                {players.filter(p => `${p.first_name} ${p.last_name}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
+                {players.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                   const isSelected = rosterPlayerIds.includes(p.id);
                   return (
                     <div key={p.id} onClick={() => toggleRosterPlayer(p.id)} className="flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl cursor-pointer">
