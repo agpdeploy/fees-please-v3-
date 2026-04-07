@@ -54,7 +54,8 @@ export default function GameDay() {
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
       if (!pendingTxStr) {
-        window.history.replaceState({}, document.title, '/');
+        // Clean URL if we somehow get here without a pending transaction
+        window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
 
@@ -71,13 +72,11 @@ export default function GameDay() {
       }
 
       if (isSuccess) {
-        // Record the fee charge
         supabase.from("transactions").insert([{ 
           player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
           fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
           amount: pendingTx.fee_amount, transaction_type: 'fee' 
         }]).then(() => {
-          // Record the card payment
           supabase.from("transactions").insert([{ 
             player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
             fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
@@ -85,17 +84,17 @@ export default function GameDay() {
           }]).then(() => {
             localStorage.removeItem('square_pending_tx');
             showToast("Payment Successful!");
-            window.history.replaceState({}, document.title, '/'); // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
             loadSquadData(); // Refresh the board instantly
           });
         });
       } else {
-        showToast("Payment was cancelled or failed.", "error");
+        showToast("Payment was cancelled or failed in Square.", "error");
         localStorage.removeItem('square_pending_tx');
-        window.history.replaceState({}, document.title, '/');
+        window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
       }
     }
-  }, [activeFixture, activeClubId]); // Added dependencies to ensure it can reload squad
+  }, [activeFixture, activeClubId]); // Ensure dependencies allow loadSquadData to work
 
   useEffect(() => {
     if (activeClubId) {
@@ -111,6 +110,7 @@ export default function GameDay() {
     }
   }, [activeClubId]);
 
+  // THE CROSS-CLUB BLEED FIX IS HERE
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
@@ -120,6 +120,7 @@ export default function GameDay() {
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
+        // Explicitly filter roles so only teams belonging to the ACTIVE club are loaded
         const teamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) query = query.in('id', teamIds);
         else { setTeams([]); setLoading(false); return; }
@@ -128,7 +129,7 @@ export default function GameDay() {
       const { data } = await query;
       if (data) {
         setTeams(data);
-        if (data.length === 1) setSelectedTeamId(data[0].id); 
+        if (data.length === 1) setSelectedTeamId(data[0].id); // Auto-selects if only 1 team!
       }
       setLoading(false);
     }
@@ -195,7 +196,7 @@ export default function GameDay() {
     }));
 
     // Ensure trailing slash so Android correctly identifies it as the PWA root scope
-    const callbackUrl = window.location.origin + '/'; 
+    const callbackUrl = window.location.origin + '/';
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
     
     if (!appId) {
@@ -203,6 +204,7 @@ export default function GameDay() {
     }
 
     const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
