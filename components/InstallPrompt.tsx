@@ -15,6 +15,11 @@ export default function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
+    // 0. ALWAYS Register Service Worker first (Required for PWA)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+
     // 1. DESKTOP CHECK: If it's a mouse-user (fine pointer), don't auto-show
     const isMobile = window.matchMedia('(pointer: coarse)').matches;
     if (!isMobile) return;
@@ -26,11 +31,12 @@ export default function InstallPrompt() {
       if (Date.now() - parseInt(lastDismissed) < sevenDaysInMs) return;
     }
 
+    // 3. Standalone Check
     const checkStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     setIsStandalone(checkStandalone);
     if (checkStandalone) return;
 
-    // iOS Logic
+    // 4. iOS Logic
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(isIOSDevice);
@@ -39,7 +45,7 @@ export default function InstallPrompt() {
       return () => clearTimeout(timer);
     }
 
-    // Android/Chrome Logic
+    // 5. Android/Chrome Logic
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault(); 
       setDeferredPrompt(e as BeforeInstallPromptEvent);
