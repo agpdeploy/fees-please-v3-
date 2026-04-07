@@ -81,7 +81,7 @@ export default function InstallPrompt() {
         {/* UPDATED ICON CONTAINER */}
         <div className="w-10 h-10 shrink-0">
           <img 
-            src="/icon-192x192.png" /* <-- Change this to match the actual file name in your public folder */
+            src="/icon-192.png" /* <-- Change this to match the actual file name in your public folder */
             alt="Fees Please App Icon"
             className="w-full h-full object-cover rounded-xl shadow-sm"
           />
