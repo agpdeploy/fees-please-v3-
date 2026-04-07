@@ -47,9 +47,9 @@ export default function GameDay() {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
     
-    const dataString = urlParams.get('data');
-    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); 
-    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE');
+    const dataString = urlParams.get('data'); // iOS
+    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); // Android Success
+    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE'); // Android Fail
 
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
@@ -71,27 +71,31 @@ export default function GameDay() {
       }
 
       if (isSuccess) {
+        // Record the fee charge
         supabase.from("transactions").insert([{ 
           player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
           fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
           amount: pendingTx.fee_amount, transaction_type: 'fee' 
         }]).then(() => {
+          // Record the card payment
           supabase.from("transactions").insert([{ 
             player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
             fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
             amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card' 
           }]).then(() => {
             localStorage.removeItem('square_pending_tx');
-            window.location.href = '/'; 
+            showToast("Payment Successful!");
+            window.history.replaceState({}, document.title, '/'); // Clean URL
+            loadSquadData(); // Refresh the board instantly
           });
         });
       } else {
-        showToast("Payment was cancelled or failed in Square.", "error");
+        showToast("Payment was cancelled or failed.", "error");
         localStorage.removeItem('square_pending_tx');
         window.history.replaceState({}, document.title, '/');
       }
     }
-  }, []);
+  }, [activeFixture, activeClubId]); // Added dependencies to ensure it can reload squad
 
   useEffect(() => {
     if (activeClubId) {
@@ -107,7 +111,6 @@ export default function GameDay() {
     }
   }, [activeClubId]);
 
-  // THE CROSS-CLUB BLEED FIX IS HERE
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
@@ -117,7 +120,6 @@ export default function GameDay() {
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) query = query.eq('club_id', activeClubId);
       } else {
-        // Explicitly filter roles so only teams belonging to the ACTIVE club are loaded
         const teamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) query = query.in('id', teamIds);
         else { setTeams([]); setLoading(false); return; }
@@ -126,7 +128,7 @@ export default function GameDay() {
       const { data } = await query;
       if (data) {
         setTeams(data);
-        if (data.length === 1) setSelectedTeamId(data[0].id); // Auto-selects if only 1 team!
+        if (data.length === 1) setSelectedTeamId(data[0].id); 
       }
       setLoading(false);
     }
@@ -192,10 +194,15 @@ export default function GameDay() {
       player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount, fee_amount: feeAmount 
     }));
 
-    const callbackUrl = window.location.origin;
+    // Ensure trailing slash so Android correctly identifies it as the PWA root scope
+    const callbackUrl = window.location.origin + '/'; 
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-    const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+    
+    if (!appId) {
+      return showToast("Square App ID is missing.", "error");
+    }
 
+    const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {

@@ -3,6 +3,7 @@
   "short_name": "FeesPlease",
   "description": "Less chasing. More playing.",
   "start_url": "/",
+  "scope": "/", 
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#10b981",
