@@ -51,9 +51,9 @@ export default function GameDay() {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
     
-    const dataString = urlParams.get('data'); // iOS
-    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); // Android Success
-    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE'); // Android Fail
+    const dataString = urlParams.get('data'); 
+    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); 
+    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE'); 
 
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
@@ -97,7 +97,7 @@ export default function GameDay() {
         window.history.replaceState({}, document.title, window.location.pathname); 
       }
     }
-  }, [activeFixture, activeClubId]);
+  }, [activeFixture, activeClubId]); 
 
   useEffect(() => {
     if (activeClubId) {
@@ -113,7 +113,6 @@ export default function GameDay() {
     }
   }, [activeClubId]);
 
-  // THE CROSS-CLUB BLEED FIX IS HERE
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
@@ -171,30 +170,6 @@ export default function GameDay() {
           });
         }
         setPlayerDebts(debts); setPaidPlayerIds(paidToday);
-
-        // --- RESTORE DRAFT STATE AFTER REDIRECT ---
-        const draftStateStr = localStorage.getItem('gameday_draft_state');
-        if (draftStateStr) {
-          try {
-            const draft = JSON.parse(draftStateStr);
-            const validSelectedIds = (draft.selectedPlayerIds || []).filter((id: string) => !paidToday.includes(id));
-            
-            const validPaymentData: Record<string, any> = {};
-            validSelectedIds.forEach((id: string) => {
-              if (draft.paymentData && draft.paymentData[id]) {
-                validPaymentData[id] = draft.paymentData[id];
-              }
-            });
-
-            setSelectedPlayerIds(validSelectedIds);
-            setPaymentData(validPaymentData);
-            if (draft.payUmpire) setPayUmpire(true);
-
-            localStorage.removeItem('gameday_draft_state');
-          } catch (e) {
-            console.error("Failed to parse draft state", e);
-          }
-        }
       }
     } else {
       setSquad([]);
@@ -203,7 +178,6 @@ export default function GameDay() {
   
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
-  // --- SQUARE TAP TO PAY ---
   const initiateTapToPay = (player: any) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (!isMobile) {
@@ -212,13 +186,6 @@ export default function GameDay() {
 
     const netAmount = paymentData[player.id]?.amount || 0;
     if (netAmount <= 0) return showToast("Amount must be > $0", "error");
-
-    // --- SAVE CURRENT SELECTIONS BEFORE LEAVING THE APP ---
-    localStorage.setItem('gameday_draft_state', JSON.stringify({
-      selectedPlayerIds,
-      paymentData,
-      payUmpire
-    }));
 
     const grossAmount = calculateSquareGross(netAmount);
     const amountCents = Math.round(grossAmount * 100);
@@ -236,6 +203,7 @@ export default function GameDay() {
     }
 
     const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
@@ -319,6 +287,17 @@ export default function GameDay() {
     loadSquadData(); 
   }
 
+  // --- NEW: INCREMENT HELPER ---
+  // This updates the local state so the UI knows they've used a credit instantly.
+  const handleReportGenerated = () => {
+    if (activeFixture) {
+      setActiveFixture({
+        ...activeFixture,
+        ai_reports_generated: (activeFixture.ai_reports_generated || 0) + 1
+      });
+    }
+  };
+
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
@@ -352,73 +331,33 @@ export default function GameDay() {
       )}
 
       {selectedTeamId && activeFixture ? (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-colors">
-          
-          {/* TOP HEADER: Status & Actions */}
-          <div className="flex justify-between items-center p-4 border-b border-zinc-100 dark:border-zinc-800">
-            <div className="flex items-center gap-3">
-              <span 
-                className="text-[10px] font-black uppercase px-2.5 py-1 rounded text-white tracking-widest"
-                style={{ backgroundColor: themeColor }}
-              >
-                Upcoming
-              </span>
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+        <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden transition-colors">
+          <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: themeColor }}></div>
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>vs {activeFixture.opponent}</h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-1">
+                {activeFixture.start_time && `${activeFixture.start_time} • `}
                 {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-              </span>
+                {activeFixture.location && ` • ${activeFixture.location}`}
+              </p>
+              {activeFixture.notes && (
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1.5 italic font-bold">{activeFixture.notes}</p>
+              )}
             </div>
             
-            {/* The AI and Add buttons scaled down to fit cleanly in the header */}
             <div className="flex gap-2">
-              <button onClick={() => setIsAiModalOpen(true)} className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity">
-                <i className="fa-solid fa-wand-magic-sparkles text-xs"></i>
+              <button 
+                onClick={() => setIsAiModalOpen(true)} 
+                className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white hover:opacity-90 flex items-center justify-center shadow-lg transition-all active:scale-95"
+              >
+                <i className="fa-solid fa-wand-magic-sparkles text-lg"></i>
               </button>
-              <button onClick={openQuickAdd} className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center transition-colors">
-                <i className="fa-solid fa-user-plus text-xs"></i>
+
+              <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
+                <i className="fa-solid fa-user-plus text-lg"></i>
               </button>
             </div>
-          </div>
-
-          {/* MIDDLE: Team vs Team Layout (PlayCricket Style) */}
-          <div className="p-5 space-y-4">
-            {/* Home Team */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
-                  {clubInfo.logo ? (
-                    <img src={clubInfo.logo} alt="Club Logo" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] font-black text-zinc-500">{clubInfo.name?.substring(0, 2).toUpperCase()}</span>
-                  )}
-                </div>
-                <span className="font-black text-sm uppercase tracking-wide text-zinc-900 dark:text-white">
-                  {currentTeamName}
-                </span>
-              </div>
-            </div>
-
-            {/* Away Team */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-                  <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
-                </div>
-                <span className="font-black text-sm uppercase tracking-wide text-zinc-900 dark:text-white">
-                  {activeFixture.opponent}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* BOTTOM: Format & Location */}
-          <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-3 border-t border-zinc-100 dark:border-zinc-800">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-              {activeFixture.start_time && `${activeFixture.start_time} • `}
-              {activeFixture.location || 'Location TBA'}
-            </p>
-            {activeFixture.notes && (
-              <p className="text-[10px] text-zinc-400 mt-1 italic font-medium">{activeFixture.notes}</p>
-            )}
           </div>
         </div>
       ) : selectedTeamId ? (
@@ -572,7 +511,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* --- AI REPORTER MODAL --- */}
+      {/* --- AI REPORTER MODAL W/ NEW PROPS --- */}
       <AiReporterModal 
         isOpen={isAiModalOpen} 
         onClose={() => setIsAiModalOpen(false)} 
@@ -580,6 +519,8 @@ export default function GameDay() {
         squad={squad}
         themeColor={themeColor}
         teamName={currentTeamName}
+        reportsGenerated={activeFixture?.ai_reports_generated || 0}
+        onReportIncrement={handleReportGenerated}
       />
     </div>
   );
