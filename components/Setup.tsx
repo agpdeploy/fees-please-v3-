@@ -30,10 +30,13 @@ export default function Setup() {
   const [seasonName, setSeasonName] = useState("");
   const [seasonStart, setSeasonStart] = useState("");
   const [seasonEnd, setSeasonEnd] = useState("");
-  const [defaultMemberFee, setDefaultMemberFee] = useState<number>(10);
-  const [defaultCasualFee, setDefaultCasualFee] = useState<number>(25);
+  
+  // --- THE FIX: Allow empty strings in numeric state ---
+  const [defaultMemberFee, setDefaultMemberFee] = useState<number | "">(10);
+  const [defaultCasualFee, setDefaultCasualFee] = useState<number | "">(25);
+  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(70);
+  
   const [expenseLabel, setExpenseLabel] = useState("Umpire Fee");
-  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number>(70); // NEW: Default Match Expense
   const [themeColor, setThemeColor] = useState("#10b981");
   const [themeFont, setThemeFont] = useState("Inter");
   
@@ -47,7 +50,10 @@ export default function Setup() {
   const [fixtureTime, setFixtureTime] = useState(""); 
   const [fixtureLocation, setFixtureLocation] = useState(""); 
   const [fixtureNotes, setFixtureNotes] = useState(""); 
-  const [umpireFee, setUmpireFee] = useState<number>(70);
+  
+  // --- THE FIX: Allow empty strings in numeric state ---
+  const [umpireFee, setUmpireFee] = useState<number | "">(70);
+  
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
 
   const [playerTeamId, setPlayerTeamId] = useState("");
@@ -64,8 +70,11 @@ export default function Setup() {
   const [parsedPlayers, setParsedPlayers] = useState<any[]>([]);
 
   const [teamName, setTeamName] = useState("");
-  const [memberFee, setMemberFee] = useState<number>(10);
-  const [casualFee, setCasualFee] = useState<number>(25);
+  
+  // --- THE FIX: Allow empty strings in numeric state ---
+  const [memberFee, setMemberFee] = useState<number | "">(10);
+  const [casualFee, setCasualFee] = useState<number | "">(25);
+  
   const [teamSeasonStart, setTeamSeasonStart] = useState("");
   const [teamSeasonEnd, setTeamSeasonEnd] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#10b981");
@@ -124,8 +133,8 @@ export default function Setup() {
       setSeasonName(clubData.season_name || "");
       setSeasonStart(clubData.season_start || "");
       setSeasonEnd(clubData.season_end || "");
-      setDefaultMemberFee(clubData.default_member_fee || 10);
-      setDefaultCasualFee(clubData.default_casual_fee || 25);
+      setDefaultMemberFee(clubData.default_member_fee !== undefined ? clubData.default_member_fee : 10);
+      setDefaultCasualFee(clubData.default_casual_fee !== undefined ? clubData.default_casual_fee : 25);
       setExpenseLabel(clubData.expense_label || "Umpire Fee");
       setDefaultUmpireFee(clubData.default_umpire_fee !== undefined ? clubData.default_umpire_fee : 70);
       setThemeColor(clubData.theme_color || "#10b981");
@@ -215,10 +224,10 @@ export default function Setup() {
       season_name: seasonName, 
       season_start: seasonStart || null, 
       season_end: seasonEnd || null, 
-      default_member_fee: defaultMemberFee, 
-      default_casual_fee: defaultCasualFee, 
+      default_member_fee: defaultMemberFee === "" ? 0 : defaultMemberFee, 
+      default_casual_fee: defaultCasualFee === "" ? 0 : defaultCasualFee, 
       expense_label: expenseLabel, 
-      default_umpire_fee: defaultUmpireFee,
+      default_umpire_fee: defaultUmpireFee === "" ? 0 : defaultUmpireFee,
       theme_color: themeColor, 
       theme_font: themeFont,
       square_access_token: squareAccessToken,
@@ -300,26 +309,79 @@ export default function Setup() {
     } else { showToast(!currentStatus ? "Payment permission granted." : "Payment permission revoked."); }
   }
 
-  function resetTeamForm() { setTeamName(""); setEditingTeamId(null); setMemberFee(defaultMemberFee); setCasualFee(defaultCasualFee); setPrimaryColor(themeColor); setTeamSeasonStart(seasonStart); setTeamSeasonEnd(seasonEnd); }
-  function startEditingTeam(t: any) { setTeamName(t.name); setMemberFee(t.member_fee || 10); setCasualFee(t.casual_fee || 25); setPrimaryColor(t.primary_color || "#10b981"); setTeamSeasonStart(t.season_start || ""); setTeamSeasonEnd(t.season_end || ""); setEditingTeamId(t.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function resetTeamForm() { 
+    setTeamName(""); 
+    setEditingTeamId(null); 
+    setMemberFee(defaultMemberFee || 10); 
+    setCasualFee(defaultCasualFee || 25); 
+    setPrimaryColor(themeColor); 
+    setTeamSeasonStart(seasonStart); 
+    setTeamSeasonEnd(seasonEnd); 
+  }
+
+  function startEditingTeam(t: any) { 
+    setTeamName(t.name); 
+    setMemberFee(t.member_fee !== undefined ? t.member_fee : 10); 
+    setCasualFee(t.casual_fee !== undefined ? t.casual_fee : 25); 
+    setPrimaryColor(t.primary_color || "#10b981"); 
+    setTeamSeasonStart(t.season_start || ""); 
+    setTeamSeasonEnd(t.season_end || ""); 
+    setEditingTeamId(t.id); 
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  }
   
   async function saveTeam() {
     if (!teamName) return showToast("Team name is required.", "error");
-    const payload = { name: teamName, member_fee: memberFee, casual_fee: casualFee, primary_color: primaryColor, club_id: clubId, season_start: teamSeasonStart || null, season_end: teamSeasonEnd || null };
+    const payload = { 
+      name: teamName, 
+      member_fee: memberFee === "" ? 0 : memberFee, 
+      casual_fee: casualFee === "" ? 0 : casualFee, 
+      primary_color: primaryColor, 
+      club_id: clubId, 
+      season_start: teamSeasonStart || null, 
+      season_end: teamSeasonEnd || null 
+    };
     let error;
     if (editingTeamId) { const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); error = res.error; } 
     else { const res = await supabase.from("teams").insert([payload]); error = res.error; }
     if (error) showToast(error.message, "error"); else { showToast("Team saved successfully!"); resetTeamForm(); loadClubData(); }
   }
 
-  function resetFixtureForm() { setFixtureTeamId(""); setOpponent(""); setMatchDate(""); setFixtureTime(""); setFixtureLocation(""); setFixtureNotes(""); setUmpireFee(defaultUmpireFee); setEditingFixtureId(null); }
+  function resetFixtureForm() { 
+    setFixtureTeamId(""); 
+    setOpponent(""); 
+    setMatchDate(""); 
+    setFixtureTime(""); 
+    setFixtureLocation(""); 
+    setFixtureNotes(""); 
+    setUmpireFee(defaultUmpireFee || 0); 
+    setEditingFixtureId(null); 
+  }
   
-  function startEditingFixture(f: any) { setFixtureTeamId(f.team_id); setOpponent(f.opponent); setMatchDate(f.match_date); setFixtureTime(f.start_time || ""); setFixtureLocation(f.location || ""); setFixtureNotes(f.notes || ""); setUmpireFee(f.umpire_fee !== undefined ? f.umpire_fee : defaultUmpireFee); setEditingFixtureId(f.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function startEditingFixture(f: any) { 
+    setFixtureTeamId(f.team_id); 
+    setOpponent(f.opponent); 
+    setMatchDate(f.match_date); 
+    setFixtureTime(f.start_time || ""); 
+    setFixtureLocation(f.location || ""); 
+    setFixtureNotes(f.notes || ""); 
+    setUmpireFee(f.umpire_fee !== undefined ? f.umpire_fee : defaultUmpireFee); 
+    setEditingFixtureId(f.id); 
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  }
   
   async function saveFixture() {
     if (!opponent || !matchDate || !fixtureTeamId) return showToast("Please fill all match fields.", "error");
     
-    const payload = { team_id: fixtureTeamId, opponent, match_date: matchDate, start_time: fixtureTime, location: fixtureLocation, notes: fixtureNotes, umpire_fee: umpireFee };
+    const payload = { 
+      team_id: fixtureTeamId, 
+      opponent, 
+      match_date: matchDate, 
+      start_time: fixtureTime, 
+      location: fixtureLocation, 
+      notes: fixtureNotes, 
+      umpire_fee: umpireFee === "" ? 0 : umpireFee 
+    };
 
     let error;
     if (editingFixtureId) { const res = await supabase.from("fixtures").update(payload).eq("id", editingFixtureId); error = res.error; } 
@@ -534,18 +596,34 @@ export default function Setup() {
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Amount</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
-                    <input type="number" placeholder="70" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                    <input 
+                      type="number" 
+                      placeholder="70" 
+                      value={defaultUmpireFee} 
+                      onChange={(e) => setDefaultUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                    />
                   </div>
                 </div>
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Member Fee ($)</label>
-                  <input type="number" value={defaultMemberFee} onChange={(e) => setDefaultMemberFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input 
+                    type="number" 
+                    value={defaultMemberFee} 
+                    onChange={(e) => setDefaultMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Casual Fee ($)</label>
-                  <input type="number" value={defaultCasualFee} onChange={(e) => setDefaultCasualFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input 
+                    type="number" 
+                    value={defaultCasualFee} 
+                    onChange={(e) => setDefaultCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                  />
                 </div>
               </div>
             </div>
@@ -747,11 +825,21 @@ export default function Setup() {
             <div className="flex gap-3 mb-3">
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Member Fee ($)</label>
-                <input type="number" value={memberFee} onChange={(e) => setMemberFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" />
+                <input 
+                  type="number" 
+                  value={memberFee} 
+                  onChange={(e) => setMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
+                />
               </div>
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Casual Fee ($)</label>
-                <input type="number" value={casualFee} onChange={(e) => setCasualFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" />
+                <input 
+                  type="number" 
+                  value={casualFee} 
+                  onChange={(e) => setCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
+                />
               </div>
             </div>
             <div className="flex gap-3 mb-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
@@ -884,7 +972,13 @@ export default function Setup() {
                 <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 <div className="flex-1 relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-                  <input type="number" placeholder={expenseLabel || "Umpire Fee"} value={umpireFee} onChange={(e) => setUmpireFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input 
+                    type="number" 
+                    placeholder={expenseLabel || "Umpire Fee"} 
+                    value={umpireFee} 
+                    onChange={(e) => setUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                  />
                 </div>
               </div>
               <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
