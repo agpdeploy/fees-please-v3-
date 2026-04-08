@@ -54,9 +54,9 @@ export default function GameDay() {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
     
-    const dataString = urlParams.get('data'); // iOS
-    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID'); // Android Success
-    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE'); // Android Fail
+    const dataString = urlParams.get('data');
+    const androidTxId = urlParams.get('com.squareup.pos.CLIENT_TRANSACTION_ID');
+    const androidError = urlParams.get('com.squareup.pos.ERROR_CODE');
 
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
@@ -95,7 +95,7 @@ export default function GameDay() {
           });
         });
       } else {
-        showToast("Payment was cancelled or failed in Square.", "error");
+        showToast("Payment was cancelled or failed.", "error");
         localStorage.removeItem('square_pending_tx');
         window.history.replaceState({}, document.title, window.location.pathname); 
       }
@@ -145,8 +145,17 @@ export default function GameDay() {
     async function loadTeamData() {
       const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
       if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
-      const today = new Date().toISOString().split('T')[0];
-      const { data: fixData } = await supabase.from('fixtures').select('*').eq('team_id', selectedTeamId).gte('match_date', today).order('match_date', { ascending: true }).limit(1).maybeSingle();
+      
+      // --- NEW LOGIC: Fetch oldest match that isn't COMPLETED or FORFEITED ---
+      const { data: fixData } = await supabase
+        .from('fixtures')
+        .select('*')
+        .eq('team_id', selectedTeamId)
+        .not('status', 'in', '("completed","forfeited")')
+        .order('match_date', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+        
       setActiveFixture(fixData || null);
     }
     loadTeamData();
@@ -155,7 +164,6 @@ export default function GameDay() {
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
     
-    // --- TS ERROR 1 FIX: Ensure this resolves to a strict boolean ---
     const { data: fixtureTx } = await supabase.from('transactions').select('transaction_type').eq('fixture_id', activeFixture.id).eq('transaction_type', 'expense');
     const hasPaidUmpire = (fixtureTx?.length || 0) > 0;
     setIsUmpirePaid(hasPaidUmpire);
@@ -214,6 +222,34 @@ export default function GameDay() {
   }
   
   useEffect(() => { loadSquadData(); }, [activeFixture]);
+
+  // --- MATCH STATUS ACTIONS ---
+  async function updateMatchStatus(status: 'completed' | 'forfeited') {
+    if (!activeFixture) return;
+    
+    const confirmMsg = status === 'completed' 
+      ? "Finalize match? Unpaid fees will remain as player debt." 
+      : "Mark as Forfeit? No fees will be collected for this match.";
+      
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsProcessing(true);
+    const { error } = await supabase
+      .from('fixtures')
+      .update({ status })
+      .eq('id', activeFixture.id);
+
+    if (error) {
+      showToast("Error updating status", "error");
+    } else {
+      showToast(status === 'completed' ? "Match Finalized!" : "Match Forfeited");
+      // This will trigger the useEffect to find the NEXT match
+      setActiveFixture(null);
+      // Wait a beat then refresh to find the next game
+      setTimeout(() => window.location.reload(), 1000);
+    }
+    setIsProcessing(false);
+  }
 
   // --- SQUARE TAP TO PAY ---
   const initiateTapToPay = (player: any) => {
@@ -370,13 +406,13 @@ export default function GameDay() {
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative overflow-x-hidden">
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-[200] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[200] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i> {toast.msg}
         </div>
       )}
 
       {teams.length > 1 && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-3xl shadow-lg transition-colors">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
           <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
@@ -394,7 +430,7 @@ export default function GameDay() {
                 className="text-[10px] font-black uppercase px-2.5 py-1 rounded text-white tracking-widest"
                 style={{ backgroundColor: themeColor }}
               >
-                Upcoming
+                {new Date(activeFixture.match_date).toDateString() === new Date().toDateString() ? 'Active' : 'Upcoming'}
               </span>
               <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
                 {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
@@ -444,14 +480,11 @@ export default function GameDay() {
               {activeFixture.start_time && `${activeFixture.start_time} • `}
               {activeFixture.location || 'Location TBA'}
             </p>
-            {activeFixture.notes && (
-              <p className="text-[10px] text-zinc-400 mt-1 italic font-medium">{activeFixture.notes}</p>
-            )}
           </div>
         </div>
       ) : selectedTeamId ? (
         <div className="text-center py-10 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 transition-colors">
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No upcoming fixtures found.</p>
+          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No active fixtures found.</p>
         </div>
       ) : null}
 
@@ -465,7 +498,7 @@ export default function GameDay() {
           
           <div className="flex flex-wrap gap-2.5 mb-6">
             {squadToPay.length === 0 && squadPaid.length > 0 ? (
-              <div className="w-full text-center py-6 border border-dashed border-emerald-500/30 dark:border-emerald-900/50 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 transition-colors">
+              <div className="w-full text-center py-6 border border-dashed border-emerald-500/30 dark:border-emerald-900/50 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 transition-colors">
                 <i className="fa-solid fa-check-double text-2xl text-emerald-500 mb-2"></i>
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">All settled!</p>
               </div>
@@ -477,7 +510,7 @@ export default function GameDay() {
                   <button 
                     key={player.id} 
                     onClick={() => togglePlayerSelection(player.id)} 
-                    className={`px-4 py-3 rounded-2xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
+                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                     style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
                   >
                     {player.nickname || `${player.first_name} ${player.last_name?.charAt(0)}.`}
@@ -507,7 +540,7 @@ export default function GameDay() {
             const matchFee = player.is_member ? teamFees.member : teamFees.casual;
 
             return (
-              <div key={player.id} className="bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-lg relative transition-colors">
+              <div key={player.id} className="bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative transition-colors">
                 <button onClick={() => togglePlayerSelection(player.id)} className="absolute top-4 right-4 text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"><i className="fa-solid fa-xmark"></i></button>
                 <div className="flex justify-between items-start mb-4 pr-6">
                   <div>
@@ -590,10 +623,32 @@ export default function GameDay() {
               </span>
             </div>
             
-            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
+            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
               {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* --- MATCH COMPLETION ACTIONS --- */}
+      {activeFixture && selectedPlayerIds.length === 0 && (
+        <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Match Workflow</h3>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => updateMatchStatus('completed')} 
+              className="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-[10px] shadow-sm active:scale-95 transition-all"
+            >
+              Finalize Match
+            </button>
+            <button 
+              onClick={() => updateMatchStatus('forfeited')} 
+              className="flex-1 bg-zinc-100 dark:bg-zinc-900 text-red-600 dark:text-red-500 border border-zinc-200 dark:border-zinc-800 font-black py-4 rounded-xl uppercase tracking-widest text-[10px] active:scale-95 transition-all"
+            >
+              Match Forfeit
+            </button>
+          </div>
+          <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center italic">Finalizing hides the match from Game Day and logs all match data to the Ledger.</p>
         </div>
       )}
 
@@ -608,7 +663,7 @@ export default function GameDay() {
               <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
                 {availablePlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
-                  <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
+                  <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
                     <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
                     <i className="fa-solid fa-plus" style={{ color: themeColor }}></i>
                   </button>
@@ -619,7 +674,6 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* --- TS ERROR 2 FIX: ADDED MISSING PROPS --- */}
       <AiReporterModal 
         isOpen={isAiModalOpen} 
         onClose={() => setIsAiModalOpen(false)} 
