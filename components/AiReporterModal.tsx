@@ -18,6 +18,38 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
 
   if (!isOpen) return null;
 
+  // --- COMPRESSION HELPER ---
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          // Shrink to 800px - plenty for AI to read, but tiny file size
+          const MAX_WIDTH = 800; 
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+          
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          }
+          
+          // Lower quality to 0.6 (60%) - this drastically reduces MBs
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const handleGenerate = async () => {
     if (!image) return alert("Please upload a scorebook photo first!");
     
@@ -25,34 +57,38 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
     setReport("");
 
     try {
-      // 1. Convert Image to Base64
-      const reader = new FileReader();
-      reader.readAsDataURL(image);
-      reader.onloadend = async () => {
-        const base64Data = reader.result as string;
+      // 1. Convert Image to Base64 USING THE COMPRESSION HELPER
+      const base64Data = await compressImage(image);
 
-        // 2. Prepare the context from your existing Gameday state
-        const context = {
-          competition: fixture?.notes || "Regular Season Match",
-          teamName: "Our Team", // You can pull this from activeClub context later
-          opponent: fixture?.opponent || "TBA",
-          roster: squad.map(p => p.nickname || p.first_name).join(", ")
-        };
-
-        // 3. Call the API we made
-        const res = await fetch("/api/generate-report", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: base64Data, character, context }),
-        });
-
-        const data = await res.json();
-        if (data.report) setReport(data.report);
-        else throw new Error("No report returned");
+      // 2. Prepare the context from your existing Gameday state
+      const context = {
+        competition: fixture?.notes || "Regular Season Match",
+        teamName: "Our Team", // You can pull this from activeClub context later
+        opponent: fixture?.opponent || "TBA",
+        roster: squad.map(p => p.nickname || p.first_name).join(", ")
       };
-    } catch (err) {
+
+      // 3. Call the API we made
+      const res = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64Data, character, context }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Server responded with an error");
+      }
+
+      if (data.report) {
+        setReport(data.report);
+      } else {
+        throw new Error("No report returned");
+      }
+    } catch (err: any) {
       console.error(err);
-      setReport("Great Odin's Raven! The news wire is down. Try again.");
+      setReport(`Great Odin's Raven! The news wire is down. Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -83,7 +119,7 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
         <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Match Reporter</h2>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Powered by Gemini 3 Flash</p>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Powered by Gemini Flash</p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><i className="fa-solid fa-xmark text-xl"></i></button>
         </div>
@@ -123,7 +159,7 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
           {/* Generated Report Output */}
           {report && (
             <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl animate-in fade-in slide-in-from-bottom-4">
-              <p className="text-sm font-medium leading-relaxed italic text-zinc-800 dark:text-zinc-200">
+              <p className="text-sm font-medium leading-relaxed italic text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
                 "{report}"
               </p>
             </div>

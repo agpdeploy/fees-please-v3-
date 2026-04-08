@@ -16,9 +16,9 @@ export async function POST(req: Request) {
 
     const systemInstruction = CHARACTERS[character as keyof typeof CHARACTERS] || CHARACTERS.BURGUNDY;
     
-    // Using Gemini 3 Flash for speed and image processing
+    // Using the 'latest' alias to fix the 404 error
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-3-flash",
+      model: "gemini-flash-latest",
       systemInstruction: systemInstruction 
     });
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const imagePart = {
       inlineData: {
         data: imageBase64.split(",")[1], // Strip the "data:image/png;base64," part
-        mimeType: "image/jpeg", // or png based on upload
+        mimeType: "image/jpeg", 
       },
     };
 
@@ -45,8 +45,14 @@ export async function POST(req: Request) {
     
     return NextResponse.json({ report: response.text() });
 
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return NextResponse.json({ error: "Failed to generate report" }, { status: 500 });
+  } catch (error: any) {
+    // Log the detailed error to the server console
+    console.error("Detailed Gemini API Error:", error);
+    
+    // Send the error message to the frontend UI
+    return NextResponse.json(
+      { error: error.message || "Failed to generate report" }, 
+      { status: 500 }
+    );
   }
 }
