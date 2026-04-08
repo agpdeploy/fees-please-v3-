@@ -16,7 +16,6 @@ export default function Setup() {
   const [allClubs, setAllClubs] = useState<any[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Invite & Edit Role State
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<'club_admin' | 'team_admin'>('club_admin');
   const [inviteTeamId, setInviteTeamId] = useState("");
@@ -37,12 +36,10 @@ export default function Setup() {
   const [themeColor, setThemeColor] = useState("#10b981");
   const [themeFont, setThemeFont] = useState("Inter");
   
-  // Square State
   const [squareAccessToken, setSquareAccessToken] = useState("");
   const [squareLocationId, setSquareLocationId] = useState("");
   const [isSquareEnabled, setIsSquareEnabled] = useState(false);
 
-  // --- FIXTURE STATE UPDATED ---
   const [fixtureTeamId, setFixtureTeamId] = useState("");
   const [opponent, setOpponent] = useState("");
   const [matchDate, setMatchDate] = useState("");
@@ -52,7 +49,6 @@ export default function Setup() {
   const [umpireFee, setUmpireFee] = useState<number>(70);
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
 
-  // --- PLAYER STATE UPDATED ---
   const [playerTeamId, setPlayerTeamId] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -328,7 +324,6 @@ export default function Setup() {
     if (error) showToast(error.message, "error"); else { showToast("Fixture saved!"); resetFixtureForm(); loadClubData(); }
   }
 
-  // --- PLAYER FUNCTIONS UPDATED ---
   function resetPlayerForm() { setPlayerTeamId(""); setFirstName(""); setLastName(""); setPlayerNickname(""); setPlayerMobile(""); setPlayerEmail(""); setIsMember(true); setEditingPlayerId(null); }
   
   function startEditingPlayer(p: any) { setPlayerTeamId(p.default_team_id || ""); setFirstName(p.first_name); setLastName(p.last_name); setPlayerNickname(p.nickname || ""); setPlayerMobile(p.mobile_number || ""); setPlayerEmail(p.email || ""); setIsMember(p.is_member); setEditingPlayerId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
@@ -400,21 +395,21 @@ export default function Setup() {
     );
   }
 
-  // The Onboarding Interceptor
+  // The Onboarding Interceptor (Updated for Light Mode)
   if (!clubId && profile?.role !== 'super_admin') {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 animate-in zoom-in-95 fade-in duration-500">
-        <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+        <div className="w-16 h-16 bg-emerald-500/10 text-emerald-600 rounded-full flex items-center justify-center mb-6">
           <i className="fa-solid fa-hand-wave text-2xl"></i>
         </div>
-        <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white mb-2">Welcome!</h1>
-        <p className="text-zinc-400 text-sm text-center mb-8 max-w-xs">
+        <h1 className="text-2xl font-black italic uppercase tracking-tighter text-zinc-900 dark:text-white mb-2">Welcome!</h1>
+        <p className="text-zinc-500 dark:text-zinc-400 text-sm text-center mb-8 max-w-xs">
           It looks like you don't belong to an organization yet. What would you like to do?
         </p>
         
         <div className="w-full max-w-sm space-y-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl">
-            <h3 className="text-white font-black uppercase tracking-widest text-xs mb-1"><i className="fa-solid fa-plus text-emerald-500 mr-2"></i> Register New Organization</h3>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
+            <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1"><i className="fa-solid fa-plus text-emerald-500 mr-2"></i> Register New Organization</h3>
             <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-4 leading-relaxed">Create a brand new workspace for your club or team.</p>
             
             <div className="space-y-3">
@@ -423,21 +418,21 @@ export default function Setup() {
                 placeholder="e.g. Ferny Districts CC" 
                 value={clubName} 
                 onChange={(e) => setClubName(e.target.value)} 
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" 
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
               />
               <button 
                 onClick={saveConfig} 
                 disabled={isSaving || !clubName} 
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-sm disabled:opacity-50"
               >
                 {isSaving ? "Creating..." : "Create Organization"}
               </button>
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl text-center">
-            <h3 className="text-white font-black uppercase tracking-widest text-xs mb-1">Looking for your team?</h3>
-            <p className="text-zinc-500 text-xs mb-0">Ask your Club Admin to send an invite to <strong className="text-zinc-300">{profile?.email}</strong></p>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm text-center">
+            <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1">Looking for your team?</h3>
+            <p className="text-zinc-500 text-xs mb-0">Ask your Club Admin to send an invite to <strong className="text-zinc-800 dark:text-zinc-300">{profile?.email}</strong></p>
           </div>
         </div>
       </div>
@@ -448,15 +443,15 @@ export default function Setup() {
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
       
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-[100] animate-in slide-in-from-bottom-5 fade-in ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[100] animate-in slide-in-from-bottom-5 fade-in ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i> {toast.msg}
         </div>
       )}
 
       {/* GOD MODE CLUB PICKER */}
       {profile?.role === 'super_admin' && (
-        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl shadow-lg mb-6 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm mb-6 flex items-center gap-4 transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
             <i className="fa-solid fa-crown"></i>
           </div>
           <div className="flex-1">
@@ -467,7 +462,7 @@ export default function Setup() {
                 setActiveClubId(e.target.value || null);
                 setClubId(e.target.value || null);
               }} 
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none font-bold"
+              className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors"
             >
               {allClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               <option value="new">+ Create New Organization...</option>
@@ -476,30 +471,32 @@ export default function Setup() {
         </div>
       )}
 
-      <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-2xl mb-6 shadow-sm overflow-x-auto hide-scrollbar">
-        <button onClick={() => {setActiveTab('config');}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'config' ? 'bg-zinc-800 text-emerald-500 shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Config</button>
-        <button onClick={() => {setActiveTab('access');}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'access' ? 'bg-zinc-800 text-emerald-500 shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Access</button>
-        <button onClick={() => {setActiveTab('teams'); resetTeamForm();}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'teams' ? 'bg-zinc-800 text-emerald-500 shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Teams</button>
-        <button onClick={() => {setActiveTab('players'); resetPlayerForm(); setIsBulkMode(false);}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'players' ? 'bg-zinc-800 text-emerald-500 shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Roster</button>
-        <button onClick={() => {setActiveTab('fixtures'); resetFixtureForm();}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'fixtures' ? 'bg-zinc-800 text-emerald-500 shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Fixtures</button>
+      {/* HORIZONTAL SCROLLING TABS */}
+      <div className="flex bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl mb-6 shadow-sm overflow-x-auto hide-scrollbar transition-colors">
+        <button onClick={() => {setActiveTab('config');}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'config' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Config</button>
+        <button onClick={() => {setActiveTab('access');}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'access' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Access</button>
+        <button onClick={() => {setActiveTab('teams'); resetTeamForm();}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'teams' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Teams</button>
+        <button onClick={() => {setActiveTab('players'); resetPlayerForm(); setIsBulkMode(false);}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'players' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Roster</button>
+        <button onClick={() => {setActiveTab('fixtures'); resetFixtureForm();}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'fixtures' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Fixtures</button>
       </div>
 
+      {/* --- CONFIG TAB --- */}
       {activeTab === 'config' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">Branding</h2>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Organization Name</label>
-                <input type="text" value={clubName} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                <input type="text" value={clubName} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo (Auto-Squares to 300px)</label>
-                <div className="flex items-center gap-4 bg-zinc-800 border border-zinc-700 p-3 rounded-xl">
-                  {logoUrl ? <img src={logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-cover bg-black" /> : <div className="w-12 h-12 rounded-lg bg-zinc-900 flex items-center justify-center border border-zinc-700 text-zinc-500"><i className="fa-solid fa-image"></i></div>}
+                <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 p-3 rounded-xl transition-colors">
+                  {logoUrl ? <img src={logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-cover bg-white" /> : <div className="w-12 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500"><i className="fa-solid fa-image"></i></div>}
                   <div className="flex-1">
                     <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" id="logo-upload" disabled={isUploadingLogo || !clubId || clubId === 'new'} />
-                    <label htmlFor="logo-upload" className={`text-xs font-bold text-white px-4 py-2 rounded-lg transition-colors inline-block ${isUploadingLogo || !clubId || clubId === 'new' ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-zinc-700 hover:bg-zinc-600 cursor-pointer'}`}>
+                    <label htmlFor="logo-upload" className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-block ${isUploadingLogo || !clubId || clubId === 'new' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed' : 'bg-zinc-800 dark:bg-zinc-700 text-white hover:bg-zinc-700 dark:hover:bg-zinc-600 cursor-pointer shadow-sm'}`}>
                       {(!clubId || clubId === 'new') ? "Save club name first to upload logo" : (isUploadingLogo ? "Compressing..." : "Upload New Image")}
                     </label>
                   </div>
@@ -508,75 +505,75 @@ export default function Setup() {
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">Season & Global Rules</h2>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Season & Global Rules</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Season Name</label>
-                <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Start Date</label>
-                  <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none color-scheme-dark" />
+                  <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
                 </div>
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global End Date</label>
-                  <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none color-scheme-dark" />
+                  <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
                 </div>
               </div>
               <div className="pt-2">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Expense Label</label>
-                <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Member Fee ($)</label>
-                  <input type="number" value={defaultMemberFee} onChange={(e) => setDefaultMemberFee(Number(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-emerald-500" />
+                  <input type="number" value={defaultMemberFee} onChange={(e) => setDefaultMemberFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Casual Fee ($)</label>
-                  <input type="number" value={defaultCasualFee} onChange={(e) => setDefaultCasualFee(Number(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-emerald-500" />
+                  <input type="number" value={defaultCasualFee} onChange={(e) => setDefaultCasualFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">Payment Integration (Square)</h2>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Payment Integration (Square)</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-xl border border-zinc-700">
-                <span className="text-xs font-bold text-zinc-300 uppercase">Enable Square</span>
-                <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-600 text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
+              <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 transition-colors">
+                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-300 uppercase">Enable Square</span>
+                <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
               </div>
               {isSquareEnabled && (
                 <>
                   <div>
                     <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Access Token</label>
-                    <input type="password" placeholder="EAAA..." value={squareAccessToken} onChange={(e) => setSquareAccessToken(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                    <input type="password" placeholder="EAAA..." value={squareAccessToken} onChange={(e) => setSquareAccessToken(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                   </div>
                   <div>
                     <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Location ID</label>
-                    <input type="text" placeholder="L..." value={squareLocationId} onChange={(e) => setSquareLocationId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                    <input type="text" placeholder="L..." value={squareLocationId} onChange={(e) => setSquareLocationId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                   </div>
                 </>
               )}
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">App Appearance</h2>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">App Appearance</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Primary Theme Color</label>
                 <div className="flex gap-3">
-                  <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="w-14 h-12 bg-zinc-800 border border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0" />
-                  <input type="text" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-mono" />
+                  <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="w-14 h-12 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0 transition-colors" />
+                  <input type="text" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-mono transition-colors" />
                 </div>
               </div>
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Typography (Google Font)</label>
-                <select value={themeFont} onChange={(e) => setThemeFont(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none font-bold">
+                <select value={themeFont} onChange={(e) => setThemeFont(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
                   <option value="Inter">Inter (Modern Default)</option>
                   <option value="Roboto">Roboto (Clean)</option>
                   <option value="Poppins">Poppins (Geometric)</option>
@@ -586,41 +583,42 @@ export default function Setup() {
             </div>
           </div>
 
-          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-lg disabled:opacity-50">
+          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md disabled:opacity-50">
             {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Organization")}
           </button>
         </div>
       )}
 
       {(!clubId || clubId === 'new') && activeTab !== 'config' && (
-        <div className="p-10 text-center bg-zinc-900 border border-zinc-800 rounded-3xl mt-6">
+        <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mt-6 shadow-sm transition-colors">
           <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your organization configuration first.</p>
         </div>
       )}
 
+      {/* --- ACCESS TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'access' && (
         <div className="space-y-6 animate-in fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4 border-b border-zinc-800 pb-2">Invite User / Grant Access</h2>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Invite User / Grant Access</h2>
             <div className="space-y-4">
               <input 
                 type="email" 
                 placeholder="User's Email Address" 
                 value={inviteEmail} 
                 onChange={(e) => setInviteEmail(e.target.value)} 
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" 
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
               />
               
-              <div className="flex bg-zinc-800 border border-zinc-700 rounded-xl p-1">
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                 <button 
                   onClick={() => setInviteRole('club_admin')} 
-                  className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-colors ${inviteRole === 'club_admin' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-all ${inviteRole === 'club_admin' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                 >
                   Club Admin
                 </button>
                 <button 
                   onClick={() => setInviteRole('team_admin')} 
-                  className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-colors ${inviteRole === 'team_admin' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-all ${inviteRole === 'team_admin' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                 >
                   Team Captain
                 </button>
@@ -630,7 +628,7 @@ export default function Setup() {
                 <select 
                   value={inviteTeamId} 
                   onChange={(e) => setInviteTeamId(e.target.value)} 
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 animate-in slide-in-from-top-2"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 animate-in slide-in-from-top-2 transition-colors"
                 >
                   <option value="">-- Select Team to Manage --</option>
                   {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -640,7 +638,7 @@ export default function Setup() {
               <button 
                 onClick={handleInviteUser} 
                 disabled={isSaving || !inviteEmail}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50 shadow-md"
               >
                 {isSaving ? "Processing..." : "Grant Access"}
               </button>
@@ -650,16 +648,16 @@ export default function Setup() {
           <div className="space-y-3">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Permissions Ledger</h3>
             {clubUsers.length === 0 ? (
-              <div className="text-center py-6 bg-zinc-900 rounded-3xl border border-zinc-800">
+              <div className="text-center py-6 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors">
                 <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No assigned roles found.</p>
               </div>
             ) : (
               clubUsers.map(user => (
-                <div key={user.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-3 group">
+                <div key={user.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
                   <div className="flex justify-between items-center">
                     <div>
-                      <div className="font-bold text-white text-sm">{user.email}</div>
-                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${user.role === 'club_admin' ? 'text-blue-400' : 'text-emerald-500'}`}>
+                      <div className="font-bold text-zinc-900 dark:text-white text-sm">{user.email}</div>
+                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${user.role === 'club_admin' ? 'text-blue-500 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
                         {user.role === 'club_admin' ? 'Club Admin' : 'Team Captain'}
                         {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
                       </div>
@@ -669,22 +667,22 @@ export default function Setup() {
                         setEditingRoleId(user.id);
                         setEditRoleAssigned(user.role);
                         setEditRoleTeamId(user.team_id || "");
-                      }} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 transition-colors flex items-center justify-center">
+                      }} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center">
                         <i className="fa-solid fa-pen text-xs"></i>
                       </button>
-                      <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
+                      <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
                         <i className="fa-solid fa-trash text-xs"></i>
                       </button>
                     </div>
                   </div>
 
                   {editingRoleId === user.id && (
-                    <div className="mt-3 pt-3 border-t border-zinc-800 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 transition-colors">
                       <div className="flex gap-2">
                         <select 
                           value={editRoleAssigned} 
                           onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
-                          className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+                          className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                         >
                           <option value="club_admin">Club Admin</option>
                           <option value="team_admin">Team Captain</option>
@@ -694,7 +692,7 @@ export default function Setup() {
                           <select 
                             value={editRoleTeamId} 
                             onChange={(e) => setEditRoleTeamId(e.target.value)} 
-                            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+                            className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                           >
                             <option value="">-- Select Team --</option>
                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -703,16 +701,16 @@ export default function Setup() {
                       </div>
                       
                       <div className="flex gap-2">
-                        <button onClick={() => setEditingRoleId(null)} className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-xs font-black uppercase transition-colors">Cancel</button>
+                        <button onClick={() => setEditingRoleId(null)} className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase transition-colors">Cancel</button>
                         <button onClick={() => saveRoleUpdate(user.id)} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase transition-colors">Save</button>
                       </div>
                     </div>
                   )}
 
                   {user.role !== 'club_admin' && editingRoleId !== user.id && (
-                    <div className="flex items-center justify-between border-t border-zinc-800 pt-3 mt-1">
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">Square Payments</span>
-                      <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg transition-colors ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
+                    <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-1 transition-colors">
+                      <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">Square Payments</span>
+                      <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg transition-colors shadow-sm ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500'}`}>
                         {user.can_take_payments ? 'Enabled' : 'Disabled'}
                       </button>
                     </div>
@@ -724,36 +722,37 @@ export default function Setup() {
         </div>
       )}
 
+      {/* --- TEAMS TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'teams' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            {editingTeamId && <button onClick={resetTeamForm} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark"></i></button>}
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4">{editingTeamId ? 'Edit Team' : 'Add New Team'}</h2>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            {editingTeamId && <button onClick={resetTeamForm} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>}
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4">{editingTeamId ? 'Edit Team' : 'Add New Team'}</h2>
             <div className="flex gap-3 mb-3">
-              <input type="text" placeholder="Team Name" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
-              <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-12 h-[46px] bg-zinc-800 border border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0" />
+              <input type="text" placeholder="Team Name" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-12 h-[46px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0 transition-colors" />
             </div>
             <div className="flex gap-3 mb-3">
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Member Fee ($)</label>
-                <input type="number" value={memberFee} onChange={(e) => setMemberFee(Number(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none" />
+                <input type="number" value={memberFee} onChange={(e) => setMemberFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" />
               </div>
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Casual Fee ($)</label>
-                <input type="number" value={casualFee} onChange={(e) => setCasualFee(Number(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white outline-none" />
+                <input type="number" value={casualFee} onChange={(e) => setCasualFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" />
               </div>
             </div>
-            <div className="flex gap-3 mb-4 p-3 bg-zinc-800/50 border border-zinc-800 rounded-xl">
+            <div className="flex gap-3 mb-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override Start Date</label>
-                <input type="date" value={teamSeasonStart} onChange={(e) => setTeamSeasonStart(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white outline-none color-scheme-dark" />
+                <input type="date" value={teamSeasonStart} onChange={(e) => setTeamSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
               </div>
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override End Date</label>
-                <input type="date" value={teamSeasonEnd} onChange={(e) => setTeamSeasonEnd(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white outline-none color-scheme-dark" />
+                <input type="date" value={teamSeasonEnd} onChange={(e) => setTeamSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
               </div>
             </div>
-            <button onClick={saveTeam} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white ${editingTeamId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+            <button onClick={saveTeam} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingTeamId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
               {editingTeamId ? 'Update Team' : 'Create Team'}
             </button>
           </div>
@@ -761,23 +760,23 @@ export default function Setup() {
             {teams.map(t => {
               const assignedCaptain = clubUsers.find(u => u.team_id === t.id && u.role === 'team_admin');
               return (
-                <div key={t.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-3 group">
+                <div key={t.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.primary_color || '#10b981' }}></div>
+                      <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: t.primary_color || '#10b981' }}></div>
                       <div>
-                        <div className="font-black text-white text-sm uppercase tracking-wide">{t.name}</div>
+                        <div className="font-black text-zinc-900 dark:text-white text-sm uppercase tracking-wide">{t.name}</div>
                         <div className="text-[10px] text-zinc-500 font-bold mt-0.5">
                           CAPTAIN: {assignedCaptain ? assignedCaptain.email : 'Unassigned'} • M: ${t.member_fee} • C: ${t.casual_fee}
                         </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                      <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
+                      <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
+                      <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
                     </div>
                   </div>
-                  <button onClick={() => openRosterModal(t)} className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-500 flex items-center justify-center gap-2">
+                  <button onClick={() => openRosterModal(t)} className="w-full py-2.5 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
                     <i className="fa-solid fa-clipboard-user"></i> Bulk Assign Roster
                   </button>
                 </div>
@@ -787,16 +786,16 @@ export default function Setup() {
         </div>
       )}
 
-      {/* --- PLAYERS TAB UPDATED --- */}
+      {/* --- PLAYERS TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'players' && (
         <div className="space-y-6 animate-in fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-[11px] font-black uppercase italic text-emerald-500">{editingPlayerId ? 'Edit Player' : (isBulkMode ? 'Bulk Import' : 'Add Player')}</h2>
-              {!editingPlayerId && <button onClick={() => {setIsBulkMode(!isBulkMode); setParsedPlayers([]);}} className="text-[10px] font-bold text-zinc-400 hover:text-white uppercase tracking-widest underline decoration-zinc-700">{isBulkMode ? 'Single Add' : 'Bulk Paste'}</button>}
+              <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500">{editingPlayerId ? 'Edit Player' : (isBulkMode ? 'Bulk Import' : 'Add Player')}</h2>
+              {!editingPlayerId && <button onClick={() => {setIsBulkMode(!isBulkMode); setParsedPlayers([]);}} className="text-[10px] font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white uppercase tracking-widest underline decoration-zinc-300 dark:decoration-zinc-700 transition-colors">{isBulkMode ? 'Single Add' : 'Bulk Paste'}</button>}
             </div>
             
-            <select value={playerTeamId} onChange={(e) => setPlayerTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 mb-3">
+            <select value={playerTeamId} onChange={(e) => setPlayerTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-3 transition-colors">
               <option value="">-- No Default Team (Casual) --</option>
               {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
@@ -804,39 +803,39 @@ export default function Setup() {
             {!isBulkMode ? (
               <>
                 <div className="flex gap-2 mb-3">
-                  <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
-                  <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                  <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
                 
                 <div className="flex gap-2 mb-3">
-                  <input type="text" placeholder="Nickname (e.g. Aitcho)" value={playerNickname} onChange={(e) => setPlayerNickname(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
-                  <input type="tel" placeholder="Mobile Number" value={playerMobile} onChange={(e) => setPlayerMobile(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                  <input type="text" placeholder="Nickname (e.g. Aitcho)" value={playerNickname} onChange={(e) => setPlayerNickname(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input type="tel" placeholder="Mobile Number" value={playerMobile} onChange={(e) => setPlayerMobile(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
                 
                 <div className="mb-3">
-                  <input type="email" placeholder="Email Address (Optional - For App Link)" value={playerEmail} onChange={(e) => setPlayerEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 placeholder:text-zinc-500" />
+                  <input type="email" placeholder="Email Address (Optional - For App Link)" value={playerEmail} onChange={(e) => setPlayerEmail(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 transition-colors" />
                 </div>
 
-                <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-xl mb-4 border border-zinc-700">
-                  <span className="text-xs font-bold text-zinc-300 uppercase">Status</span>
-                  <button onClick={() => setIsMember(!isMember)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-600 text-zinc-300'}`}>{isMember ? 'Member' : 'Casual'}</button>
+                <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl mb-4 border border-zinc-300 dark:border-zinc-700 transition-colors">
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-300 uppercase">Status</span>
+                  <button onClick={() => setIsMember(!isMember)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isMember ? 'Member' : 'Casual'}</button>
                 </div>
-                <button onClick={savePlayer} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white ${editingPlayerId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingPlayerId ? 'Update Player' : 'Save Player'}</button>
+                <button onClick={savePlayer} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingPlayerId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingPlayerId ? 'Update Player' : 'Save Player'}</button>
               </>
             ) : (
               <div className="space-y-3">
-                <textarea value={bulkInput} onChange={(e) => setBulkInput(e.target.value)} placeholder="Tony \t C \t Member" className="w-full h-32 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 font-mono text-xs whitespace-pre" />
-                {parsedPlayers.length === 0 ? <button onClick={parseBulkData} className="w-full bg-zinc-700 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs">Parse Data</button> : 
-                  <button onClick={saveBulkPlayers} disabled={isSaving} className="w-full bg-emerald-600 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs disabled:opacity-50">{isSaving ? 'Importing...' : `Import ${parsedPlayers.length}`}</button>}
+                <textarea value={bulkInput} onChange={(e) => setBulkInput(e.target.value)} placeholder="Tony \t C \t Member" className="w-full h-32 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 font-mono text-xs whitespace-pre transition-colors" />
+                {parsedPlayers.length === 0 ? <button onClick={parseBulkData} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs transition-colors shadow-sm">Parse Data</button> : 
+                  <button onClick={saveBulkPlayers} disabled={isSaving} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Importing...' : `Import ${parsedPlayers.length}`}</button>}
               </div>
             )}
           </div>
           <div className="space-y-2">
             {players.map(p => (
-              <div key={p.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-2 group">
+              <div key={p.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-2 group shadow-sm transition-colors">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-white">
+                    <div className="font-bold text-zinc-900 dark:text-white">
                       {p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic">"{p.nickname}"</span>}
                     </div>
                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1">
@@ -845,8 +844,8 @@ export default function Setup() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => startEditingPlayer(p)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                    <button onClick={() => deleteItem('players', p.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
+                    <button onClick={() => startEditingPlayer(p)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
+                    <button onClick={() => deleteItem('players', p.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
                   </div>
                 </div>
               </div>
@@ -855,42 +854,42 @@ export default function Setup() {
         </div>
       )}
 
-      {/* --- FIXTURES TAB UPDATED --- */}
+      {/* --- FIXTURES TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'fixtures' && (
         <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-lg relative">
-            {editingFixtureId && <button onClick={resetFixtureForm} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark"></i></button>}
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-500 mb-4">{editingFixtureId ? 'Edit Match' : 'Add Match'}</h2>
-            <select value={fixtureTeamId} onChange={(e) => setFixtureTeamId(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 mb-3">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            {editingFixtureId && <button onClick={resetFixtureForm} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark"></i></button>}
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4">{editingFixtureId ? 'Edit Match' : 'Add Match'}</h2>
+            <select value={fixtureTeamId} onChange={(e) => setFixtureTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-3 transition-colors">
               <option value="">-- Assign to Team --</option>
               {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <div className="space-y-3 mb-4">
-              <input type="text" placeholder="Opponent" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
-              <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 color-scheme-dark" />
+              <input type="text" placeholder="Opponent" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
               
               <div className="flex gap-2">
-                <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
-                <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+                <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
-              <input type="text" placeholder="Match Notes" value={fixtureNotes} onChange={(e) => setFixtureNotes(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+              <input type="text" placeholder="Match Notes" value={fixtureNotes} onChange={(e) => setFixtureNotes(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
             </div>
-            <button onClick={saveFixture} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white ${editingFixtureId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingFixtureId ? 'Update Fixture' : 'Save Fixture'}</button>
+            <button onClick={saveFixture} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingFixtureId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingFixtureId ? 'Update Fixture' : 'Save Fixture'}</button>
           </div>
           <div className="space-y-2">
             {fixtures.map(f => (
-              <div key={f.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col gap-3 group">
+              <div key={f.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">{new Date(f.match_date).toLocaleDateString()} {f.start_time && `• ${f.start_time}`}</div>
-                    <div className="font-bold text-white flex items-center gap-2">{f.teams?.name} vs {f.opponent}</div>
+                    <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-1">{new Date(f.match_date).toLocaleDateString()} {f.start_time && `• ${f.start_time}`}</div>
+                    <div className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">{f.teams?.name} vs {f.opponent}</div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => startEditingFixture(f)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-blue-400 flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                    <button onClick={() => deleteItem('fixtures', f.id)} className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-500 flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
+                    <button onClick={() => startEditingFixture(f)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
+                    <button onClick={() => deleteItem('fixtures', f.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
                   </div>
                 </div>
-                <button onClick={() => openSquadModal(f)} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-500 flex items-center justify-center gap-2">
+                <button onClick={() => openSquadModal(f)} className="w-full py-2 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
                   <i className="fa-solid fa-users"></i> Pre-Game Squad
                 </button>
               </div>
@@ -901,75 +900,75 @@ export default function Setup() {
 
       {/* --- MODALS --- */}
       {isSquadModalOpen && activeSquadFixture && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-800">
-              <h2 className="text-lg font-black italic text-emerald-500 uppercase tracking-tighter">SQUAD: {activeSquadFixture.opponent}</h2>
-              <button onClick={() => setIsSquadModalOpen(false)} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
+              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">SQUAD: {activeSquadFixture.opponent}</h2>
+              <button onClick={() => setIsSquadModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <input type="text" placeholder="Search player..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+              <input type="text" placeholder="Search player..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3">Core Team</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3">Core Team</h3>
                 <div className="space-y-2">
                   {players.filter(p => p.default_team_id === activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                     const isSelected = squadPlayerIds.includes(p.id);
                     return (
-                      <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-colors">
-                        <span className="font-bold text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${isSelected ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
+                      <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800/50 p-4 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                        <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors ${isSelected ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
               <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3">Other Members</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3">Other Members</h3>
                 <div className="space-y-2">
                   {players.filter(p => p.default_team_id !== activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                     const isSelected = squadPlayerIds.includes(p.id);
                     return (
-                      <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-colors">
-                        <span className="font-bold text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${isSelected ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
+                      <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800/50 p-4 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                        <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors ${isSelected ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
             </div>
-            <div className="p-5 border-t border-zinc-800 flex gap-3 bg-[#111]">
-              <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-400 bg-zinc-900 hover:bg-zinc-800">Cancel</button>
-              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">{isSaving ? 'Saving...' : 'Update Squad'}</button>
+            <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
+              <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Update Squad'}</button>
             </div>
           </div>
         </div>
       )}
 
       {isRosterModalOpen && activeRosterTeam && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-[#111] border border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-800">
-              <h2 className="text-lg font-black italic text-emerald-500 uppercase tracking-tighter">{activeRosterTeam.name} Roster</h2>
-              <button onClick={() => setIsRosterModalOpen(false)} className="text-zinc-500 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
+              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">{activeRosterTeam.name} Roster</h2>
+              <button onClick={() => setIsRosterModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-[#1A1A1A] border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" />
+              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <div className="space-y-2">
                 {players.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                   const isSelected = rosterPlayerIds.includes(p.id);
                   return (
-                    <div key={p.id} onClick={() => toggleRosterPlayer(p.id)} className="flex justify-between items-center bg-[#1A1A1A] p-4 rounded-2xl cursor-pointer">
-                      <span className="font-bold text-white text-sm">{p.first_name} {p.last_name}</span>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${isSelected ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
+                    <div key={p.id} onClick={() => toggleRosterPlayer(p.id)} className="flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800/50 p-4 rounded-xl cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name}</span>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors ${isSelected ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
                     </div>
                   );
                 })}
               </div>
             </div>
-            <div className="p-5 border-t border-zinc-800 flex gap-3 bg-[#111]">
-              <button onClick={() => setIsRosterModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-400 bg-zinc-900">Cancel</button>
-              <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 disabled:opacity-50">{isSaving ? 'Saving...' : 'Save Roster'}</button>
+            <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
+              <button onClick={() => setIsRosterModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+              <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Save Roster'}</button>
             </div>
           </div>
         </div>

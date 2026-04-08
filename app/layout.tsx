@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
-import InstallPrompt from '@/components/InstallPrompt' // <-- IMPORTED HERE
+import InstallPrompt from '@/components/InstallPrompt'
 import "./globals.css"
 
 const inter = Inter({ subsets: ['latin'] })
@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ['latin'] })
 // --- PWA & SEO METADATA ---
 export const metadata: Metadata = {
   title: "Fees Please",
-  description: "Match fee collection for legends.",
+  description: "Less chasing. More playing.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -45,8 +45,8 @@ export default function RootLayout({
       <body className={`${inter.className} bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-[#e5e5e5] overflow-x-hidden antialiased transition-colors duration-300`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light" /* <-- FORCED LIGHT MODE */
+          enableSystem={false} /* <-- IGNORES PHONE OS DARK MODE */
           disableTransitionOnChange
         >
           <ClubProvider>
