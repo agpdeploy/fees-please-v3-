@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface AiReporterModalProps {
   isOpen: boolean;
@@ -8,15 +9,22 @@ interface AiReporterModalProps {
   fixture: any;
   squad: any[];
   themeColor: string;
-  teamName: string; // Accepts the dynamic team name from Gameday.tsx
+  teamName: string;
 }
 
 export default function AiReporterModal({ isOpen, onClose, fixture, squad, themeColor, teamName }: AiReporterModalProps) {
+  // --- ADDED MOUNTED STATE FOR PORTAL ---
+  const [mounted, setMounted] = useState(false);
+  
   const [image, setImage] = useState<File | null>(null);
-  const [character, setCharacter] = useState("OUTBACK_EXPERT"); // Default to Rusty
+  const [character, setCharacter] = useState("OUTBACK_EXPERT");
   const [report, setReport] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
+
+  useEffect(() => {
+    setMounted(true); // Ensures portal only renders on the client
+  }, []);
 
   // --- DYNAMIC LOADING MESSAGES ---
   useEffect(() => {
@@ -60,13 +68,13 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
         } else {
           setLoadingText("Still analyzing... the handwriting is terrible...");
         }
-      }, 2500); // Change text every 2.5 seconds
+      }, 2500); 
     }
     
     return () => clearInterval(interval);
   }, [loading, character]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   // --- COMPRESSION HELPER ---
   const compressImage = (file: File): Promise<string> => {
@@ -158,7 +166,6 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
   };
 
   // --- MARKDOWN FORMATTER ---
-  // Converts "**Text**" into bold HTML tags safely for React
   const formatReportText = (text: string) => {
     return text.split('\n').map((line, index) => {
       const parts = line.split(/(\*\*.*?\*\*)/g);
@@ -175,20 +182,23 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
     });
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[300] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-[#111] w-full max-w-md rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+  // --- THE PORTAL CONTENT ---
+  const modalContent = (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 transition-all">
+      <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         
-        {/* Header - shrink-0 keeps it attached to the top */}
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
+        {/* Header */}
+        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0 bg-white dark:bg-zinc-900">
           <div>
             <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Match Reporter</h2>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Powered by Gemini Flash</p>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Powered by Gemini</p>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><i className="fa-solid fa-xmark text-xl"></i></button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors w-8 h-8 flex items-center justify-center rounded-full bg-zinc-50 dark:bg-zinc-800">
+            <i className="fa-solid fa-xmark text-lg"></i>
+          </button>
         </div>
 
-        {/* Scrollable Body - flex-1 prevents pushing the footer off screen! */}
+        {/* Scrollable Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {/* Character Selection */}
           {!loading && !report && (
@@ -201,7 +211,7 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
                 <button 
                   key={char.id}
                   onClick={() => setCharacter(char.id)}
-                  className={`flex-1 py-3 px-1 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${character === char.id ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'}`}
+                  className={`flex-1 py-3 px-1 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${character === char.id ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white shadow-md' : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700'}`}
                 >
                   {char.label}
                 </button>
@@ -218,9 +228,9 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
                 onChange={(e) => setImage(e.target.files?.[0] || null)} 
                 className="absolute inset-0 opacity-0 cursor-pointer z-10"
               />
-              <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-10 text-center group-hover:border-zinc-400 dark:group-hover:border-zinc-600 transition-colors">
-                <i className={`fa-solid ${image ? 'fa-file-image text-emerald-500' : 'fa-camera text-zinc-400'} text-3xl mb-3`}></i>
-                <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <div className={`border-2 border-dashed rounded-3xl p-10 text-center transition-colors ${image ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 group-hover:border-zinc-400 dark:group-hover:border-zinc-500'}`}>
+                <i className={`fa-solid ${image ? 'fa-file-image text-emerald-600 dark:text-emerald-500' : 'fa-camera text-zinc-400 dark:text-zinc-500'} text-3xl mb-3 transition-colors`}></i>
+                <p className={`text-xs font-bold uppercase tracking-widest ${image ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}`}>
                   {image ? image.name : 'Upload Scorebook'}
                 </p>
               </div>
@@ -239,29 +249,29 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
 
           {/* Generated Report Output */}
           {report && !loading && (
-            <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl animate-in fade-in slide-in-from-bottom-4">
-              <div className="text-sm font-medium leading-relaxed italic text-zinc-800 dark:text-zinc-200">
+            <div className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-5 rounded-2xl animate-in fade-in slide-in-from-bottom-4 shadow-inner">
+              <div className="text-sm font-medium leading-relaxed text-zinc-800 dark:text-zinc-300">
                 {formatReportText(report)}
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer Actions - shrink-0 keeps it locked to the bottom */}
-        <div className="p-6 bg-zinc-50 dark:bg-[#151515] border-t border-zinc-100 dark:border-zinc-800 shrink-0">
+        {/* Footer Actions */}
+        <div className="p-6 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
           {!report && !loading ? (
             <button 
               onClick={handleGenerate}
               disabled={!image}
-              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm text-white shadow-lg active:scale-95 transition-all disabled:opacity-50"
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm text-white shadow-md active:scale-95 transition-all disabled:opacity-50"
               style={{ backgroundColor: themeColor }}
             >
               Generate Report
             </button>
           ) : !loading ? (
             <div className="flex gap-3 animate-in fade-in">
-              <button onClick={() => setReport("")} className="flex-1 py-4 rounded-2xl bg-zinc-200 dark:bg-zinc-800 font-black uppercase tracking-widest text-[10px] text-zinc-600 dark:text-zinc-400">Retry</button>
-              <button onClick={handleShare} className="flex-[2] py-4 rounded-2xl text-white font-black uppercase tracking-widest text-sm shadow-lg" style={{ backgroundColor: themeColor }}>
+              <button onClick={() => setReport("")} className="flex-1 py-4 rounded-2xl bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors font-black uppercase tracking-widest text-[10px] text-zinc-600 dark:text-zinc-400 shadow-sm">Retry</button>
+              <button onClick={handleShare} className="flex-[2] py-4 rounded-2xl text-white font-black uppercase tracking-widest text-sm shadow-md transition-transform active:scale-95" style={{ backgroundColor: themeColor }}>
                 <i className="fa-solid fa-share-nodes mr-2"></i> Share Report
               </button>
             </div>
@@ -270,4 +280,7 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
       </div>
     </div>
   );
+
+  // --- TELEPORT THE MODAL TO THE BODY ---
+  return createPortal(modalContent, document.body);
 }
