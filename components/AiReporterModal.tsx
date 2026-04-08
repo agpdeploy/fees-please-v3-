@@ -8,11 +8,12 @@ interface AiReporterModalProps {
   fixture: any;
   squad: any[];
   themeColor: string;
+  teamName: string; // Accepts the dynamic team name from Gameday.tsx
 }
 
-export default function AiReporterModal({ isOpen, onClose, fixture, squad, themeColor }: AiReporterModalProps) {
+export default function AiReporterModal({ isOpen, onClose, fixture, squad, themeColor, teamName }: AiReporterModalProps) {
   const [image, setImage] = useState<File | null>(null);
-  const [character, setCharacter] = useState("CLUB_VETERAN");
+  const [character, setCharacter] = useState("OUTBACK_EXPERT"); // Default to Rusty
   const [report, setReport] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -107,10 +108,12 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
       const base64Data = await compressImage(image);
 
       const context = {
-        competition: fixture?.notes || "Regular Season Match",
-        teamName: "Our Team", 
-        opponent: fixture?.opponent || "TBA",
-        roster: squad.map(p => p.nickname || p.first_name).join(", ")
+        competition: fixture?.notes || "Indoor Cricket Season",
+        teamName: teamName, 
+        opponent: fixture?.opponent || "The Opposition",
+        roster: squad.length > 0 
+          ? squad.map(p => p.nickname || p.first_name).join(", ") 
+          : "Names currently being finalized in the Fees Please app."
       };
 
       const res = await fetch("/api/generate-report", {
@@ -154,12 +157,30 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
     }
   };
 
+  // --- MARKDOWN FORMATTER ---
+  // Converts "**Text**" into bold HTML tags safely for React
+  const formatReportText = (text: string) => {
+    return text.split('\n').map((line, index) => {
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      return (
+        <span key={index} className="block mb-3">
+          {parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return <strong key={i} className="font-black text-zinc-900 dark:text-white">{part.slice(2, -2)}</strong>;
+            }
+            return part;
+          })}
+        </span>
+      );
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[300] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#111] w-full max-w-md rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         
-        {/* Header */}
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+        {/* Header - shrink-0 keeps it attached to the top */}
+        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
           <div>
             <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Match Reporter</h2>
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Powered by Gemini Flash</p>
@@ -167,7 +188,8 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><i className="fa-solid fa-xmark text-xl"></i></button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6">
+        {/* Scrollable Body - flex-1 prevents pushing the footer off screen! */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {/* Character Selection */}
           {!loading && !report && (
             <div className="flex gap-2">
@@ -218,15 +240,15 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
           {/* Generated Report Output */}
           {report && !loading && (
             <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl animate-in fade-in slide-in-from-bottom-4">
-              <p className="text-sm font-medium leading-relaxed italic text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
-                "{report}"
-              </p>
+              <div className="text-sm font-medium leading-relaxed italic text-zinc-800 dark:text-zinc-200">
+                {formatReportText(report)}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-6 bg-zinc-50 dark:bg-[#151515] border-t border-zinc-100 dark:border-zinc-800">
+        {/* Footer Actions - shrink-0 keeps it locked to the bottom */}
+        <div className="p-6 bg-zinc-50 dark:bg-[#151515] border-t border-zinc-100 dark:border-zinc-800 shrink-0">
           {!report && !loading ? (
             <button 
               onClick={handleGenerate}

@@ -302,6 +302,9 @@ export default function GameDay() {
     return !(isSquareEnabled && method === 'card');
   }).length;
 
+  // NEW: Grab the actual team name based on the selected dropdown
+  const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
+
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
   return (
@@ -511,6 +514,7 @@ export default function GameDay() {
         fixture={activeFixture}
         squad={squad}
         themeColor={themeColor}
+        teamName={currentTeamName}
       />
     </div>
   );
