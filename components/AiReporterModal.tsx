@@ -13,9 +13,7 @@ interface AiReporterModalProps {
 }
 
 export default function AiReporterModal({ isOpen, onClose, fixture, squad, themeColor, teamName }: AiReporterModalProps) {
-  // --- ADDED MOUNTED STATE FOR PORTAL ---
   const [mounted, setMounted] = useState(false);
-  
   const [image, setImage] = useState<File | null>(null);
   const [character, setCharacter] = useState("OUTBACK_EXPERT");
   const [report, setReport] = useState("");
@@ -23,10 +21,9 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
   const [loadingText, setLoadingText] = useState("");
 
   useEffect(() => {
-    setMounted(true); // Ensures portal only renders on the client
+    setMounted(true); 
   }, []);
 
-  // --- DYNAMIC LOADING MESSAGES ---
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (loading) {
@@ -48,13 +45,13 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
           "Reminiscing about the 1998 Grand Final...",
           "Squinting at the run rate..."
         ];
-      } else if (character === 'THE_ENFORCER') {
+      } else if (character === 'SUBURBAN_MUM') {
         messages = [
-          "Counting the gold coins...", 
-          "Checking the Square reader...", 
-          "Yelling at the stragglers...", 
-          "Slicing the half-time oranges...",
-          "Tallying up the wickets..."
+          "Pouring a generous glass of Cardonnay...", 
+          "Saying 'Look at moy' to the umpire...", 
+          "Adjusting her statement earrings...", 
+          "Admiring her new activewear...",
+          "Gossiping with the scorers..."
         ];
       }
       
@@ -76,7 +73,6 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
 
   if (!isOpen || !mounted) return null;
 
-  // --- COMPRESSION HELPER ---
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -150,27 +146,29 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
   };
 
   const handleShare = async () => {
+    // Convert Markdown bold (**) to WhatsApp bold (*)
+    const shareText = report.replace(/\*\*/g, '*');
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: 'Match Report',
-          text: report,
+          text: shareText,
         });
       } catch (err) {
         console.log("Share failed", err);
       }
     } else {
-      navigator.clipboard.writeText(report);
+      navigator.clipboard.writeText(shareText);
       alert("Report copied to clipboard!");
     }
   };
 
-  // --- MARKDOWN FORMATTER ---
   const formatReportText = (text: string) => {
     return text.split('\n').map((line, index) => {
       const parts = line.split(/(\*\*.*?\*\*)/g);
       return (
-        <span key={index} className="block mb-3">
+        <span key={index} className="block mb-2">
           {parts.map((part, i) => {
             if (part.startsWith('**') && part.endsWith('**')) {
               return <strong key={i} className="font-black text-zinc-900 dark:text-white">{part.slice(2, -2)}</strong>;
@@ -182,7 +180,6 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
     });
   };
 
-  // --- THE PORTAL CONTENT ---
   const modalContent = (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 transition-all">
       <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
@@ -206,7 +203,7 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
               {[
                 { id: 'OUTBACK_EXPERT', label: 'Rusty (Outback)' },
                 { id: 'CLUB_VETERAN', label: 'Gaz (Veteran)' },
-                { id: 'THE_ENFORCER', label: 'Shazza (Treasurer)' }
+                { id: 'SUBURBAN_MUM', label: 'Shazza (Kath & Kim)' }
               ].map((char) => (
                 <button 
                   key={char.id}
