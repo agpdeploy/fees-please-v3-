@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface AiReporterModalProps {
   isOpen: boolean;
@@ -12,9 +12,58 @@ interface AiReporterModalProps {
 
 export default function AiReporterModal({ isOpen, onClose, fixture, squad, themeColor }: AiReporterModalProps) {
   const [image, setImage] = useState<File | null>(null);
-  const [character, setCharacter] = useState("BURGUNDY");
+  const [character, setCharacter] = useState("CLUB_VETERAN");
   const [report, setReport] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
+
+  // --- DYNAMIC LOADING MESSAGES ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      let messages: string[] = [];
+      
+      if (character === 'OUTBACK_EXPERT') {
+        messages = [
+          "Looking for the snake bite kit...", 
+          "Checking the radiator levels...", 
+          "Wrestling a rogue bin chicken...", 
+          "Sparking up the camp oven...",
+          "Decoding the scorebook..."
+        ];
+      } else if (character === 'CLUB_VETERAN') {
+        messages = [
+          "Stretching the hammies...", 
+          "Complaining about the umpire...", 
+          "Checking the price of a meat pie...", 
+          "Reminiscing about the 1998 Grand Final...",
+          "Squinting at the run rate..."
+        ];
+      } else if (character === 'THE_ENFORCER') {
+        messages = [
+          "Counting the gold coins...", 
+          "Checking the Square reader...", 
+          "Yelling at the stragglers...", 
+          "Slicing the half-time oranges...",
+          "Tallying up the wickets..."
+        ];
+      }
+      
+      let i = 0;
+      setLoadingText(messages[0]);
+      
+      interval = setInterval(() => {
+        i++;
+        if (i < messages.length) {
+          setLoadingText(messages[i]);
+        } else {
+          setLoadingText("Still analyzing... the handwriting is terrible...");
+        }
+      }, 2500); // Change text every 2.5 seconds
+    }
+    
+    return () => clearInterval(interval);
+  }, [loading, character]);
 
   if (!isOpen) return null;
 
@@ -28,7 +77,6 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          // Shrink to 800px - plenty for AI to read, but tiny file size
           const MAX_WIDTH = 800; 
           const scaleSize = MAX_WIDTH / img.width;
           canvas.width = MAX_WIDTH;
@@ -41,7 +89,6 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           }
           
-          // Lower quality to 0.6 (60%) - this drastically reduces MBs
           resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
         img.onerror = (err) => reject(err);
@@ -57,18 +104,15 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
     setReport("");
 
     try {
-      // 1. Convert Image to Base64 USING THE COMPRESSION HELPER
       const base64Data = await compressImage(image);
 
-      // 2. Prepare the context from your existing Gameday state
       const context = {
         competition: fixture?.notes || "Regular Season Match",
-        teamName: "Our Team", // You can pull this from activeClub context later
+        teamName: "Our Team", 
         opponent: fixture?.opponent || "TBA",
         roster: squad.map(p => p.nickname || p.first_name).join(", ")
       };
 
-      // 3. Call the API we made
       const res = await fetch("/api/generate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,7 +132,7 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
       }
     } catch (err: any) {
       console.error(err);
-      setReport(`Great Odin's Raven! The news wire is down. Error: ${err.message}`);
+      setReport(`Blimey! The news wire is down. Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -105,7 +149,6 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
         console.log("Share failed", err);
       }
     } else {
-      // Fallback: Copy to clipboard
       navigator.clipboard.writeText(report);
       alert("Report copied to clipboard!");
     }
@@ -126,20 +169,26 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
 
         <div className="p-6 overflow-y-auto space-y-6">
           {/* Character Selection */}
-          <div className="flex gap-2">
-            {['BURGUNDY', 'DREBIN'].map((char) => (
-              <button 
-                key={char}
-                onClick={() => setCharacter(char)}
-                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${character === char ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'}`}
-              >
-                {char === 'BURGUNDY' ? 'Ron Burgundy' : 'Frank Drebin'}
-              </button>
-            ))}
-          </div>
+          {!loading && !report && (
+            <div className="flex gap-2">
+              {[
+                { id: 'OUTBACK_EXPERT', label: 'Rusty (Outback)' },
+                { id: 'CLUB_VETERAN', label: 'Gaz (Veteran)' },
+                { id: 'THE_ENFORCER', label: 'Shazza (Treasurer)' }
+              ].map((char) => (
+                <button 
+                  key={char.id}
+                  onClick={() => setCharacter(char.id)}
+                  className={`flex-1 py-3 px-1 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${character === char.id ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'}`}
+                >
+                  {char.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* File Upload */}
-          {!report && (
+          {!loading && !report && (
             <div className="relative group">
               <input 
                 type="file" 
@@ -156,8 +205,18 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
             </div>
           )}
 
+          {/* Loading State Output */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-10 space-y-6 animate-in fade-in duration-500">
+              <i className="fa-solid fa-microphone-lines text-4xl animate-pulse" style={{ color: themeColor }}></i>
+              <p className="text-xs font-black uppercase tracking-widest text-zinc-500 text-center px-4 animate-pulse">
+                {loadingText}
+              </p>
+            </div>
+          )}
+
           {/* Generated Report Output */}
-          {report && (
+          {report && !loading && (
             <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl animate-in fade-in slide-in-from-bottom-4">
               <p className="text-sm font-medium leading-relaxed italic text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
                 "{report}"
@@ -168,23 +227,23 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
 
         {/* Footer Actions */}
         <div className="p-6 bg-zinc-50 dark:bg-[#151515] border-t border-zinc-100 dark:border-zinc-800">
-          {!report ? (
+          {!report && !loading ? (
             <button 
               onClick={handleGenerate}
-              disabled={loading || !image}
+              disabled={!image}
               className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm text-white shadow-lg active:scale-95 transition-all disabled:opacity-50"
               style={{ backgroundColor: themeColor }}
             >
-              {loading ? <i className="fa-solid fa-circle-notch animate-spin"></i> : 'Generate Report'}
+              Generate Report
             </button>
-          ) : (
-            <div className="flex gap-3">
+          ) : !loading ? (
+            <div className="flex gap-3 animate-in fade-in">
               <button onClick={() => setReport("")} className="flex-1 py-4 rounded-2xl bg-zinc-200 dark:bg-zinc-800 font-black uppercase tracking-widest text-[10px] text-zinc-600 dark:text-zinc-400">Retry</button>
               <button onClick={handleShare} className="flex-[2] py-4 rounded-2xl text-white font-black uppercase tracking-widest text-sm shadow-lg" style={{ backgroundColor: themeColor }}>
                 <i className="fa-solid fa-share-nodes mr-2"></i> Share Report
               </button>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

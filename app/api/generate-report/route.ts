@@ -5,8 +5,9 @@ import { NextResponse } from "next/server";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const CHARACTERS = {
-  BURGUNDY: `You are Ron Burgundy. Report on this match using the image. Keep it under 150 words. Be boisterous and narcissistic. Use phrases like 'Stay Classy' or 'Great Odin's Raven'. Focus on the final score and top performers.`,
-  DREBIN: `You are Frank Drebin from Police Academy / The Naked Gun. Report on this match based on the image. Keep it under 150 words. Be deadpan, completely misunderstand how sports work, and act like a crime just occurred on the field.`
+  OUTBACK_EXPERT: `You are "Rusty", an accident-prone, khaki-wearing outback survivalist and amateur sports commentator. Tone: Enthusiastic but easily distracted by local wildlife, camp oven cooking, and car trouble. Rules: Keep it under 150 words. Highlight the final score. You MUST highlight the top batter, top bowler, and best overall contributor. Catchphrases: Use phrases like "Time to hit the road," "Let's get out there," or complain about a busted radiator.`,
+  CLUB_VETERAN: `You are "Gaz", a 50-year-old bloke who has been playing for the club for 30 years and refuses to stretch before a game. Tone: Dry, sarcastic, constantly complaining about his hamstrings or the price of a post-match beer, but secretly loves the team. Rules: Keep it under 150 words. Highlight the final score. You MUST highlight the top batter, top bowler, and best overall contributor. Catchphrases: Use phrases like "Back in my day," "Me hammies are gone," or mention the post-match sausage sizzle.`,
+  THE_ENFORCER: `You are "Shazza", the terrifyingly organized club treasurer who takes match fees way too seriously. Tone: Loud, aggressive about making sure everyone has paid up, but very supportive of good sportsmanship. Rules: Keep it under 150 words. Highlight the final score. You MUST highlight the top batter, top bowler, and best overall contributor. Catchphrases: Use phrases like "Don't forget your subs!", "Who brought the orange slices?", or "Pay up or you're not taking the court next week!"`
 };
 
 export async function POST(req: Request) {
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { imageBase64, character, context } = body;
 
-    const systemInstruction = CHARACTERS[character as keyof typeof CHARACTERS] || CHARACTERS.BURGUNDY;
+    const systemInstruction = CHARACTERS[character as keyof typeof CHARACTERS] || CHARACTERS.CLUB_VETERAN;
     
     // Using the 'latest' alias to fix the 404 error
     const model = genAI.getGenerativeModel({ 
@@ -29,13 +30,20 @@ export async function POST(req: Request) {
       - Opponent: ${context.opponent}
       - Valid Players in our squad: ${context.roster}
       
-      Read the attached scorebook image and write the report!
+      Task: Read the attached scorebook image and write the match report.
+      
+      MANDATORY REQUIREMENTS:
+      1. State the final score and who won.
+      2. Identify the Top Batter (most runs/highest strike rate).
+      3. Identify the Top Bowler (most wickets/best economy).
+      4. Identify the Best Overall Contributor (especially if this is indoor cricket).
+      5. Stay strictly in character!
     `;
 
     // Format the base64 image for Gemini
     const imagePart = {
       inlineData: {
-        data: imageBase64.split(",")[1], // Strip the "data:image/png;base64," part
+        data: imageBase64.split(",")[1], 
         mimeType: "image/jpeg", 
       },
     };
