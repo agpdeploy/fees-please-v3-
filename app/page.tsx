@@ -10,6 +10,7 @@ import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
+import OnboardingFlow from "../components/OnboardingFlow"; // <-- Added Import
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -31,6 +32,9 @@ export default function Home() {
 
   // God Mode Switcher State
   const [allClubs, setAllClubs] = useState<any[]>([]);
+  
+  // Onboarding State
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const isAdmin = profile?.role === 'super_admin' || profile?.role === 'club_admin';
 
@@ -94,6 +98,13 @@ export default function Home() {
     }
   }, [profile, isAdmin, activeTab]);
 
+  // --- CHECK ONBOARDING STATUS ---
+  useEffect(() => {
+    if (profile && profile.has_onboarded === false) {
+      setShowOnboarding(true);
+    }
+  }, [profile]);
+
   // --- ROBUST LOGOUT ---
   const handleLogout = async () => {
     setIsSidebarOpen(false);
@@ -127,6 +138,14 @@ export default function Home() {
 
   return (
     <>
+      {/* --- ONBOARDING OVERLAY --- */}
+      {showOnboarding && (
+        <OnboardingFlow 
+          user={session.user} 
+          onComplete={() => setShowOnboarding(false)} 
+        />
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --brand-color: ${theme.color};

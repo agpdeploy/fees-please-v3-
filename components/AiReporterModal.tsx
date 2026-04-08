@@ -10,6 +10,8 @@ interface AiReporterModalProps {
   squad: any[];
   themeColor: string;
   teamName: string;
+  reportsGenerated: number;       // <-- Make sure this is here!
+  onReportIncrement: () => void;  // <-- Make sure this is here!
 }
 
 export default function AiReporterModal({ isOpen, onClose, fixture, squad, themeColor, teamName }: AiReporterModalProps) {
@@ -201,9 +203,9 @@ export default function AiReporterModal({ isOpen, onClose, fixture, squad, theme
           {!loading && !report && (
             <div className="flex gap-2">
               {[
-                { id: 'OUTBACK_EXPERT', label: 'Rusty (Outback)' },
-                { id: 'CLUB_VETERAN', label: 'Gaz (Veteran)' },
-                { id: 'SUBURBAN_MUM', label: 'Shazza (Kath & Kim)' }
+                { id: 'OUTBACK_EXPERT', label: 'Rusty' },
+                { id: 'CLUB_VETERAN', label: 'Gaz' },
+                { id: 'SUBURBAN_MUM', label: 'Shazza' }
               ].map((char) => (
                 <button 
                   key={char.id}
