@@ -33,6 +33,7 @@ export default function Setup() {
   const [defaultMemberFee, setDefaultMemberFee] = useState<number>(10);
   const [defaultCasualFee, setDefaultCasualFee] = useState<number>(25);
   const [expenseLabel, setExpenseLabel] = useState("Umpire Fee");
+  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number>(70); // NEW: Default Match Expense
   const [themeColor, setThemeColor] = useState("#10b981");
   const [themeFont, setThemeFont] = useState("Inter");
   
@@ -126,6 +127,7 @@ export default function Setup() {
       setDefaultMemberFee(clubData.default_member_fee || 10);
       setDefaultCasualFee(clubData.default_casual_fee || 25);
       setExpenseLabel(clubData.expense_label || "Umpire Fee");
+      setDefaultUmpireFee(clubData.default_umpire_fee !== undefined ? clubData.default_umpire_fee : 70);
       setThemeColor(clubData.theme_color || "#10b981");
       setThemeFont(clubData.theme_font || "Inter");
       setSquareAccessToken(clubData.square_access_token || "");
@@ -216,6 +218,7 @@ export default function Setup() {
       default_member_fee: defaultMemberFee, 
       default_casual_fee: defaultCasualFee, 
       expense_label: expenseLabel, 
+      default_umpire_fee: defaultUmpireFee,
       theme_color: themeColor, 
       theme_font: themeFont,
       square_access_token: squareAccessToken,
@@ -309,9 +312,9 @@ export default function Setup() {
     if (error) showToast(error.message, "error"); else { showToast("Team saved successfully!"); resetTeamForm(); loadClubData(); }
   }
 
-  function resetFixtureForm() { setFixtureTeamId(""); setOpponent(""); setMatchDate(""); setFixtureTime(""); setFixtureLocation(""); setFixtureNotes(""); setUmpireFee(70); setEditingFixtureId(null); }
+  function resetFixtureForm() { setFixtureTeamId(""); setOpponent(""); setMatchDate(""); setFixtureTime(""); setFixtureLocation(""); setFixtureNotes(""); setUmpireFee(defaultUmpireFee); setEditingFixtureId(null); }
   
-  function startEditingFixture(f: any) { setFixtureTeamId(f.team_id); setOpponent(f.opponent); setMatchDate(f.match_date); setFixtureTime(f.start_time || ""); setFixtureLocation(f.location || ""); setFixtureNotes(f.notes || ""); setUmpireFee(f.umpire_fee || 0); setEditingFixtureId(f.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function startEditingFixture(f: any) { setFixtureTeamId(f.team_id); setOpponent(f.opponent); setMatchDate(f.match_date); setFixtureTime(f.start_time || ""); setFixtureLocation(f.location || ""); setFixtureNotes(f.notes || ""); setUmpireFee(f.umpire_fee !== undefined ? f.umpire_fee : defaultUmpireFee); setEditingFixtureId(f.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   
   async function saveFixture() {
     if (!opponent || !matchDate || !fixtureTeamId) return showToast("Please fill all match fields.", "error");
@@ -522,9 +525,18 @@ export default function Setup() {
                   <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
                 </div>
               </div>
-              <div className="pt-2">
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Expense Label</label>
-                <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <div className="flex gap-3 pt-2">
+                <div className="flex-[2]">
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Expense Label</label>
+                  <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                    <input type="number" placeholder="70" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  </div>
+                </div>
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -870,8 +882,12 @@ export default function Setup() {
               
               <div className="flex gap-2">
                 <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                <div className="flex-1 relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                  <input type="number" placeholder={expenseLabel || "Umpire Fee"} value={umpireFee} onChange={(e) => setUmpireFee(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                </div>
               </div>
+              <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <input type="text" placeholder="Match Notes" value={fixtureNotes} onChange={(e) => setFixtureNotes(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
             </div>
             <button onClick={saveFixture} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingFixtureId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingFixtureId ? 'Update Fixture' : 'Save Fixture'}</button>

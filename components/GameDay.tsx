@@ -12,7 +12,7 @@ export default function GameDay() {
   const { activeClubId } = useActiveClub();
 
   const [themeColor, setThemeColor] = useState("#10b981");
-  const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '' });
+  const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '', expense_label: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -25,7 +25,10 @@ export default function GameDay() {
   const [paidPlayerIds, setPaidPlayerIds] = useState<string[]>([]); 
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [paymentData, setPaymentData] = useState<Record<string, { amount: number, method: 'cash' | 'card' }>>({});
+  
+  // Umpire/Expense State
   const [payUmpire, setPayUmpire] = useState(false);
+  const [isUmpirePaid, setIsUmpirePaid] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Square State
@@ -101,10 +104,10 @@ export default function GameDay() {
 
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('clubs').select('name, logo_url, theme_color, is_square_enabled').eq('id', activeClubId).single().then(({data}) => {
+      supabase.from('clubs').select('name, logo_url, theme_color, is_square_enabled, expense_label').eq('id', activeClubId).single().then(({data}) => {
         if (data) {
           if (data.theme_color) setThemeColor(data.theme_color);
-          setClubInfo({ name: data.name || 'FP', logo: data.logo_url || '' });
+          setClubInfo({ name: data.name || 'FP', logo: data.logo_url || '', expense_label: data.expense_label || '' });
           setIsSquareEnabled(data.is_square_enabled || false);
         }
       });
@@ -113,7 +116,6 @@ export default function GameDay() {
     }
   }, [activeClubId]);
 
-  // THE CROSS-CLUB BLEED FIX IS HERE
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
@@ -152,12 +154,21 @@ export default function GameDay() {
 
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
+    
+    // --- TS ERROR 1 FIX: Ensure this resolves to a strict boolean ---
+    const { data: fixtureTx } = await supabase.from('transactions').select('transaction_type').eq('fixture_id', activeFixture.id).eq('transaction_type', 'expense');
+    const hasPaidUmpire = (fixtureTx?.length || 0) > 0;
+    setIsUmpirePaid(hasPaidUmpire);
+    if (hasPaidUmpire) setPayUmpire(false);
+
     const { data: squadRows } = await supabase.from('match_squads').select('player_id').eq('fixture_id', activeFixture.id);
     if (squadRows && squadRows.length > 0) {
       const playerIds = squadRows.map(row => row.player_id);
       const { data: playerDetails } = await supabase.from("players").select("*").in("id", playerIds);
+      
       if (playerDetails) {
         setSquad(playerDetails.sort((a, b) => (a.first_name || "").localeCompare(b.first_name || "")));
+        
         const { data: txData } = await supabase.from("transactions").select("player_id, amount, transaction_type, fixture_id").in("player_id", playerIds);
         const debts: Record<string, number> = {};
         const paidToday: string[] = []; 
@@ -170,9 +181,9 @@ export default function GameDay() {
             }
           });
         }
-        setPlayerDebts(debts); setPaidPlayerIds(paidToday);
+        setPlayerDebts(debts); 
+        setPaidPlayerIds(paidToday);
 
-        // --- RESTORE DRAFT STATE AFTER REDIRECT ---
         const draftStateStr = localStorage.getItem('gameday_draft_state');
         if (draftStateStr) {
           try {
@@ -188,7 +199,8 @@ export default function GameDay() {
 
             setSelectedPlayerIds(validSelectedIds);
             setPaymentData(validPaymentData);
-            if (draft.payUmpire) setPayUmpire(true);
+            
+            if (draft.payUmpire && !hasPaidUmpire) setPayUmpire(true);
 
             localStorage.removeItem('gameday_draft_state');
           } catch (e) {
@@ -213,7 +225,6 @@ export default function GameDay() {
     const netAmount = paymentData[player.id]?.amount || 0;
     if (netAmount <= 0) return showToast("Amount must be > $0", "error");
 
-    // --- SAVE CURRENT SELECTIONS BEFORE LEAVING THE APP ---
     localStorage.setItem('gameday_draft_state', JSON.stringify({
       selectedPlayerIds,
       paymentData,
@@ -294,10 +305,24 @@ export default function GameDay() {
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: player.is_member ? teamFees.member : teamFees.casual, transaction_type: 'fee' }]);
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: paymentData[player.id].amount, transaction_type: 'payment', payment_method: method }]);
       }
-      if (payUmpire && activeFixture.umpire_fee > 0) {
-        await supabase.from("transactions").insert([{ team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: activeFixture.umpire_fee, transaction_type: 'expense', payment_method: 'cash', description: 'Umpire Payment' }]);
+      
+      if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
+        await supabase.from("transactions").insert([{ 
+          team_id: selectedTeamId, 
+          fixture_id: activeFixture.id, 
+          club_id: activeClubId, 
+          amount: activeFixture.umpire_fee, 
+          transaction_type: 'expense', 
+          payment_method: 'cash', 
+          description: clubInfo.expense_label || 'Match Expense' 
+        }]);
       }
-      await loadSquadData(); setSelectedPlayerIds([]); setPaymentData({}); setPayUmpire(false); showToast(`Saved!`);
+      
+      await loadSquadData(); 
+      setSelectedPlayerIds([]); 
+      setPaymentData({}); 
+      setPayUmpire(false); 
+      showToast(`Saved!`);
     } catch (err) { showToast("Error", "error"); } finally { setIsProcessing(false); }
   }
 
@@ -319,8 +344,6 @@ export default function GameDay() {
     loadSquadData(); 
   }
 
-  // --- NEW: INCREMENT HELPER ---
-  // Updates local state to accurately track AI limits across renders
   const handleReportGenerated = () => {
     if (activeFixture) {
       setActiveFixture({
@@ -365,7 +388,6 @@ export default function GameDay() {
       {selectedTeamId && activeFixture ? (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-colors">
           
-          {/* TOP HEADER: Status & Actions */}
           <div className="flex justify-between items-center p-4 border-b border-zinc-100 dark:border-zinc-800">
             <div className="flex items-center gap-3">
               <span 
@@ -379,7 +401,6 @@ export default function GameDay() {
               </span>
             </div>
             
-            {/* The AI and Add buttons scaled down to fit cleanly in the header */}
             <div className="flex gap-2">
               <button onClick={() => setIsAiModalOpen(true)} className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity">
                 <i className="fa-solid fa-wand-magic-sparkles text-xs"></i>
@@ -390,9 +411,7 @@ export default function GameDay() {
             </div>
           </div>
 
-          {/* MIDDLE: Team vs Team Layout (PlayCricket Style) */}
           <div className="p-5 space-y-4">
-            {/* Home Team */}
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
@@ -408,7 +427,6 @@ export default function GameDay() {
               </div>
             </div>
 
-            {/* Away Team */}
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
@@ -421,7 +439,6 @@ export default function GameDay() {
             </div>
           </div>
 
-          {/* BOTTOM: Format & Location */}
           <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-3 border-t border-zinc-100 dark:border-zinc-800">
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
               {activeFixture.start_time && `${activeFixture.start_time} • `}
@@ -538,13 +555,32 @@ export default function GameDay() {
           
           <div className="pt-4 space-y-4">
             {activeFixture.umpire_fee > 0 && (
-              <div className="bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex justify-between items-center cursor-pointer transition-colors" onClick={() => setPayUmpire(!payUmpire)}>
-                <span className="text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300 flex items-center gap-2"><i className="fa-solid fa-ticket text-zinc-500"></i> Pay Umpire (${activeFixture.umpire_fee})</span>
-                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-800'}`}>
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${payUmpire ? 'translate-x-4' : ''}`}></div>
+              <div 
+                className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 cursor-pointer active:scale-[0.98]'}`} 
+                onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isUmpirePaid ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : payUmpire ? 'bg-red-50 dark:bg-red-500/10 text-red-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
+                    <i className={`fa-solid ${isUmpirePaid ? 'fa-check' : 'fa-whistle'} text-sm`}></i>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Match Expense</span>
+                    <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                      {clubInfo.expense_label || 'Umpire'} (${activeFixture.umpire_fee})
+                    </span>
+                  </div>
                 </div>
+                
+                {isUmpirePaid ? (
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">Paid</span>
+                ) : (
+                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                  </div>
+                )}
               </div>
             )}
+            
             <div className="flex justify-between items-end px-2">
               <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">
                 {netTotal < 0 ? 'Net Outlay:' : 'Total Collected:'}
@@ -583,7 +619,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* --- AI REPORTER MODAL W/ MERGED PROPS --- */}
+      {/* --- TS ERROR 2 FIX: ADDED MISSING PROPS --- */}
       <AiReporterModal 
         isOpen={isAiModalOpen} 
         onClose={() => setIsAiModalOpen(false)} 
