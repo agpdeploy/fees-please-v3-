@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareGross } from '@/lib/fees';
+import AiReporterModal from "@/components/AiReporterModal";
 
 export default function GameDay() {
   const { profile, roles } = useProfile();
@@ -34,6 +35,9 @@ export default function GameDay() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
+  
+  // AI Modal State
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -333,9 +337,20 @@ export default function GameDay() {
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-1.5 italic font-bold">{activeFixture.notes}</p>
               )}
             </div>
-            <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
-              <i className="fa-solid fa-user-plus text-lg"></i>
-            </button>
+            
+            {/* AI and Quick Add Buttons wrapped in a flex container */}
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setIsAiModalOpen(true)} 
+                className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white hover:opacity-90 flex items-center justify-center shadow-lg transition-all active:scale-95"
+              >
+                <i className="fa-solid fa-wand-magic-sparkles text-lg"></i>
+              </button>
+
+              <button onClick={openQuickAdd} className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center shadow-inner transition-colors" style={{ color: themeColor }}>
+                <i className="fa-solid fa-user-plus text-lg"></i>
+              </button>
+            </div>
           </div>
         </div>
       ) : selectedTeamId ? (
@@ -488,6 +503,15 @@ export default function GameDay() {
           </div>
         </div>
       )}
+
+      {/* --- AI REPORTER MODAL --- */}
+      <AiReporterModal 
+        isOpen={isAiModalOpen} 
+        onClose={() => setIsAiModalOpen(false)} 
+        fixture={activeFixture}
+        squad={squad}
+        themeColor={themeColor}
+      />
     </div>
   );
 }
