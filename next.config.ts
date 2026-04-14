@@ -7,6 +7,10 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development", // Keeps it turned off while you are coding locally
+  workboxOptions: {
+    skipWaiting: true,   // Forces the new service worker to activate immediately
+    clientsClaim: true,  // Takes control of all open tabs/windows immediately
+  },
 });
 
 const nextConfig: NextConfig = {
