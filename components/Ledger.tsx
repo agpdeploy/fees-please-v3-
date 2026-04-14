@@ -318,7 +318,7 @@ export default function Ledger() {
 
       {/* FIXTURE MODAL (Match Details) */}
       {selectedFixture && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors">
               <div>
@@ -331,7 +331,7 @@ export default function Ledger() {
               </div>
               <button onClick={() => setSelectedFixture(null)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-2">
+            <div className="p-5 overflow-y-auto flex-1 space-y-2 pb-24">
               {transactions.filter(tx => tx.fixture_id === selectedFixture.id).map(tx => (
                 <div key={tx.id} className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl flex justify-between items-center transition-colors">
                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{tx.players ? `${tx.players.first_name} ${tx.players.last_name?.charAt(0)}.` : tx.description}</span>
@@ -345,7 +345,7 @@ export default function Ledger() {
 
       {/* PLAYER MODAL (History & Manual Add) */}
       {selectedPlayer && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors">
               <div>
@@ -356,7 +356,7 @@ export default function Ledger() {
             </div>
             
             {isManualModalOpen ? (
-              <form onSubmit={handleManualSave} className="p-5 space-y-4 animate-in slide-in-from-right-4">
+              <form onSubmit={handleManualSave} className="p-5 space-y-4 animate-in slide-in-from-right-4 pb-24">
                 <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                   <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'text-white shadow-sm' : 'text-zinc-500'}`} style={manualType === 'payment' ? { backgroundColor: themeColor } : {}}>Payment (+)</button>
                   <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
@@ -378,7 +378,7 @@ export default function Ledger() {
                 <button type="button" onClick={() => setIsManualModalOpen(false)} className="w-full text-[10px] text-zinc-500 hover:text-zinc-900 dark:hover:text-white uppercase font-black py-2 tracking-widest transition-colors">Back to History</button>
               </form>
             ) : (
-              <div className="p-5 overflow-y-auto flex-1 space-y-3">
+              <div className="p-5 overflow-y-auto flex-1 space-y-3 pb-24">
                 <button onClick={() => setIsManualModalOpen(true)} className="w-full py-4 border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mb-2" style={{ color: themeColor }}>
                   <i className="fa-solid fa-plus"></i> Add Manual Transaction
                 </button>
