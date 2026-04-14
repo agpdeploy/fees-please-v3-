@@ -1,6 +1,6 @@
 // sw.js
 const CACHE_NAME = 'fees-please-cache-v1';
-const urlsToCache = ['/', '/globals.css'];
+const urlsToCache = ['/'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

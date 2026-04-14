@@ -7,12 +7,22 @@ export function useProfile() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true // <-- FIX 1: The safety switch for Strict Mode
+
     async function getProfile() {
+      // <-- FIX 2: Check local session first to prevent lock stealing
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        if (isMounted) setLoading(false)
+        return
+      }
+
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (authError || !user) {
         console.error("AUTH ERROR:", authError);
-        setLoading(false);
+        if (isMounted) setLoading(false);
         return;
       }
 
@@ -21,6 +31,7 @@ export function useProfile() {
       // Fetch base profile and roles
       const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       const { data: rolesData, error: rolesError } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url)').eq('user_id', user.id)
+      
       console.log("2. DB PROFILE DATA:", profileData, "| ERROR:", profileError);
       console.log("3. DB ROLES DATA:", rolesData, "| ERROR:", rolesError);
 
@@ -39,12 +50,20 @@ export function useProfile() {
 
       console.log("4. FINAL ASSEMBLED PROFILE:", finalProfile);
 
-      setProfile(finalProfile)
-      setRoles(rolesData || [])
-      setLoading(false)
+      // <-- FIX 3: Only update state if the component hasn't been unmounted
+      if (isMounted) {
+        setProfile(finalProfile)
+        setRoles(rolesData || [])
+        setLoading(false)
+      }
     }
 
     getProfile()
+
+    // <-- FIX 4: Cleanup function flips the switch when React unmounts it
+    return () => {
+      isMounted = false 
+    }
   }, [])
 
   return { profile, roles, loading }

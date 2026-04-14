@@ -5,27 +5,55 @@
 
 /* 2. Define Variables */
 :root {
-  --background: #f4f4f5; /* Soft zinc-100 so white cards pop off the background */
+  --background: #f4f4f5; 
   --foreground: #171717;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --x-color-nextra-bg: #f4f4f5; 
 }
 
 /* 3. Manual Dark Mode Override */
 .dark {
-  --background: #18181b; /* Softened from #0a0a0a to zinc-900 */
+  --background: #18181b; 
   --foreground: #e5e5e5;
+  --x-color-nextra-bg: #18181b; 
 }
 
 /* 4. Global Styles */
 body {
   background: var(--background);
   color: var(--foreground);
-  /* Transition makes the switch feel smooth */
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Keep scrollbar looking good in dark mode */
 .dark {
   color-scheme: dark;
 }
+
+/* Nextra Theme Overrides */
+@layer base {
+  :root {
+    --nextra-primary-hue: 160deg;
+    --nextra-primary-saturation: 84%;
+    --nextra-navbar-height: 4rem;
+  }
+}
+
+/* Sidebar "Wiki" Styling */
+.nextra-sidebar-container {
+  @apply border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950;
+}
+
+.nextra-sidebar-container a.active {
+  @apply !font-semibold !text-emerald-600 dark:!text-emerald-400 !bg-emerald-50 dark:!bg-emerald-900/20;
+}
+
+/* Fix the SSOT Logo styling */
+.fees-please-logo {
+  @apply flex items-center gap-2 text-zinc-900 dark:text-white antialiased tracking-tight;
+}
+
+.fees-please-logo span {
+  @apply bg-emerald-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest;
+}
+

@@ -3,7 +3,8 @@ import { Inter } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import InstallPrompt from '@/components/InstallPrompt'
-import "./globals.css"
+import ChatWidget from '@/components/ChatWidget'
+import "@/app/globals.css"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -28,7 +29,7 @@ export const viewport: Viewport = {
   themeColor: "#10b981",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // Prevents annoying zoom on mobile tap
+  maximumScale: 1,
   userScalable: false,
 };
 
@@ -42,17 +43,22 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
       </head>
-      <body className={`${inter.className} bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-[#e5e5e5] overflow-x-hidden antialiased transition-colors duration-300`}>
+      <body 
+        className={`${inter.className} bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-[#e5e5e5] antialiased transition-colors duration-300`} 
+        suppressHydrationWarning
+      >
         <ThemeProvider
           attribute="class"
-          defaultTheme="light" /* <-- FORCED LIGHT MODE */
-          enableSystem={false} /* <-- IGNORES PHONE OS DARK MODE */
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
+          /* @ts-ignore - suppressHydrationWarning is valid here to stop the script tag error */
+          suppressHydrationWarning
         >
           <ClubProvider>
             {children}
-            {/* --- ADDED RIGHT HERE SO IT FLOATS OVER EVERYTHING --- */}
             <InstallPrompt /> 
+            <ChatWidget />
           </ClubProvider>
         </ThemeProvider>
       </body>

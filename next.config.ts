@@ -6,11 +6,11 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  disable: process.env.NODE_ENV === "development", // Keeps it turned off while you are coding locally
+  disable: process.env.NODE_ENV === "development",
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  // Back to basics for maximum stability
 };
 
 export default withPWA(nextConfig);
