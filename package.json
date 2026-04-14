@@ -13,6 +13,7 @@
     "@ai-sdk/react": "^3.0.160",
     "@ducanh2912/next-pwa": "^10.2.6",
     "@google/generative-ai": "^0.24.1",
+    "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.100.1",
     "ai": "^6.0.158",
     "html-to-image": "^1.11.13",

@@ -13,7 +13,8 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        // UPDATED: Added /auth/callback so Next.js can process the session
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     if (error) setError(error.message);
@@ -26,7 +27,10 @@ export default function Login() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { 
+        // UPDATED: Added /auth/callback for Magic Links too
+        emailRedirectTo: `${window.location.origin}/auth/callback` 
+      },
     });
 
     if (error) setError(error.message);

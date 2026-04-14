@@ -652,14 +652,17 @@ export default function GameDay() {
         </div>
       )}
 
+      {/* --- QUICK ADD MODAL --- */}
       {isQuickAddOpen && (
-        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4 transition-colors">
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
               <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Add to Squad</h2>
               <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+            
+            {/* Added pb-24 here to ensure list scrolls past the floating button */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-24">
               <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
                 {availablePlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (

@@ -1,4 +1,4 @@
-// Deploy version 3.7 - Clean Page (No Install Prompt Imports)
+// Deploy version 3.9 - Native dAIve Overlay Integration
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,7 +10,8 @@ import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
-import OnboardingFlow from "../components/OnboardingFlow"; // <-- Added Import
+import OnboardingFlow from "../components/OnboardingFlow"; 
+import ChatWidget from "../components/ChatWidget";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -36,6 +37,9 @@ export default function Home() {
   // Onboarding State
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // NEW STATE: Manage dAIve as an overlay, not a standard tab
+  const [isDaiveOpen, setIsDaiveOpen] = useState(false);
+
   const isAdmin = profile?.role === 'super_admin' || profile?.role === 'club_admin';
 
   // Fetch all clubs if user is super_admin
@@ -52,9 +56,16 @@ export default function Home() {
     ? allClubs 
     : Array.from(new Map(roles?.map((r: any) => [r.club_id, r.clubs])).values()).filter(Boolean);
 
+  // UPDATED: Handle dAIve toggling separately from core tabs
   const handleTabChange = (tab: string) => {
+    if (tab === "daive") {
+      setIsDaiveOpen((prev) => !prev);
+      setIsSidebarOpen(false);
+      return;
+    }
     setActiveTab(tab);
     sessionStorage.setItem('activeTab', tab);
+    setIsDaiveOpen(false); // Auto-close dAIve if they click GameDay or Ledger
     setIsSidebarOpen(false);
   };
 
@@ -154,17 +165,18 @@ export default function Home() {
         body { font-family: var(--brand-font) !important; }
       `}} />
 
-      <div className="flex flex-col min-h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
+      {/* FIXED CONTAINER: Height set to screen to handle the flex layout */}
+      <div className="flex flex-col h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         
-        <header className="sticky top-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white/80 dark:bg-black/80 backdrop-blur-md z-40 transition-colors">
+        <header className="shrink-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-black z-40">
           <button 
             onClick={() => uniqueClubs.length > 1 && setShowClubMenu(true)} 
             className={`flex items-center gap-3 text-left ${uniqueClubs.length > 1 ? 'group cursor-pointer' : 'cursor-default'}`}
           >
             {theme.logo ? (
-              <img src={theme.logo} className={`w-9 h-9 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-transform ${uniqueClubs.length > 1 ? 'group-hover:scale-95' : ''}`} alt="Club Logo" />
+              <img src={theme.logo} className="w-9 h-9 rounded-lg object-cover border border-zinc-200 dark:border-zinc-800" alt="Club Logo" />
             ) : (
-              <div className={`w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase tracking-tighter shadow-inner transition-transform ${uniqueClubs.length > 1 ? 'group-hover:scale-95' : ''}`}>
+              <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-brand uppercase">
                 {theme.name.substring(0, 2)}
               </div>
             )}
@@ -177,7 +189,7 @@ export default function Home() {
             </div>
           </button>
           
-          <button onClick={() => setIsSidebarOpen(true)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-colors">
+          <button onClick={() => setIsSidebarOpen(true)} className="text-zinc-500 w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-colors">
             <i className="fa-solid fa-bars text-sm"></i>
           </button>
         </header>
@@ -213,19 +225,36 @@ export default function Home() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto pb-24 px-4 pt-4 relative z-30">
-          {activeTab === "gameday" && <GameDay />}
-          {activeTab === "ledger" && <Ledger />}
-          {activeTab === "setup" && isAdmin && <Setup />}
+        {/* --- MAIN CONTENT AREA WITH OVERLAY --- */}
+        <main className="flex-1 relative z-30 flex flex-col overflow-hidden">
+          
+          {/* BASE CONTENT: Always renders so it doesn't unmount when dAIve opens */}
+          <div className="flex-1 overflow-y-auto">
+            {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
+            {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
+            {activeTab === "setup" && isAdmin && <div className="p-4"><Setup /></div>}
+          </div>
+
+          {/* OVERLAY: dAIve slides up over the base content */}
+          {isDaiveOpen && (
+            <div className="absolute inset-0 z-50 bg-white dark:bg-zinc-950 animate-in slide-in-from-bottom-8 duration-200 shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+              <ChatWidget onClose={() => setIsDaiveOpen(false)} />
+            </div>
+          )}
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-black/95 backdrop-blur-md pb-8 pt-4 z-40 transition-colors">
+        {/* --- BOTTOM NAVIGATION BAR --- */}
+        <nav className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black pb-8 pt-4 z-40 relative">
           <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
-            <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" ? "text-brand" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            {/* Highlight rules updated to respect isDaiveOpen */}
+            <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-brand" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
               <i className="fa-solid fa-bolt-lightning text-2xl mb-1"></i><span>GameDay</span>
             </button>
-            <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" ? "text-brand" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-brand" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
               <i className="fa-solid fa-wallet text-2xl mb-1"></i><span>Ledger</span>
+            </button>
+            <button onClick={() => handleTabChange("daive")} className={`flex-1 flex flex-col items-center transition-colors ${isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+              <i className="fa-solid fa-robot text-2xl mb-1"></i><span>dAIve</span>
             </button>
           </div>
         </nav>
@@ -252,7 +281,7 @@ export default function Home() {
                   </button>
                 )}
                 
-                <button onClick={() => { alert('Fees Please v3.7\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
+                <button onClick={() => { alert('Fees Please v3.9\nCreated for sports clubs.'); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">
                   <i className="fa-solid fa-circle-info text-zinc-500 w-5"></i> About App
                 </button>
                 <button onClick={() => window.location.reload()} className="w-full text-left px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">

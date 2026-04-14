@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Manrope } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import InstallPrompt from '@/components/InstallPrompt'
-import ChatWidget from '@/components/ChatWidget'
 import "@/app/globals.css"
 
-const inter = Inter({ subsets: ['latin'] })
+const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
 // --- PWA & SEO METADATA ---
 export const metadata: Metadata = {
@@ -44,7 +43,7 @@ export default function RootLayout({
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
       </head>
       <body 
-        className={`${inter.className} bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-[#e5e5e5] antialiased transition-colors duration-300`} 
+        className={`${manrope.className} bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-[#e5e5e5] antialiased transition-colors duration-300`} 
         suppressHydrationWarning
       >
         <ThemeProvider
@@ -58,7 +57,6 @@ export default function RootLayout({
           <ClubProvider>
             {children}
             <InstallPrompt /> 
-            <ChatWidget />
           </ClubProvider>
         </ThemeProvider>
       </body>
