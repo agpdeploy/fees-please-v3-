@@ -5,9 +5,11 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 
-export default function Setup() {
-  const [activeTab, setActiveTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures'>('config');
-  
+interface SetupProps {
+  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures';
+}
+
+export default function Setup({ activeTab }: SetupProps) {
   const [clubRecord, setClubRecord] = useState<any>(null);
   const [clubUsers, setClubUsers] = useState<any[]>([]); 
   const [teams, setTeams] = useState<any[]>([]);
@@ -31,7 +33,6 @@ export default function Setup() {
   const [seasonStart, setSeasonStart] = useState("");
   const [seasonEnd, setSeasonEnd] = useState("");
   
-  // --- THE FIX: Allow empty strings in numeric state ---
   const [defaultMemberFee, setDefaultMemberFee] = useState<number | "">(10);
   const [defaultCasualFee, setDefaultCasualFee] = useState<number | "">(25);
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(70);
@@ -51,7 +52,6 @@ export default function Setup() {
   const [fixtureLocation, setFixtureLocation] = useState(""); 
   const [fixtureNotes, setFixtureNotes] = useState(""); 
   
-  // --- THE FIX: Allow empty strings in numeric state ---
   const [umpireFee, setUmpireFee] = useState<number | "">(70);
   
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
@@ -71,7 +71,6 @@ export default function Setup() {
 
   const [teamName, setTeamName] = useState("");
   
-  // --- THE FIX: Allow empty strings in numeric state ---
   const [memberFee, setMemberFee] = useState<number | "">(10);
   const [casualFee, setCasualFee] = useState<number | "">(25);
   
@@ -101,6 +100,18 @@ export default function Setup() {
   const { profile, loading: profileLoading } = useProfile();
   const { activeClubId, setActiveClubId } = useActiveClub();
   const [clubId, setClubId] = useState<string | null>(null);
+
+  // Replaces the inline resets from the old horizontal tabs
+  useEffect(() => {
+    if (activeTab === 'teams') {
+      resetTeamForm();
+    } else if (activeTab === 'players') {
+      resetPlayerForm();
+      setIsBulkMode(false);
+    } else if (activeTab === 'fixtures') {
+      resetFixtureForm();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!profile) return;
@@ -535,15 +546,6 @@ export default function Setup() {
           </div>
         </div>
       )}
-
-      {/* HORIZONTAL SCROLLING TABS */}
-      <div className="flex bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl mb-6 shadow-sm overflow-x-auto hide-scrollbar transition-colors">
-        <button onClick={() => {setActiveTab('config');}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'config' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Config</button>
-        <button onClick={() => {setActiveTab('access');}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'access' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Access</button>
-        <button onClick={() => {setActiveTab('teams'); resetTeamForm();}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'teams' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Teams</button>
-        <button onClick={() => {setActiveTab('players'); resetPlayerForm(); setIsBulkMode(false);}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'players' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Roster</button>
-        <button onClick={() => {setActiveTab('fixtures'); resetFixtureForm();}} className={`flex-1 min-w-[70px] py-2.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'fixtures' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-500 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Fixtures</button>
-      </div>
 
       {/* --- CONFIG TAB --- */}
       {activeTab === 'config' && (
