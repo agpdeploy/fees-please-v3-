@@ -3,6 +3,7 @@ import { Manrope } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import InstallPrompt from '@/components/InstallPrompt'
+import PWAUpdateHandler from '@/components/PWAUpdateHandler'
 import "@/app/globals.css"
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
@@ -57,6 +58,7 @@ export default function RootLayout({
           <ClubProvider>
             {children}
             <InstallPrompt /> 
+            <PWAUpdateHandler />
           </ClubProvider>
         </ThemeProvider>
       </body>

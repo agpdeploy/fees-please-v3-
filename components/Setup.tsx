@@ -713,6 +713,33 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
+          {/* APP VERSION & CACHE WIPE */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors text-center space-y-3">
+            <h2 className="text-[11px] font-black uppercase italic text-zinc-500 mb-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">System Info</h2>
+            <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400">
+               <span>Version: {process.env.NEXT_PUBLIC_APP_VERSION || 'dev-local'}</span>
+               <span>Build: {process.env.NEXT_PUBLIC_BUILD_TIME ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleDateString() : 'N/A'}</span>
+            </div>
+            <button
+               onClick={async () => {
+                  if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                  }
+                  if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                      await registration.unregister();
+                    }
+                  }
+                  window.location.reload();
+               }}
+               className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-xl text-[10px] font-black uppercase transition-colors flex items-center justify-center gap-2"
+            >
+               <i className="fa-solid fa-arrows-rotate"></i> Force App Update
+            </button>
+          </div>
+
           <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md disabled:opacity-50">
             {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Organization")}
           </button>
