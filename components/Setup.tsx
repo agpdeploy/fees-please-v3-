@@ -45,6 +45,10 @@ export default function Setup({ activeTab }: SetupProps) {
   const [squareLocationId, setSquareLocationId] = useState("");
   const [isSquareEnabled, setIsSquareEnabled] = useState(false);
 
+  // CLUB LEVEL MANUAL PAYMENT STATE
+  const [payIdType, setPayIdType] = useState<'mobile' | 'email' | 'bank_account'>('mobile');
+  const [payIdValue, setPayIdValue] = useState("");
+
   const [fixtureTeamId, setFixtureTeamId] = useState("");
   const [opponent, setOpponent] = useState("");
   const [matchDate, setMatchDate] = useState("");
@@ -101,7 +105,6 @@ export default function Setup({ activeTab }: SetupProps) {
   const { activeClubId, setActiveClubId } = useActiveClub();
   const [clubId, setClubId] = useState<string | null>(null);
 
-  // Replaces the inline resets from the old horizontal tabs
   useEffect(() => {
     if (activeTab === 'teams') {
       resetTeamForm();
@@ -153,6 +156,8 @@ export default function Setup({ activeTab }: SetupProps) {
       setSquareAccessToken(clubData.square_access_token || "");
       setSquareLocationId(clubData.square_location_id || "");
       setIsSquareEnabled(clubData.is_square_enabled || false);
+      setPayIdType(clubData.pay_id_type || 'mobile');
+      setPayIdValue(clubData.pay_id_value || "");
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
@@ -243,7 +248,9 @@ export default function Setup({ activeTab }: SetupProps) {
       theme_font: themeFont,
       square_access_token: squareAccessToken,
       square_location_id: squareLocationId,
-      is_square_enabled: isSquareEnabled
+      is_square_enabled: isSquareEnabled,
+      pay_id_type: payIdValue ? payIdType : null,
+      pay_id_value: payIdValue || null
     };
     
     if (clubId && clubId !== 'new') {
@@ -350,7 +357,7 @@ export default function Setup({ activeTab }: SetupProps) {
       primary_color: primaryColor, 
       club_id: clubId, 
       season_start: teamSeasonStart || null, 
-      season_end: teamSeasonEnd || null 
+      season_end: teamSeasonEnd || null
     };
     let error;
     if (editingTeamId) { const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); error = res.error; } 
@@ -654,6 +661,36 @@ export default function Setup({ activeTab }: SetupProps) {
           </div>
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Details (Club Level)</h2>
+            <div className="space-y-4">
+              <div className="flex gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
+                <div className="w-1/3">
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Transfer Type</label>
+                  <select 
+                    value={payIdType} 
+                    onChange={(e) => setPayIdType(e.target.value as any)} 
+                    className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
+                  >
+                    <option value="mobile">PayID (Mobile)</option>
+                    <option value="email">PayID (Email)</option>
+                    <option value="bank_account">Bank Account</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Payment Details</label>
+                  <input 
+                    type="text" 
+                    value={payIdValue} 
+                    onChange={(e) => setPayIdValue(e.target.value)} 
+                    placeholder={payIdType === 'mobile' ? 'e.g. 0400 000 000' : payIdType === 'email' ? 'e.g. admin@club.com' : 'e.g. BSB: 123-456 ACC: 12345678'}
+                    className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">App Appearance</h2>
             <div className="space-y-4">
               <div>
@@ -844,6 +881,7 @@ export default function Setup({ activeTab }: SetupProps) {
                 />
               </div>
             </div>
+
             <div className="flex gap-3 mb-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override Start Date</label>

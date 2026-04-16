@@ -38,6 +38,10 @@ export default function GameDay() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
+
+  // Digital Transfer / PayID Modal States
+  const [isPayIdModalOpen, setIsPayIdModalOpen] = useState(false);
+  const [activePayIdPlayer, setActivePayIdPlayer] = useState<any>(null);
   
   // AI Modal State
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -146,7 +150,6 @@ export default function GameDay() {
       const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
       if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
       
-      // --- NEW LOGIC: Fetch oldest match that isn't COMPLETED or FORFEITED ---
       const { data: fixData } = await supabase
         .from('fixtures')
         .select('*')
@@ -243,9 +246,7 @@ export default function GameDay() {
       showToast("Error updating status", "error");
     } else {
       showToast(status === 'completed' ? "Match Finalized!" : "Match Forfeited");
-      // This will trigger the useEffect to find the NEXT match
       setActiveFixture(null);
-      // Wait a beat then refresh to find the next game
       setTimeout(() => window.location.reload(), 1000);
     }
     setIsProcessing(false);
@@ -336,6 +337,7 @@ export default function GameDay() {
       for (const player of selectedPlayers) {
         const method = paymentData[player.id]?.method || 'cash';
         
+        // Skip players pushed to Square. They log upon successful return redirect.
         if (isSquareEnabled && method === 'card') continue;
 
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: player.is_member ? teamFees.member : teamFees.casual, transaction_type: 'fee' }]);
@@ -399,14 +401,15 @@ export default function GameDay() {
     return !(isSquareEnabled && method === 'card');
   }).length;
 
-  const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
+  const currentTeam = teams.find(t => t.id === selectedTeamId);
+  const currentTeamName = currentTeam?.name || "Our Team";
 
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative overflow-x-hidden">
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[200] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[300] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i> {toast.msg}
         </div>
       )}
@@ -552,10 +555,13 @@ export default function GameDay() {
                       <span className="text-emerald-500">Fee: ${matchFee}</span>
                     </div>
                   </div>
+                  
+                  {/* CLEAN BINARY PAYMENT TOGGLE */}
                   <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
                     <button 
                       onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      title="Cash"
+                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
                       <i className="fa-solid fa-money-bill-wave"></i>
                     </button>
@@ -564,15 +570,22 @@ export default function GameDay() {
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         
+                        // Square Override
                         if (isSquareEnabled) {
                           const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
                           if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
                             return showToast("Permission Denied", "error");
                           }
                           initiateTapToPay(player);
+
+                        // Secondary Behavior: Show Captain's PayID
+                        } else if (currentTeam?.pay_id_value) {
+                          setActivePayIdPlayer(player);
+                          setIsPayIdModalOpen(true);
                         }
                       }} 
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      title="Card / Transfer"
+                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
                       <i className="fa-solid fa-credit-card"></i>
                     </button>
@@ -661,7 +674,6 @@ export default function GameDay() {
               <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             
-            {/* Added pb-24 here to ensure list scrolls past the floating button */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-24">
               <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
@@ -672,6 +684,49 @@ export default function GameDay() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- DIGITAL TRANSFER / PAYID MODAL --- */}
+      {isPayIdModalOpen && activePayIdPlayer && currentTeam && (
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[400px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Digital Transfer</h2>
+              <button onClick={() => setIsPayIdModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <div className="p-6 space-y-6 text-center">
+              <div>
+                <p className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-1">Amount Due</p>
+                <p className="text-4xl font-black text-zinc-900 dark:text-white">${paymentData[activePayIdPlayer.id]?.amount?.toFixed(2)}</p>
+                <p className="text-sm font-bold text-zinc-500 mt-2">for {activePayIdPlayer.first_name}&apos;s match fees</p>
+              </div>
+
+              <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 transition-colors">
+                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Pay Captain via {currentTeam.pay_id_type}</p>
+                 <div className="flex items-center gap-2">
+                   <code className="flex-1 bg-white dark:bg-[#111] px-3 py-3 rounded-lg font-mono text-sm border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-bold select-all transition-colors">{currentTeam.pay_id_value}</code>
+                   <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentTeam.pay_id_value);
+                        showToast("PayID Copied!");
+                      }}
+                      className="px-4 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-black uppercase transition-colors shadow-sm flex items-center gap-2"
+                   >
+                     Copy
+                   </button>
+                 </div>
+              </div>
+
+              <button 
+                onClick={() => setIsPayIdModalOpen(false)} 
+                className="w-full py-4 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-md hover:scale-[0.98] transition-transform"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
