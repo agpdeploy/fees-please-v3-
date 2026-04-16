@@ -385,6 +385,7 @@ export default function GameDay() {
       const currentIds = squad.map(p => p.id);
       setAvailablePlayers(data.filter(p => !currentIds.includes(p.id)));
     }
+    setPlayerSearch(""); // Reset search on open
     setIsQuickAddOpen(true);
   }
 
@@ -392,8 +393,46 @@ export default function GameDay() {
     if (!activeFixture) return;
     await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
     setIsQuickAddOpen(false);
+    setPlayerSearch("");
     showToast("Player Added to Squad");
     loadSquadData(); 
+  }
+
+  // --- NEW: ON-THE-FLY PLAYER CREATION ---
+  async function createAndAddPlayer(fullName: string) {
+    if (!activeClubId || !activeFixture) return;
+    setIsProcessing(true);
+    
+    try {
+      // Split the name. If they just type "Dave", last name defaults to "(Casual)"
+      const parts = fullName.trim().split(' ');
+      const firstName = parts[0];
+      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '(Casual)';
+
+      // 1. Insert into Players table
+      const { data: newPlayer, error: playerError } = await supabase
+        .from('players')
+        .insert([{
+          first_name: firstName,
+          last_name: lastName,
+          club_id: activeClubId,
+          is_member: false // Always add fly-ins as casuals
+        }])
+        .select()
+        .single();
+
+      if (playerError) throw playerError;
+
+      // 2. Immediately add them to the match squad
+      if (newPlayer) {
+        await addPlayerToMatch(newPlayer.id);
+      }
+
+    } catch (err: any) {
+      showToast(err.message || "Failed to create player", "error");
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
   const handleReportGenerated = () => {
@@ -409,6 +448,11 @@ export default function GameDay() {
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
   const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? (activeFixture?.umpire_fee || 0) : 0);
+
+  const processableCount = selectedPlayers.filter(p => {
+    const method = paymentData[p.id]?.method || 'cash';
+    return !(isSquareEnabled && method === 'card');
+  }).length;
 
   const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
 
@@ -640,8 +684,8 @@ export default function GameDay() {
               </span>
             </div>
             
-            <button onClick={processBatchPayments} disabled={isProcessing} className="w-full text-white font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
-              {isProcessing ? 'Saving...' : `Save ${selectedPlayers.length} Payment${selectedPlayers.length === 1 ? '' : 's'}`}
+            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
+              {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
             </button>
           </div>
         </div>
@@ -679,8 +723,24 @@ export default function GameDay() {
             </div>
             
             <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-24">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
+              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
+                
+                {/* NEW: CREATE ON THE FLY BUTTON */}
+                {playerSearch.trim().length > 0 && (
+                  <button 
+                    onClick={() => createAndAddPlayer(playerSearch)}
+                    disabled={isProcessing}
+                    className="w-full flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors text-left group mb-2 disabled:opacity-50"
+                  >
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                      + Add "{playerSearch}"
+                    </span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-200 dark:bg-emerald-900 px-2 py-1 rounded-md">New Casual</span>
+                  </button>
+                )}
+
+                {/* EXISTING PLAYER SEARCH LIST */}
                 {availablePlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
                   <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
                     <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
