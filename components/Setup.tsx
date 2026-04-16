@@ -660,8 +660,9 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
+          {/* MANUAL PAYMENT DETAILS (ORG LEVEL) */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Details (Club Level)</h2>
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Club Level)</h2>
             <div className="space-y-4">
               <div className="flex gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
                 <div className="w-1/3">
@@ -851,7 +852,7 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
       )}
 
-      {/* --- TEAMS TAB --- */}
+      {/* --- TEAMS TAB (CLEANED UP) --- */}
       {clubId && clubId !== 'new' && activeTab === 'teams' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">

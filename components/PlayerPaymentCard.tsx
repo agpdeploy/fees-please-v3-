@@ -10,9 +10,7 @@ interface PaymentCardProps {
   expenseLabel: string;
   club?: {
     is_square_enabled: boolean;
-  };
-  team?: {
-    pay_id_type: 'mobile' | 'email' | 'abn' | null;
+    pay_id_type: 'mobile' | 'email' | 'bank_account' | null;
     pay_id_value: string | null;
   };
   onPaymentComplete?: () => void;
@@ -24,7 +22,6 @@ export default function PlayerPaymentCard({
   amountOwed,
   expenseLabel,
   club,
-  team,
   onPaymentComplete
 }: PaymentCardProps) {
   const [isCopied, setIsCopied] = useState(false);
@@ -37,18 +34,17 @@ export default function PlayerPaymentCard({
   };
 
   const handleCopyPayId = async () => {
-    if (!team?.pay_id_value) return;
+    if (!club?.pay_id_value) return;
     try {
-      await navigator.clipboard.writeText(team.pay_id_value);
+      await navigator.clipboard.writeText(club.pay_id_value);
       setIsCopied(true);
-      showToast("PayID copied to clipboard!");
+      showToast("Payment Info copied!");
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       showToast("Failed to copy", "error");
     }
   };
 
-  // LOCKED to binary methods, but accepts custom descriptions for the ledger
   const handleMarkAsPaid = async (method: 'card' | 'cash', descriptionLabel: string) => {
     setIsProcessing(true);
     
@@ -81,9 +77,7 @@ export default function PlayerPaymentCard({
     );
   }
 
-  // Extracting the render logic removes the nested ternary syntax errors
   const renderPaymentOptions = () => {
-    // 1. SQUARE PRIORITY
     if (club?.is_square_enabled) {
       return (
         <div className="space-y-3">
@@ -101,18 +95,17 @@ export default function PlayerPaymentCard({
       );
     }
 
-    // 2. PAYID FALLBACK (Saved to DB as 'card' method to keep ledger binary)
-    if (team?.pay_id_value) {
+    if (club?.pay_id_value) {
       return (
         <div className="space-y-3">
           <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700">
             <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2 text-center">
-              Pay Captain via {team.pay_id_type} (Osko)
+              {club.pay_id_type === 'bank_account' ? 'Pay Club via Bank Transfer' : `Pay Club via Digital Transfer (${club.pay_id_type})`}
             </p>
             
             <div className="flex items-center gap-2 mb-4">
               <code className="flex-1 bg-white dark:bg-[#111] px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 font-mono text-sm text-center font-bold text-zinc-900 dark:text-white select-all">
-                {team.pay_id_value}
+                {club.pay_id_value}
               </code>
               <button 
                 onClick={handleCopyPayId}
@@ -124,7 +117,7 @@ export default function PlayerPaymentCard({
 
             <button 
               disabled={isProcessing}
-              onClick={() => handleMarkAsPaid('card', `Digital Transfer (${team.pay_id_type})`)} 
+              onClick={() => handleMarkAsPaid('card', `Digital Transfer (${club.pay_id_type})`)} 
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm flex justify-center items-center gap-2 disabled:opacity-50"
             >
               <i className="fa-solid fa-paper-plane"></i> {isProcessing ? 'Updating Ledger...' : "I've Sent the Transfer"}
@@ -134,7 +127,6 @@ export default function PlayerPaymentCard({
       );
     }
 
-    // 3. CASH DEFAULT
     return (
       <div className="space-y-3 text-center py-2">
         <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -148,7 +140,7 @@ export default function PlayerPaymentCard({
           onClick={() => handleMarkAsPaid('cash', 'Cash')} 
           className="w-full bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-black py-3 rounded-xl uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm flex justify-center items-center gap-2 mt-4 disabled:opacity-50"
         >
-          {isProcessing ? 'Updating...' : "I Paid Cash to the Captain"}
+          {isProcessing ? 'Updating...' : "I Paid Cash to the Club"}
         </button>
       </div>
     );

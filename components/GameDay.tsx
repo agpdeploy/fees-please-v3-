@@ -12,7 +12,7 @@ export default function GameDay() {
   const { activeClubId } = useActiveClub();
 
   const [themeColor, setThemeColor] = useState("#10b981");
-  const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '', expense_label: '' });
+  const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -108,12 +108,22 @@ export default function GameDay() {
 
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('clubs').select('name, logo_url, theme_color, is_square_enabled, expense_label').eq('id', activeClubId).single().then(({data}) => {
-        if (data) {
-          if (data.theme_color) setThemeColor(data.theme_color);
-          setClubInfo({ name: data.name || 'FP', logo: data.logo_url || '', expense_label: data.expense_label || '' });
-          setIsSquareEnabled(data.is_square_enabled || false);
-        }
+      supabase.from('clubs')
+        .select('name, logo_url, theme_color, is_square_enabled, expense_label, pay_id_type, pay_id_value')
+        .eq('id', activeClubId)
+        .single()
+        .then(({data}) => {
+          if (data) {
+            if (data.theme_color) setThemeColor(data.theme_color);
+            setClubInfo({ 
+              name: data.name || 'FP', 
+              logo: data.logo_url || '', 
+              expense_label: data.expense_label || '',
+              pay_id_type: data.pay_id_type || '',
+              pay_id_value: data.pay_id_value || ''
+            });
+            setIsSquareEnabled(data.is_square_enabled || false);
+          }
       });
     } else {
       setIsSquareEnabled(false);
@@ -337,8 +347,12 @@ export default function GameDay() {
       for (const player of selectedPlayers) {
         const method = paymentData[player.id]?.method || 'cash';
         
-        // Skip players pushed to Square. They log upon successful return redirect.
-        if (isSquareEnabled && method === 'card') continue;
+        if (isSquareEnabled && method === 'card') {
+           const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
+           if (userRole?.can_take_payments || profile.role === 'super_admin' || profile.role === 'club_admin') {
+              continue; // Skip, they log on return
+           }
+        }
 
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: player.is_member ? teamFees.member : teamFees.casual, transaction_type: 'fee' }]);
         await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: paymentData[player.id].amount, transaction_type: 'payment', payment_method: method }]);
@@ -396,13 +410,7 @@ export default function GameDay() {
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
   const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? (activeFixture?.umpire_fee || 0) : 0);
 
-  const processableCount = selectedPlayers.filter(p => {
-    const method = paymentData[p.id]?.method || 'cash';
-    return !(isSquareEnabled && method === 'card');
-  }).length;
-
-  const currentTeam = teams.find(t => t.id === selectedTeamId);
-  const currentTeamName = currentTeam?.name || "Our Team";
+  const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
 
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
@@ -556,7 +564,6 @@ export default function GameDay() {
                     </div>
                   </div>
                   
-                  {/* CLEAN BINARY PAYMENT TOGGLE */}
                   <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
                     <button 
                       onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
@@ -570,21 +577,18 @@ export default function GameDay() {
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         
-                        // Square Override
-                        if (isSquareEnabled) {
-                          const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
-                          if (!userRole?.can_take_payments && profile.role !== 'super_admin' && profile.role !== 'club_admin') {
-                            return showToast("Permission Denied", "error");
-                          }
-                          initiateTapToPay(player);
+                        // PERMISSION-BASED FALLBACK LOGIC
+                        const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
+                        const hasSquarePerms = userRole?.can_take_payments || profile.role === 'super_admin' || profile.role === 'club_admin';
 
-                        // Secondary Behavior: Show Captain's PayID
-                        } else if (currentTeam?.pay_id_value) {
+                        if (isSquareEnabled && hasSquarePerms) {
+                          initiateTapToPay(player);
+                        } else if (clubInfo.pay_id_value) {
                           setActivePayIdPlayer(player);
                           setIsPayIdModalOpen(true);
                         }
                       }} 
-                      title="Card / Transfer"
+                      title="Card / Digital"
                       className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
                       <i className="fa-solid fa-credit-card"></i>
@@ -636,8 +640,8 @@ export default function GameDay() {
               </span>
             </div>
             
-            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
-              {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
+            <button onClick={processBatchPayments} disabled={isProcessing} className="w-full text-white font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
+              {isProcessing ? 'Saving...' : `Save ${selectedPlayers.length} Payment${selectedPlayers.length === 1 ? '' : 's'}`}
             </button>
           </div>
         </div>
@@ -675,7 +679,7 @@ export default function GameDay() {
             </div>
             
             <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-24">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
+              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               <div className="space-y-2">
                 {availablePlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
                   <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
@@ -690,11 +694,11 @@ export default function GameDay() {
       )}
 
       {/* --- DIGITAL TRANSFER / PAYID MODAL --- */}
-      {isPayIdModalOpen && activePayIdPlayer && currentTeam && (
-        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
+      {isPayIdModalOpen && activePayIdPlayer && (
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[400px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95">
             <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Digital Transfer</h2>
+              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Transfer</h2>
               <button onClick={() => setIsPayIdModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             
@@ -706,13 +710,15 @@ export default function GameDay() {
               </div>
 
               <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 transition-colors">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Pay Captain via {currentTeam.pay_id_type}</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">
+                    {clubInfo.pay_id_type === 'bank_account' ? 'Pay Club via Bank Account' : `Pay Club via ${clubInfo.pay_id_type}`}
+                 </p>
                  <div className="flex items-center gap-2">
-                   <code className="flex-1 bg-white dark:bg-[#111] px-3 py-3 rounded-lg font-mono text-sm border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-bold select-all transition-colors">{currentTeam.pay_id_value}</code>
+                   <code className="flex-1 bg-white dark:bg-[#111] px-3 py-3 rounded-lg font-mono text-sm border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-bold select-all transition-colors">{clubInfo.pay_id_value}</code>
                    <button 
                       onClick={() => {
-                        navigator.clipboard.writeText(currentTeam.pay_id_value);
-                        showToast("PayID Copied!");
+                        navigator.clipboard.writeText(clubInfo.pay_id_value);
+                        showToast("Copied!");
                       }}
                       className="px-4 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-black uppercase transition-colors shadow-sm flex items-center gap-2"
                    >
