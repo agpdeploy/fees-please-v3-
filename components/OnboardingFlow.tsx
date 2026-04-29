@@ -83,20 +83,25 @@ export default function OnboardingFlow({ user, onComplete }: { user: any, onComp
 
   const finishOnboarding = async (): Promise<void> => {
     if (user && clubId) {
-      await supabase.from('profiles').update({ 
+      // 1. Await the update strictly
+      const { error } = await supabase.from('profiles').update({ 
         has_onboarded: true,           
         onboarding_completed: true,    
         club_id: clubId 
       }).eq('id', user.id);
+
+      if (error) {
+        console.error("Failed to save onboarding:", error);
+        return;
+      }
     }
 
     localStorage.removeItem('fp_onboarding_step');
     localStorage.removeItem('fp_onboarding_club');
     
-    // Smooth transition back to dashboard
-    if (onComplete) {
-      onComplete();
-    }
+    // 2. FORCE A HARD RELOAD
+    // This is the "Nuclear Option". It guarantees useProfile fetches fresh data and wipes the banner.
+    window.location.href = '/'; 
   };
 
   if (!isLoaded) return null;

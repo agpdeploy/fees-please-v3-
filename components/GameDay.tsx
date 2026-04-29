@@ -1,3 +1,4 @@
+// components/GameDay.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -340,42 +341,74 @@ export default function GameDay() {
     }
   }
 
+  // OPTIMISTIC BATCH PAYMENTS WITH OFFLINE QUEUE
   async function processBatchPayments() {
     if (selectedPlayers.length === 0 || !activeFixture || !activeClubId) return;
-    setIsProcessing(true);
-    try {
-      for (const player of selectedPlayers) {
-        const method = paymentData[player.id]?.method || 'cash';
-        
-        if (isSquareEnabled && method === 'card') {
-           const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
-           if (userRole?.can_take_payments || profile.role === 'super_admin' || profile.role === 'club_admin') {
-              continue; // Skip, they log on return
-           }
-        }
 
-        await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: player.is_member ? teamFees.member : teamFees.casual, transaction_type: 'fee' }]);
-        await supabase.from("transactions").insert([{ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: paymentData[player.id].amount, transaction_type: 'payment', payment_method: method }]);
-      }
+    // 1. OPTIMISTIC UI UPDATE (Instant Gratification)
+    const newlyPaidIds = selectedPlayers.map(p => p.id);
+    setPaidPlayerIds(prev => [...prev, ...newlyPaidIds]);
+    setSelectedPlayerIds([]); // Clear selection instantly
+    
+    let umpirePaidNow = false;
+    if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
+      setIsUmpirePaid(true); // Optimistic umpire update
+      setPayUmpire(false);
+      umpirePaidNow = true;
+    }
+
+    // Keep a copy of the payment data for the background sync, then clear UI
+    const payloadData = { ...paymentData };
+    setPaymentData({}); 
+    showToast(`Saving...`);
+
+    // 2. PREPARE THE PAYLOAD
+    const offlinePayload: any[] = [];
+    
+    for (const player of selectedPlayers) {
+      const method = payloadData[player.id]?.method || 'cash';
+      const amount = payloadData[player.id]?.amount || 0;
+      const fee = player.is_member ? teamFees.member : teamFees.casual;
       
-      if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
-        await supabase.from("transactions").insert([{ 
-          team_id: selectedTeamId, 
-          fixture_id: activeFixture.id, 
-          club_id: activeClubId, 
-          amount: activeFixture.umpire_fee, 
-          transaction_type: 'expense', 
-          payment_method: 'cash', 
-          description: clubInfo.expense_label || 'Match Expense' 
-        }]);
+      if (isSquareEnabled && method === 'card') {
+         const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
+         if (userRole?.can_take_payments || profile?.role === 'super_admin' || profile?.role === 'club_admin') {
+            continue; // Skip Square transactions, they log on return
+         }
       }
+
+      offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: fee, transaction_type: 'fee' });
+      offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: amount, transaction_type: 'payment', payment_method: method });
+    }
+    
+    if (umpirePaidNow) {
+      offlinePayload.push({ 
+        team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, 
+        amount: activeFixture.umpire_fee, transaction_type: 'expense', 
+        payment_method: 'cash', description: clubInfo.expense_label || 'Match Expense' 
+      });
+    }
+
+    if (offlinePayload.length === 0) return;
+
+    // 3. BACKGROUND SYNC (The Real DB Call)
+    try {
+      const { error } = await supabase.from("transactions").insert(offlinePayload);
+      if (error) throw error;
       
-      await loadSquadData(); 
-      setSelectedPlayerIds([]); 
-      setPaymentData({}); 
-      setPayUmpire(false); 
-      showToast(`Saved!`);
-    } catch (err) { showToast("Error", "error"); } finally { setIsProcessing(false); }
+      showToast(`Fully Synced!`);
+      // Silently refresh true state from DB in background
+      loadSquadData(); 
+
+    } catch (err) {
+      console.error("Network drop! Saving to offline queue:", err);
+      
+      // 4. THE SAFETY NET (Offline Queue)
+      const existingQueue = JSON.parse(localStorage.getItem('fp_offline_tx_queue') || '[]');
+      localStorage.setItem('fp_offline_tx_queue', JSON.stringify([...existingQueue, ...offlinePayload]));
+      
+      showToast("Saved offline. Will sync when signal returns.", "error");
+    }
   }
 
   async function openQuickAdd() {
@@ -481,7 +514,8 @@ export default function GameDay() {
         </div>
       )}
 
-      {teams.length > 1 && (
+      {/* HALLUCINATION GUARD: Only show Admin dropdown if they are an admin */}
+      {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.length > 1 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
           <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
