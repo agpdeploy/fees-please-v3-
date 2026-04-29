@@ -1,17 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-// 1. Pull the key securely from your environment variables
-const apiKey = process.env.GEMINI_API_KEY;
-
-if (!apiKey) {
-  throw new Error("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
-}
-
-// 2. Initialize the AI with the secure key
-const genAI = new GoogleGenerativeAI(apiKey);
 export async function POST(req: Request) {
   try {
+    // 1. Pull the key securely from your environment variables (Runtime, not Build-time)
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      console.error("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
+
+    // 2. Initialize the AI with the secure key
+    const genAI = new GoogleGenerativeAI(apiKey);
+
     const body = await req.json();
     const { imageBase64 } = body;
 
