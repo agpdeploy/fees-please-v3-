@@ -1,10 +1,15 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-// 1. Exact same initialization as generate-report. 
-// No .replace(), no .trim(), just the raw variable.
-const genAI = new GoogleGenerativeAI("AIzaSyCNApXEDvnwOOtaiCkHgpZGsudsB2lWG0E");
+// 1. Pull the key securely from your environment variables
+const apiKey = process.env.GEMINI_API_KEY;
 
+if (!apiKey) {
+  throw new Error("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
+}
+
+// 2. Initialize the AI with the secure key
+const genAI = new GoogleGenerativeAI(apiKey);
 export async function POST(req: Request) {
   try {
     const body = await req.json();
