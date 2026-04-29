@@ -466,6 +466,21 @@ export default function GameDay() {
         </div>
       )}
 
+      {/* THE MANUAL OVERRIDE BANNER */}
+      {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5 rounded-xl shadow-sm mb-6 flex flex-col items-center text-center animate-in slide-in-from-top-4">
+          <i className="fa-solid fa-triangle-exclamation text-amber-500 text-2xl mb-2"></i>
+          <h3 className="font-black uppercase tracking-widest text-amber-900 dark:text-amber-400 text-sm mb-1">Setup Incomplete</h3>
+          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-500/70 mb-4">Your club configuration is missing critical data. Some features may be disabled.</p>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('trigger-onboarding'))}
+            className="bg-amber-500 hover:bg-amber-400 text-white dark:text-black font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-lg shadow-md active:scale-95 transition-all"
+          >
+            Resume Setup Now
+          </button>
+        </div>
+      )}
+
       {teams.length > 1 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
@@ -782,7 +797,7 @@ export default function GameDay() {
                       }}
                       className="px-4 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-black uppercase transition-colors shadow-sm flex items-center gap-2"
                    >
-                     Copy
+                      Copy
                    </button>
                  </div>
               </div>

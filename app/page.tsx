@@ -1,4 +1,4 @@
-// Deploy version 4.5 - User Profile Sidebar Update
+// Deploy version 5.3 - Exclusive Render + Clean House Logout
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,14 +29,17 @@ export default function Home() {
   const { profile, roles, loading: profileLoading } = useProfile();
   const { activeClubId, setActiveClubId } = useActiveClub();
   
+  const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
+  const isAdmin = profile?.role === 'super_admin' || currentClubRole === 'club_admin';
+  
   const [theme, setTheme] = useState({ name: 'FP', color: '#10b981', font: 'Inter', logo: '' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showClubMenu, setShowClubMenu] = useState(false);
-  const [allClubs, setAllClubs] = useState<any[]>([]);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // THE LOCK: Default is TRUE. You are in the wizard until proven otherwise.
+  const [showOnboarding, setShowOnboarding] = useState(true); 
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
-
-  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'club_admin';
+  const [allClubs, setAllClubs] = useState<any[]>([]);
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
@@ -62,21 +65,45 @@ export default function Home() {
   };
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsCheckingAuth(false);
+    }, 4000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setIsCheckingAuth(false);
+      clearTimeout(timer);
+    }).catch(err => {
+      console.error("Auth initialization error:", err);
+      setIsCheckingAuth(false);
+      clearTimeout(timer);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      setIsCheckingAuth(false); 
+      clearTimeout(timer);
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
-    if (!activeClubId && profile?.club_id && profile?.role !== 'super_admin') {
-      setActiveClubId(profile.club_id);
+    if (!activeClubId && profile?.role !== 'super_admin') {
+      if (profile?.club_id) {
+        setActiveClubId(profile.club_id);
+      } else if (roles && roles.length > 0) {
+        setActiveClubId(roles[0].club_id);
+      }
     }
 
     if (activeClubId) {
@@ -93,7 +120,7 @@ export default function Home() {
       };
       fetchTheme();
     }
-  }, [profile, activeClubId, setActiveClubId]);
+  }, [profile, roles, activeClubId, setActiveClubId]);
 
   useEffect(() => {
     if (profile && !isAdmin && activeTab === 'setup') {
@@ -101,26 +128,61 @@ export default function Home() {
     }
   }, [profile, isAdmin, activeTab]);
 
+  // THE KEY: The only way to unlock the dashboard
   useEffect(() => {
-    if (profile && profile.has_onboarded === false) {
-      setShowOnboarding(true);
+    if (profileLoading) return;
+
+    if (profile?.role === 'super_admin') {
+      setShowOnboarding(false);
+      return;
     }
-  }, [profile]);
+
+    if (profile?.onboarding_completed === true) {
+      setShowOnboarding(false);
+      return;
+    }
+
+  }, [profile, profileLoading]);
+
+  // THE MANUAL OVERRIDE LISTENER
+  useEffect(() => {
+    const triggerWizard = () => setShowOnboarding(true);
+    window.addEventListener('trigger-onboarding', triggerWizard);
+    return () => window.removeEventListener('trigger-onboarding', triggerWizard);
+  }, []);
 
   const handleLogout = async () => {
     setIsSidebarOpen(false);
     setIsCheckingAuth(true); 
     try {
+      // 1. Sign out of the server
       await supabase.auth.signOut();
+      
+      // 2. INCINERATE local memory to prevent "wigging out" on re-entry
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
     } catch (error) {
       console.error("Logout Error:", error);
     } finally {
-      sessionStorage.clear();
+      // 3. Force a hard reload to the root
       window.location.href = '/'; 
     }
   };
 
-  if (isCheckingAuth || profileLoading) {
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
+        <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
+        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Authenticating...</div>
+      </div>
+    );
+  }
+
+  if (!session) return <Login />;
+
+  if (profileLoading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
         <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
@@ -129,14 +191,26 @@ export default function Home() {
     );
   }
 
-  if (!session) return <Login />;
+  // --- THE EXCLUSIVE RENDER ---
+  // If the wizard is triggered, completely unmount the dashboard.
+  if (showOnboarding) {
+    return (
+      <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
+        <OnboardingFlow 
+          user={session.user} 
+          onComplete={() => {
+            console.log("Wizard officially requested closure.");
+            setShowOnboarding(false);
+          }} 
+        />
+      </div>
+    );
+  }
 
-  const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role || profile?.role;
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Club Admin' : 
                       currentClubRole === 'team_admin' ? 'Team Captain' : 'Player';
 
-  // Extract Profile Info for the Sidebar
   const userMeta = session?.user?.user_metadata;
   const avatarUrl = userMeta?.avatar_url;
   const fullName = userMeta?.full_name || '';
@@ -153,10 +227,6 @@ export default function Home() {
 
   return (
     <>
-      {showOnboarding && (
-        <OnboardingFlow user={session.user} onComplete={() => setShowOnboarding(false)} />
-      )}
-
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --brand-color: ${theme.color};
@@ -167,7 +237,6 @@ export default function Home() {
 
       <div className="flex flex-col h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         
-        {/* HEADER */}
         <header className="shrink-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-black z-40">
           <button 
             onClick={() => uniqueClubs.length > 1 && setShowClubMenu(true)} 
@@ -194,7 +263,6 @@ export default function Home() {
           </button>
         </header>
 
-        {/* CLUB MENU DROPDOWN */}
         {showClubMenu && uniqueClubs.length > 1 && (
           <div className="fixed inset-0 z-[200] flex justify-center items-start pt-20 px-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowClubMenu(false)}></div>
@@ -226,7 +294,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* MAIN CONTENT AREA */}
         <main className="flex-1 relative z-30 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
@@ -234,7 +301,6 @@ export default function Home() {
             {activeTab === "setup" && isAdmin && <div className="p-4"><Setup activeTab={setupTab} /></div>}
           </div>
 
-          {/* OVERLAY dAIve */}
           {isDaiveOpen && (
             <div className="absolute inset-0 z-50 bg-white dark:bg-zinc-950 animate-in slide-in-from-bottom-8 duration-200 shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
               <ChatWidget onClose={() => setIsDaiveOpen(false)} />
@@ -242,7 +308,6 @@ export default function Home() {
           )}
         </main>
 
-        {/* BOTTOM NAV */}
         <nav className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black pb-8 pt-4 z-40 relative">
           <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
             <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-brand" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
@@ -257,13 +322,11 @@ export default function Home() {
           </div>
         </nav>
 
-        {/* SIDEBAR MODAL */}
         {isSidebarOpen && (
           <div className="fixed inset-0 z-[100] flex justify-end">
             <div className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-colors" onClick={() => setIsSidebarOpen(false)}></div>
             <div className="w-[280px] bg-white dark:bg-[#111] h-full relative flex flex-col border-l border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in slide-in-from-right duration-300 transition-colors">
               
-              {/* PROFILE HEADER OVERHAUL */}
               <div className="p-6 flex flex-col items-center justify-center border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 relative">
                 <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
                   <i className="fa-solid fa-xmark text-xl"></i>

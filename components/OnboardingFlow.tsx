@@ -1,77 +1,198 @@
-'use client';
+// components/OnboardingFlow.tsx
+"use client";
 
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Your supabase client
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useProfile } from "@/lib/useProfile";
+import DaiveOnboardingChat from "./DaiveOnboardingChat"; 
+import Step2_Branding from "./Step2_Branding";          
+import Step3_Squad from "./Step3_Squad";                
+import Step4_Season from "./Step4_Season";              
+import Step5_Payment from "./Step5_Payment";
+
+const STEPS = [
+  { id: 1, title: "Identity", icon: "fa-robot" },
+  { id: 2, title: "Branding", icon: "fa-palette" },
+  { id: 3, title: "Squad", icon: "fa-users" },
+  { id: 4, title: "Season", icon: "fa-calendar-days" },
+  { id: 5, title: "Payments", icon: "fa-money-bill-wave" }
+];
 
 export default function OnboardingFlow({ user, onComplete }: { user: any, onComplete: () => void }) {
-  const [step, setStep] = useState(1); // 1: Welcome/Fork, 2: Feature Tour
+  const [currentStep, setCurrentStep] = useState(1);
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  
+  const { roles, loading } = useProfile(); 
 
-  const finishOnboarding = async () => {
-    // Update Supabase so they don't see this again
-    const { error } = await supabase
-      .from('profiles')
-      .update({ has_onboarded: true })
-      .eq('id', user.id);
+  // PERSISTENCE & RESUME LOGIC (With Self-Healing)
+  useEffect(() => {
+    if (loading) return; 
 
-    if (!error) onComplete();
+    const savedStep = localStorage.getItem('fp_onboarding_step');
+    const savedClub = localStorage.getItem('fp_onboarding_club');
+    
+    // Check if the user actually has access to the club in localStorage
+    const hasAccessToSavedClub = roles?.some(r => r.club_id === savedClub);
+
+    // If we have a saved club but no role for it, the state is POISONED. Nuke it.
+    if (savedClub && !hasAccessToSavedClub) {
+      console.warn("Poisoned state detected. Resetting wizard.");
+      localStorage.removeItem('fp_onboarding_step');
+      localStorage.removeItem('fp_onboarding_club');
+      setCurrentStep(1);
+      setShowResumePrompt(false);
+    } 
+    // OPTION 1: Valid LocalStorage
+    else if (savedStep && savedClub && hasAccessToSavedClub) {
+      const stepNum = parseInt(savedStep, 10);
+      setClubId(savedClub);
+      if (stepNum > 1) {
+        setShowResumePrompt(true);
+      } else {
+        setCurrentStep(stepNum);
+      }
+    } 
+    // OPTION 2: Database fallback (Incognito, Device switch, or cleared cache)
+    else if (roles && roles.length > 0) {
+      const existingClubId = roles[0].club_id;
+      if (existingClubId) {
+        setClubId(existingClubId);
+        localStorage.setItem('fp_onboarding_club', existingClubId);
+        localStorage.setItem('fp_onboarding_step', '2'); // Resume at Branding
+        setShowResumePrompt(true);
+      } else {
+        setCurrentStep(1);
+      }
+    } else {
+      setCurrentStep(1);
+    }
+
+    setIsLoaded(true);
+  }, [roles, loading]);
+
+  const goToStep = (step: number, currentClubId: string | null = clubId) => {
+    setCurrentStep(step);
+    localStorage.setItem('fp_onboarding_step', step.toString());
+    if (currentClubId) {
+      setClubId(currentClubId);
+      localStorage.setItem('fp_onboarding_club', currentClubId);
+    }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl">
-        
-        {/* STEP 1: Combined Welcome & Fork */}
-        {step === 1 && (
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Fees Please!</h2>
-            <p className="text-gray-600 mb-8">Ready to ditch the clipboard? Tell us why you're here today.</p>
-            
-            <div className="space-y-4">
-              <button 
-                onClick={() => setStep(2)}
-                className="w-full p-4 border-2 border-blue-600 rounded-xl hover:bg-blue-50 transition text-left group"
-              >
-                <span className="block font-bold text-blue-600">I'm a Coach / Manager</span>
-                <span className="text-sm text-gray-500">I want to set up a team and collect fees.</span>
-              </button>
+  const finishOnboarding = async (): Promise<void> => {
+    if (user && clubId) {
+      await supabase.from('profiles').update({ 
+        has_onboarded: true,           
+        onboarding_completed: true,    
+        club_id: clubId 
+      }).eq('id', user.id);
+    }
 
-              <button 
-                onClick={() => setStep(2)} // You could also skip straight to a "Join" screen
-                className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-blue-600 transition text-left"
-              >
-                <span className="block font-bold text-gray-900">I'm a Player / Parent</span>
-                <span className="text-sm text-gray-500">I'm here to pay my dues and get playing.</span>
-              </button>
-            </div>
+    localStorage.removeItem('fp_onboarding_step');
+    localStorage.removeItem('fp_onboarding_club');
+    
+    // Smooth transition back to dashboard
+    if (onComplete) {
+      onComplete();
+    }
+  };
+
+  if (!isLoaded) return null;
+
+  // THE INTERCEPTOR: The "Would you like to resume?" modal
+  if (showResumePrompt) {
+    return (
+      <div className="fixed inset-0 z-[500] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i className="fa-solid fa-clock-rotate-left text-3xl"></i>
           </div>
-        )}
-
-        {/* STEP 2: Feature Tour */}
-        {step === 2 && (
-          <div className="text-center">
-            <div className="mb-6 text-5xl">⚡</div>
-            <h2 className="text-2xl font-bold mb-4">How it works</h2>
-            <ul className="text-left space-y-4 mb-8">
-              <li className="flex items-start gap-3">
-                <span className="text-green-500 font-bold">✓</span>
-                <p className="text-gray-600">Set fee amounts for the season.</p>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-green-500 font-bold">✓</span>
-                <p className="text-gray-600">Players pay securely via Square.</p>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-green-500 font-bold">✓</span>
-                <p className="text-gray-600">We automate the "polite reminders."</p>
-              </li>
-            </ul>
+          <h2 className="text-2xl font-black italic uppercase text-zinc-900 dark:text-white mb-2 tracking-tighter">Resume Setup?</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 mb-8 text-sm font-bold leading-relaxed">
+            Want to pick up where you left off, or skip to the dashboard and finish setup later?
+          </p>
+          
+          <div className="space-y-3">
             <button 
-              onClick={finishOnboarding}
-              className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition"
+              onClick={() => {
+                const step = localStorage.getItem('fp_onboarding_step') || '2';
+                setCurrentStep(parseInt(step, 10));
+                setShowResumePrompt(false);
+              }} 
+              className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-emerald-500 transition-colors shadow-md active:scale-95"
             >
-              Let's Go!
+              Yes, Resume Setup
+            </button>
+            <button 
+              onClick={finishOnboarding} 
+              className="w-full py-4 bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 rounded-xl font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors active:scale-95"
+            >
+              No, Skip to Dashboard
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[400] bg-zinc-100 dark:bg-zinc-950 sm:p-6 flex items-center justify-center overflow-hidden">
+      <div className="flex flex-col h-full sm:h-[700px] w-full max-w-3xl mx-auto font-sans bg-white dark:bg-[#111] shadow-2xl sm:rounded-2xl overflow-hidden border-0 sm:border border-zinc-200 dark:border-zinc-800 relative">
+        
+        <div className="bg-zinc-900 p-6 shrink-0 relative overflow-hidden">
+          <div className="relative z-10 flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-2xl font-black italic uppercase text-white tracking-tighter">
+                Setup • Step {currentStep}
+              </h2>
+              <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-1">
+                {STEPS[currentStep - 1].title}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {currentStep > 1 && (
+                <button 
+                  onClick={finishOnboarding} 
+                  className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-colors underline decoration-zinc-700 underline-offset-4 hidden sm:block"
+                >
+                  Skip to Dashboard
+                </button>
+              )}
+              <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center border border-white/20 text-white shrink-0">
+                <i className={`fa-solid ${STEPS[currentStep - 1].icon} text-xl`}></i>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 flex gap-2">
+            {STEPS.map((step) => (
+              <div key={step.id} className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ease-out ${currentStep >= step.id ? 'bg-emerald-500' : 'bg-transparent w-0'}`}
+                  style={{ width: currentStep >= step.id ? '100%' : '0%' }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden bg-zinc-50 dark:bg-[#1A1A1A] relative flex flex-col">
+          {currentStep === 1 && <DaiveOnboardingChat onComplete={(id) => goToStep(2, id)} />}
+          {currentStep === 2 && clubId && <Step2_Branding clubId={clubId} onNext={() => goToStep(3)} />}
+          {currentStep === 3 && clubId && <Step3_Squad clubId={clubId} onNext={() => goToStep(4)} />}
+          {currentStep === 4 && clubId && <Step4_Season clubId={clubId} onNext={() => goToStep(5)} />}
+          {currentStep === 5 && clubId && <Step5_Payment clubId={clubId} onNext={finishOnboarding} />}
+        </div>
+        
+        {currentStep > 1 && (
+           <div className="sm:hidden p-4 bg-zinc-50 dark:bg-[#1A1A1A] text-center border-t border-zinc-200 dark:border-zinc-800">
+             <button onClick={finishOnboarding} className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                Skip to Dashboard
+             </button>
+           </div>
         )}
       </div>
     </div>
