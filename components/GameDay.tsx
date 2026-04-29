@@ -242,25 +242,53 @@ export default function GameDay() {
     if (!activeFixture) return;
     
     const confirmMsg = status === 'completed' 
-      ? "Finalize match? Unpaid fees will remain as player debt." 
+      ? "Finalize match? Unpaid fees will be added to player debts." 
       : "Mark as Forfeit? No fees will be collected for this match.";
       
     if (!window.confirm(confirmMsg)) return;
 
     setIsProcessing(true);
-    const { error } = await supabase
-      .from('fixtures')
-      .update({ status })
-      .eq('id', activeFixture.id);
 
-    if (error) {
-      showToast("Error updating status", "error");
-    } else {
-      showToast(status === 'completed' ? "Match Finalized!" : "Match Forfeited");
+    try {
+      // 1. If completing, bill the stragglers who haven't paid yet
+      if (status === 'completed') {
+        const unpaidPlayers = squad.filter(p => !paidPlayerIds.includes(p.id));
+        
+        if (unpaidPlayers.length > 0) {
+          const debtPayload = unpaidPlayers.map(player => ({
+            player_id: player.id,
+            team_id: selectedTeamId,
+            fixture_id: activeFixture.id,
+            club_id: activeClubId,
+            amount: player.is_member ? teamFees.member : teamFees.casual,
+            transaction_type: 'fee'
+          }));
+
+          const { error: debtError } = await supabase.from("transactions").insert(debtPayload);
+          if (debtError) throw debtError;
+        }
+      }
+
+      // 2. Update the fixture status
+      const { error } = await supabase
+        .from('fixtures')
+        .update({ status })
+        .eq('id', activeFixture.id);
+
+      if (error) throw error;
+
+      showToast(status === 'completed' ? "Match Finalized & Debts Logged!" : "Match Forfeited");
       setActiveFixture(null);
+      
+      // Force reload to refresh the global debt state for the next game
       setTimeout(() => window.location.reload(), 1000);
+
+    } catch (err) {
+      console.error("Finalization error:", err);
+      showToast("Error finalizing match", "error");
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   }
 
   // --- SQUARE TAP TO PAY ---
@@ -335,9 +363,14 @@ export default function GameDay() {
     } else {
       const player = squad.find(p => p.id === id);
       if (!player) return;
-      const amount = (player.is_member ? teamFees.member : teamFees.casual) + Math.max(0, playerDebts[id] || 0);
+      
+      // Current Match Fee + Any outstanding debt from the ledger
+      const matchFee = player.is_member ? teamFees.member : teamFees.casual;
+      const outstandingDebt = Math.max(0, playerDebts[id] || 0);
+      const totalToCollect = matchFee + outstandingDebt;
+
       setSelectedPlayerIds(prev => [...prev, id]);
-      setPaymentData(prev => ({ ...prev, [id]: { amount, method: 'cash' } }));
+      setPaymentData(prev => ({ ...prev, [id]: { amount: totalToCollect, method: 'cash' } }));
     }
   }
 

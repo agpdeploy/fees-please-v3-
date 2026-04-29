@@ -1,3 +1,4 @@
+// components/Ledger.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,6 +15,7 @@ export default function Ledger() {
   const [teams, setTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>("");
   
+  const [allPlayers, setAllPlayers] = useState<any[]>([]); // New: To populate global dropdown
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState(""); 
@@ -28,7 +30,14 @@ export default function Ledger() {
   const [selectedFixture, setSelectedFixture] = useState<any>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   
+  // Existing specific player manual modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  
+  // New global manual modal
+  const [isGlobalManualModalOpen, setIsGlobalManualModalOpen] = useState(false);
+  const [globalSelectedPlayerId, setGlobalSelectedPlayerId] = useState("");
+  
+  // Shared manual form state
   const [manualType, setManualType] = useState<'payment' | 'fee'>('payment');
   const [manualFixtureId, setManualFixtureId] = useState("");
   const [manualAmount, setManualAmount] = useState<number | "">("");
@@ -46,6 +55,10 @@ export default function Ledger() {
     if (activeClubId) {
       supabase.from('clubs').select('theme_color').eq('id', activeClubId).single().then(({data}) => {
         if (data?.theme_color) setThemeColor(data.theme_color);
+      });
+      // Fetch all players to populate the global dropdown
+      supabase.from('players').select('id, first_name, last_name').eq('club_id', activeClubId).order('first_name').then(({data}) => {
+        if (data) setAllPlayers(data);
       });
     }
   }, [activeClubId]);
@@ -143,13 +156,13 @@ export default function Ledger() {
     setManualFixtureId("");
   };
 
-  async function handleManualSave(e: React.FormEvent) {
+  async function handleManualSave(e: React.FormEvent, targetPlayerId: string, isGlobal: boolean) {
     e.preventDefault();
-    if (!selectedPlayer || !manualAmount || isSaving || !activeClubId) return;
+    if (!targetPlayerId || !manualAmount || isSaving || !activeClubId) return;
     setIsSaving(true);
 
     const payload = {
-      player_id: selectedPlayer.id,
+      player_id: targetPlayerId,
       team_id: activeTeamId,
       club_id: activeClubId,
       fixture_id: manualFixtureId || null,
@@ -165,10 +178,17 @@ export default function Ledger() {
       showToast("Error saving transaction: " + error.message, 'error');
     } else {
       await fetchLedger();
-      setIsManualModalOpen(false);
       setManualAmount("");
       setManualNote("");
-      setSelectedPlayer(null); 
+      setManualFixtureId("");
+      
+      if (isGlobal) {
+        setIsGlobalManualModalOpen(false);
+        setGlobalSelectedPlayerId("");
+      } else {
+        setIsManualModalOpen(false);
+        setSelectedPlayer(null); 
+      }
       showToast("Transaction Recorded!");
     }
     setIsSaving(false);
@@ -208,6 +228,22 @@ export default function Ledger() {
 
       {activeTeamId && !isLoading ? (
         <>
+          {/* THE NEW GLOBAL ADD BUTTON */}
+          <button
+            onClick={() => {
+              setIsGlobalManualModalOpen(true);
+              setManualType('payment');
+              setManualAmount("");
+              setManualNote("");
+              setManualFixtureId("");
+              setGlobalSelectedPlayerId("");
+            }}
+            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 p-4 rounded-xl shadow-sm text-sm font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group active:scale-95"
+          >
+            <i className="fa-solid fa-plus text-lg transition-transform group-hover:scale-110" style={{ color: themeColor }}></i>
+            <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">Log Manual Transaction</span>
+          </button>
+
           {/* 2. SEASON AUDIT CARD */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative overflow-hidden transition-colors">
             <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: themeColor }}></div>
@@ -316,6 +352,46 @@ export default function Ledger() {
         </div>
       )}
 
+      {/* --- NEW: GLOBAL MANUAL TRANSACTION MODAL --- */}
+      {isGlobalManualModalOpen && (
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 transition-colors">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Log Transaction</h2>
+              <button onClick={() => { setIsGlobalManualModalOpen(false); setManualAmount(""); setManualNote(""); setManualFixtureId(""); setGlobalSelectedPlayerId(""); }} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <form onSubmit={(e) => handleManualSave(e, globalSelectedPlayerId, true)} className="p-5 space-y-4 pb-8">
+               <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
+                 <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'text-white shadow-sm' : 'text-zinc-500'}`} style={manualType === 'payment' ? { backgroundColor: themeColor } : {}}>Payment (+)</button>
+                 <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
+               </div>
+
+               <select value={globalSelectedPlayerId} onChange={e => setGlobalSelectedPlayerId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors" required>
+                 <option value="" disabled>-- Select Player --</option>
+                 {allPlayers.map(p => (
+                   <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+                 ))}
+               </select>
+
+               <select value={manualFixtureId} onChange={e => setManualFixtureId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+                 <option value="">-- Optional: Assign to Match --</option>
+                 {fixtures.map(f => (
+                   <option key={f.id} value={f.id}>vs {f.opponent} ({new Date(f.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})</option>
+                 ))}
+               </select>
+
+               <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-4 text-center text-xl font-black text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" required />
+               <input type="text" placeholder="Method / Note (e.g. Bank Transfer, Cash)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+               
+               <button type="submit" disabled={isSaving} className="w-full text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50 mt-2" style={{ backgroundColor: themeColor }}>
+                 {isSaving ? 'Saving...' : 'Confirm Transaction'}
+               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* FIXTURE MODAL (Match Details) */}
       {selectedFixture && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
@@ -356,7 +432,7 @@ export default function Ledger() {
             </div>
             
             {isManualModalOpen ? (
-              <form onSubmit={handleManualSave} className="p-5 space-y-4 animate-in slide-in-from-right-4 pb-24">
+              <form onSubmit={(e) => handleManualSave(e, selectedPlayer.id, false)} className="p-5 space-y-4 animate-in slide-in-from-right-4 pb-24">
                 <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                   <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'text-white shadow-sm' : 'text-zinc-500'}`} style={manualType === 'payment' ? { backgroundColor: themeColor } : {}}>Payment (+)</button>
                   <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
