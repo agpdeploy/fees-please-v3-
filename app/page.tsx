@@ -1,4 +1,4 @@
-// Deploy version 5.3 - Exclusive Render + Clean House Logout
+// Deploy version 5.5 - Exclusive Render + Clean House Logout + Offline Hook
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,8 +12,11 @@ import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
 import OnboardingFlow from "../components/OnboardingFlow"; 
 import ChatWidget from "../components/ChatWidget";
+import { useOfflineSync } from "../lib/useOfflineSync"; // <-- NEW HOOK IMPORT
 
 export default function Home() {
+  useOfflineSync(); // <-- THE HEARTBEAT: Silently syncs offline transactions
+
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('activeTab') || 'gameday';
