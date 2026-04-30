@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
+import PlayersTab from "@/components/PlayersTab";
+import FixturesTab from "@/components/FixturesTab"; // IMPORTANT: Added this import
 
 interface SetupProps {
   activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures';
@@ -49,30 +51,6 @@ export default function Setup({ activeTab }: SetupProps) {
   const [payIdType, setPayIdType] = useState<'mobile' | 'email' | 'bank_account'>('mobile');
   const [payIdValue, setPayIdValue] = useState("");
 
-  const [fixtureTeamId, setFixtureTeamId] = useState("");
-  const [opponent, setOpponent] = useState("");
-  const [matchDate, setMatchDate] = useState("");
-  const [fixtureTime, setFixtureTime] = useState(""); 
-  const [fixtureLocation, setFixtureLocation] = useState(""); 
-  const [fixtureNotes, setFixtureNotes] = useState(""); 
-  
-  const [umpireFee, setUmpireFee] = useState<number | "">(70);
-  
-  const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
-
-  const [playerTeamId, setPlayerTeamId] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [playerNickname, setPlayerNickname] = useState(""); 
-  const [playerMobile, setPlayerMobile] = useState(""); 
-  const [playerEmail, setPlayerEmail] = useState("");
-  const [isMember, setIsMember] = useState(true);
-  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
-
-  const [isBulkMode, setIsBulkMode] = useState(false);
-  const [bulkInput, setBulkInput] = useState("");
-  const [parsedPlayers, setParsedPlayers] = useState<any[]>([]);
-
   const [teamName, setTeamName] = useState("");
   
   const [memberFee, setMemberFee] = useState<number | "">(10);
@@ -108,11 +86,6 @@ export default function Setup({ activeTab }: SetupProps) {
   useEffect(() => {
     if (activeTab === 'teams') {
       resetTeamForm();
-    } else if (activeTab === 'players') {
-      resetPlayerForm();
-      setIsBulkMode(false);
-    } else if (activeTab === 'fixtures') {
-      resetFixtureForm();
     }
   }, [activeTab]);
 
@@ -363,88 +336,6 @@ export default function Setup({ activeTab }: SetupProps) {
     if (editingTeamId) { const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); error = res.error; } 
     else { const res = await supabase.from("teams").insert([payload]); error = res.error; }
     if (error) showToast(error.message, "error"); else { showToast("Team saved successfully!"); resetTeamForm(); loadClubData(); }
-  }
-
-  function resetFixtureForm() { 
-    setFixtureTeamId(""); 
-    setOpponent(""); 
-    setMatchDate(""); 
-    setFixtureTime(""); 
-    setFixtureLocation(""); 
-    setFixtureNotes(""); 
-    setUmpireFee(defaultUmpireFee || 0); 
-    setEditingFixtureId(null); 
-  }
-  
-  function startEditingFixture(f: any) { 
-    setFixtureTeamId(f.team_id); 
-    setOpponent(f.opponent); 
-    setMatchDate(f.match_date); 
-    setFixtureTime(f.start_time || ""); 
-    setFixtureLocation(f.location || ""); 
-    setFixtureNotes(f.notes || ""); 
-    setUmpireFee(f.umpire_fee !== undefined ? f.umpire_fee : defaultUmpireFee); 
-    setEditingFixtureId(f.id); 
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
-  }
-  
-  async function saveFixture() {
-    if (!opponent || !matchDate || !fixtureTeamId) return showToast("Please fill all match fields.", "error");
-    
-    const payload = { 
-      team_id: fixtureTeamId, 
-      opponent, 
-      match_date: matchDate, 
-      start_time: fixtureTime, 
-      location: fixtureLocation, 
-      notes: fixtureNotes, 
-      umpire_fee: umpireFee === "" ? 0 : umpireFee 
-    };
-
-    let error;
-    if (editingFixtureId) { const res = await supabase.from("fixtures").update(payload).eq("id", editingFixtureId); error = res.error; } 
-    else { const res = await supabase.from("fixtures").insert([payload]); error = res.error; }
-    if (error) showToast(error.message, "error"); else { showToast("Fixture saved!"); resetFixtureForm(); loadClubData(); }
-  }
-
-  function resetPlayerForm() { setPlayerTeamId(""); setFirstName(""); setLastName(""); setPlayerNickname(""); setPlayerMobile(""); setPlayerEmail(""); setIsMember(true); setEditingPlayerId(null); }
-  
-  function startEditingPlayer(p: any) { setPlayerTeamId(p.default_team_id || ""); setFirstName(p.first_name); setLastName(p.last_name); setPlayerNickname(p.nickname || ""); setPlayerMobile(p.mobile_number || ""); setPlayerEmail(p.email || ""); setIsMember(p.is_member); setEditingPlayerId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  
-  async function savePlayer() {
-    if (!firstName || !lastName) return showToast("Please enter player name.", "error");
-    
-    const cleanEmail = playerEmail ? playerEmail.toLowerCase().trim() : null;
-    
-    const payload = { 
-      first_name: firstName, 
-      last_name: lastName, 
-      nickname: playerNickname || null,
-      mobile_number: playerMobile || null,
-      email: cleanEmail,
-      is_member: isMember, 
-      default_team_id: playerTeamId || null, 
-      club_id: clubId 
-    };
-    
-    let error;
-    if (editingPlayerId) { const res = await supabase.from("players").update(payload).eq("id", editingPlayerId); error = res.error; } 
-    else { const res = await supabase.from("players").insert([payload]); error = res.error; }
-    if (error) showToast(error.message, "error"); else { showToast("Player saved!"); resetPlayerForm(); loadClubData(); }
-  }
-
-  function parseBulkData() {
-    const rows = bulkInput.trim().split('\n');
-    const parsed = rows.map(row => { const cols = row.split(/\t|,/).map(c => c.trim()); return { first_name: cols[0] || "", last_name: cols[1] || "", is_member: cols[2] ? !cols[2].toLowerCase().includes('casual') : true }; }).filter(p => p.first_name);
-    setParsedPlayers(parsed);
-  }
-  async function saveBulkPlayers() {
-    if (parsedPlayers.length === 0) return showToast("No players parsed.", "error");
-    setIsSaving(true);
-    const payload = parsedPlayers.map(p => ({ ...p, default_team_id: playerTeamId || null, club_id: clubId }));
-    const { error } = await supabase.from("players").insert(payload);
-    setIsSaving(false);
-    if (error) showToast(error.message, "error"); else { showToast(`Imported ${parsedPlayers.length} players!`); setBulkInput(""); setParsedPlayers([]); setIsBulkMode(false); loadClubData(); }
   }
 
   async function openRosterModal(team: any) { setActiveRosterTeam(team); setPlayerSearch(""); setRosterPlayerIds(players.filter(p => p.default_team_id === team.id).map(p => p.id)); setIsRosterModalOpen(true); }
@@ -956,124 +847,27 @@ export default function Setup({ activeTab }: SetupProps) {
 
       {/* --- PLAYERS TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'players' && (
-        <div className="space-y-6 animate-in fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500">{editingPlayerId ? 'Edit Player' : (isBulkMode ? 'Bulk Import' : 'Add Player')}</h2>
-              {!editingPlayerId && <button onClick={() => {setIsBulkMode(!isBulkMode); setParsedPlayers([]);}} className="text-[10px] font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white uppercase tracking-widest underline decoration-zinc-300 dark:decoration-zinc-700 transition-colors">{isBulkMode ? 'Single Add' : 'Bulk Paste'}</button>}
-            </div>
-            
-            <select value={playerTeamId} onChange={(e) => setPlayerTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-3 transition-colors">
-              <option value="">-- No Default Team (Casual) --</option>
-              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            
-            {!isBulkMode ? (
-              <>
-                <div className="flex gap-2 mb-3">
-                  <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                  <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                </div>
-                
-                <div className="flex gap-2 mb-3">
-                  <input type="text" placeholder="Nickname (e.g. Aitcho)" value={playerNickname} onChange={(e) => setPlayerNickname(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                  <input type="tel" placeholder="Mobile Number" value={playerMobile} onChange={(e) => setPlayerMobile(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                </div>
-                
-                <div className="mb-3">
-                  <input type="email" placeholder="Email Address (Optional - For App Link)" value={playerEmail} onChange={(e) => setPlayerEmail(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 transition-colors" />
-                </div>
-
-                <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl mb-4 border border-zinc-300 dark:border-zinc-700 transition-colors">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-300 uppercase">Status</span>
-                  <button onClick={() => setIsMember(!isMember)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isMember ? 'Member' : 'Casual'}</button>
-                </div>
-                <button onClick={savePlayer} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingPlayerId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingPlayerId ? 'Update Player' : 'Save Player'}</button>
-              </>
-            ) : (
-              <div className="space-y-3">
-                <textarea value={bulkInput} onChange={(e) => setBulkInput(e.target.value)} placeholder="Tony \t C \t Member" className="w-full h-32 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 font-mono text-xs whitespace-pre transition-colors" />
-                {parsedPlayers.length === 0 ? <button onClick={parseBulkData} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs transition-colors shadow-sm">Parse Data</button> : 
-                  <button onClick={saveBulkPlayers} disabled={isSaving} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Importing...' : `Import ${parsedPlayers.length}`}</button>}
-              </div>
-            )}
-          </div>
-          <div className="space-y-2">
-            {players.map(p => (
-              <div key={p.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-2 group shadow-sm transition-colors">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-bold text-zinc-900 dark:text-white">
-                      {p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic">"{p.nickname}"</span>}
-                    </div>
-                    <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1">
-                      {teams.find(t => t.id === p.default_team_id)?.name || "Casual"} 
-                      {p.email && ` • ${p.email}`}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => startEditingPlayer(p)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                    <button onClick={() => deleteItem('players', p.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <PlayersTab 
+          clubId={clubId} 
+          teams={teams} 
+          players={players} 
+          loadClubData={loadClubData} 
+          showToast={showToast} 
+        />
       )}
 
       {/* --- FIXTURES TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'fixtures' && (
-        <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            {editingFixtureId && <button onClick={resetFixtureForm} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark"></i></button>}
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4">{editingFixtureId ? 'Edit Match' : 'Add Match'}</h2>
-            <select value={fixtureTeamId} onChange={(e) => setFixtureTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-3 transition-colors">
-              <option value="">-- Assign to Team --</option>
-              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <div className="space-y-3 mb-4">
-              <input type="text" placeholder="Opponent" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
-              
-              <div className="flex gap-2">
-                <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                <div className="flex-1 relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-                  <input 
-                    type="number" 
-                    placeholder={expenseLabel || "Umpire Fee"} 
-                    value={umpireFee} 
-                    onChange={(e) => setUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} 
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
-                  />
-                </div>
-              </div>
-              <input type="text" placeholder="Location" value={fixtureLocation} onChange={(e) => setFixtureLocation(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              <input type="text" placeholder="Match Notes" value={fixtureNotes} onChange={(e) => setFixtureNotes(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-            </div>
-            <button onClick={saveFixture} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingFixtureId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{editingFixtureId ? 'Update Fixture' : 'Save Fixture'}</button>
-          </div>
-          <div className="space-y-2">
-            {fixtures.map(f => (
-              <div key={f.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-1">{new Date(f.match_date).toLocaleDateString()} {f.start_time && `• ${f.start_time}`}</div>
-                    <div className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">{f.teams?.name} vs {f.opponent}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => startEditingFixture(f)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                    <button onClick={() => deleteItem('fixtures', f.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
-                  </div>
-                </div>
-                <button onClick={() => openSquadModal(f)} className="w-full py-2 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-                  <i className="fa-solid fa-users"></i> Pre-Game Squad
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+        <FixturesTab 
+          clubId={clubId} 
+          teams={teams} 
+          fixtures={fixtures} 
+          defaultUmpireFee={defaultUmpireFee}
+          expenseLabel={expenseLabel}
+          loadClubData={loadClubData} 
+          showToast={showToast} 
+          openSquadModal={openSquadModal}
+        />
       )}
 
       {/* --- MODALS --- */}

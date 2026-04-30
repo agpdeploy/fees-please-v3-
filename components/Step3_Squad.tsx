@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 
-// Updated interface to hold all the data we need
+// Added nickname to the interface
 interface DraftPlayer {
   firstName: string;
   lastName: string;
+  nickname: string;
   email: string;
   mobile: string;
 }
@@ -15,9 +16,9 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
   const [players, setPlayers] = useState<DraftPlayer[]>([]);
-  const [mode, setMode] = useState<'upload' | 'review' | 'manual'>('upload');
+  // We only need upload and review modes now
+  const [mode, setMode] = useState<'upload' | 'review'>('upload');
   const [isSaving, setIsSaving] = useState(false);
-  const [hasConsent, setHasConsent] = useState(false); // LEGAL CONSENT STATE
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -62,52 +63,85 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
       reader.onerror = (err) => reject(err);
     });
   };
+
+  const fileToBase64 = (f: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(f);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // --- SECURITY GUARDRAIL ---
+    const dangerousExtensions = /\.(exe|bat|cmd|sh|js|ts|html|htm|php|py|vbs|ps1)$/i;
+    if (dangerousExtensions.test(file.name)) {
+      e.target.value = ''; 
+      return alert(`Security Block: .${file.name.split('.').pop()?.toUpperCase()} files are strictly prohibited.`);
+    }
+
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      e.target.value = ''; 
+      return alert("Please save your Excel file as a CSV or PDF first.");
+    }
+    // --------------------------
+
     setLoading(true);
     setMode('review'); 
 
     try {
-      const base64Data = await compressImage(file);
+      let payload = {};
+
+      if (file.type.startsWith('image/')) {
+        const base64Data = await compressImage(file);
+        payload = { fileBase64: base64Data, mimeType: 'image/jpeg' };
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        if (file.size > 5 * 1024 * 1024) throw new Error("PDF must be smaller than 5MB.");
+        const base64Data = await fileToBase64(file);
+        payload = { fileBase64: base64Data, mimeType: 'application/pdf' };
+      } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        const textData = await file.text();
+        payload = { csvText: textData };
+      } else {
+        throw new Error("Unsupported file format. Please upload a PDF, CSV, or Image.");
+      }
       
       const res = await fetch("/api/extract-roster", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64Data }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (data.players && Array.isArray(data.players)) {
-        setPlayers(data.players);
-      } else if (data.names && Array.isArray(data.names)) {
-        const mappedPlayers = data.names.map((fullName: string) => {
-          const parts = fullName.trim().split(' ');
-          return {
-            firstName: parts[0] || "",
-            lastName: parts.slice(1).join(' ') || "",
-            email: "",
-            mobile: ""
-          };
-        });
-        setPlayers(mappedPlayers);
+        setPlayers(data.players.map((p: any) => ({
+          firstName: p.firstName || p.first_name || p.name?.split(' ')[0] || "",
+          lastName: p.lastName || p.last_name || p.name?.split(' ').slice(1).join(' ') || "",
+          nickname: p.nickname || "",
+          email: p.email || p.emailAddress || p.email_address || "",
+          mobile: p.mobile || p.mobile_number || p.phone || p.phoneNumber || p.phone_number || "",
+        })));
       } else if (data.error) {
         throw new Error(data.error);
       }
     } catch (error: any) {
       console.error("Failed to extract:", error);
-      alert("Couldn't parse the image data. Switching to manual entry! Error: " + error.message);
-      setMode('manual');
+      alert("Couldn't parse the file data. Switching to manual entry!");
+      setMode('review');
+      setPlayers([{ firstName: "", lastName: "", nickname: "", email: "", mobile: "" }]);
     } finally {
       setLoading(false);
+      e.target.value = ''; // Reset input
     }
   };
 
   const addManualPlayer = () => {
-    setPlayers([...players, { firstName: "", lastName: "", email: "", mobile: "" }]);
+    setPlayers([...players, { firstName: "", lastName: "", nickname: "", email: "", mobile: "" }]);
   };
 
   const updatePlayer = (index: number, field: keyof DraftPlayer, value: string) => {
@@ -137,6 +171,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
         club_id: clubId,
         first_name: p.firstName,
         last_name: p.lastName,
+        nickname: p.nickname || null,
         email: p.email || null,
         mobile_number: p.mobile || null,
         is_member: true
@@ -160,13 +195,24 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
 
       {mode === 'upload' && !loading && (
         <>
-          <div className="relative group border-2 border-dashed border-emerald-500 rounded-3xl p-16 text-center hover:bg-emerald-50 transition-colors bg-white shadow-sm cursor-pointer mx-auto w-full max-w-lg">
-            <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-            <i className="fa-solid fa-camera-retro text-5xl text-emerald-600 mb-4 group-hover:scale-110 transition-transform"></i>
-            <h3 className="font-black uppercase tracking-widest text-emerald-800">Tap to Upload Roster Image</h3>
+          <div className="relative group border-2 border-dashed border-emerald-500 rounded-3xl p-10 text-center hover:bg-emerald-50 transition-colors bg-white shadow-sm cursor-pointer mx-auto w-full max-w-lg">
+            <input type="file" accept="image/*,.csv,.pdf" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+            
+            {/* dAIve UI */}
+            <div className="w-20 h-20 mx-auto bg-emerald-100 rounded-full flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-600"></i>
+            </div>
+            <h3 className="font-black uppercase tracking-widest text-emerald-800 text-lg mb-1">Give it to dAIve</h3>
+            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Auto-Extract PDF, CSV, or Image</p>
           </div>
           <div className="mt-8 text-center">
-             <button onClick={() => { setMode('manual'); addManualPlayer(); }} className="text-xs font-bold text-zinc-400 uppercase tracking-widest hover:text-emerald-600 transition-colors underline">
+             <button 
+                onClick={() => { 
+                  setMode('review'); 
+                  setPlayers([{ firstName: "", lastName: "", nickname: "", email: "", mobile: "" }]); 
+                }} 
+                className="text-xs font-bold text-zinc-400 uppercase tracking-widest hover:text-emerald-600 transition-colors underline"
+              >
                Skip upload and add manually
              </button>
           </div>
@@ -180,10 +226,9 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
         </div>
       )}
 
-      {(mode === 'review' || mode === 'manual') && !loading && (
+      {mode === 'review' && !loading && (
         <div className="w-full max-w-2xl mx-auto flex flex-col h-full pb-10 animate-in slide-in-from-bottom-4 fade-in">
           
-          {/* THE FIX: Back to Upload Button */}
           <button 
             onClick={() => { setMode('upload'); setPlayers([]); }} 
             className="self-start mb-4 text-xs font-bold text-zinc-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center"
@@ -193,37 +238,47 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
 
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden flex-1 flex flex-col">
             <div className="bg-zinc-900 px-4 py-3 flex justify-between items-center text-white shrink-0">
-              <span className="font-black text-xs uppercase tracking-widest">Squad Roster</span>
-              <button onClick={addManualPlayer} className="text-emerald-400 hover:text-emerald-300 text-xs font-bold uppercase"><i className="fa-solid fa-plus mr-1"></i> Add Row</button>
+              <span className="font-black text-xs uppercase tracking-widest">Review Players</span>
+              <button onClick={addManualPlayer} className="text-emerald-400 hover:text-emerald-300 text-xs font-bold uppercase tracking-widest"><i className="fa-solid fa-plus mr-1"></i> Row</button>
             </div>
             
-            <div className="overflow-y-auto p-2 space-y-2 flex-1 max-h-[40vh]">
+            <div className="overflow-y-auto p-3 space-y-3 flex-1 max-h-[45vh] bg-zinc-50">
               {players.map((p, i) => (
-                <div key={i} className="flex flex-wrap md:flex-nowrap gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-200 items-center">
-                  <input type="text" placeholder="First Name" value={p.firstName} onChange={(e) => updatePlayer(i, 'firstName', e.target.value)} className="flex-1 min-w-[120px] p-2 text-sm border border-zinc-300 rounded-lg outline-none focus:border-emerald-500" />
-                  <input type="text" placeholder="Last Name" value={p.lastName} onChange={(e) => updatePlayer(i, 'lastName', e.target.value)} className="flex-1 min-w-[120px] p-2 text-sm border border-zinc-300 rounded-lg outline-none focus:border-emerald-500" />
-                  <input type="email" placeholder="Email" value={p.email} onChange={(e) => updatePlayer(i, 'email', e.target.value)} className="flex-1 min-w-[150px] p-2 text-sm border border-zinc-300 rounded-lg outline-none focus:border-emerald-500" />
-                  <input type="tel" placeholder="Mobile" value={p.mobile} onChange={(e) => updatePlayer(i, 'mobile', e.target.value)} className="flex-1 min-w-[120px] p-2 text-sm border border-zinc-300 rounded-lg outline-none focus:border-emerald-500" />
-                  <button onClick={() => removePlayer(i)} className="p-2 text-red-400 hover:text-red-600"><i className="fa-solid fa-trash-can"></i></button>
+                <div key={i} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-zinc-200 shadow-sm relative">
+                  <button onClick={() => removePlayer(i)} className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50"><i className="fa-solid fa-xmark"></i></button>
+                  
+                  {/* min-w-0 applied to fix overflow, matching PlayersTab styling */}
+                  <div className="flex gap-2 pr-6">
+                    <input type="text" placeholder="First" value={p.firstName} onChange={(e) => updatePlayer(i, 'firstName', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="text" placeholder="Last" value={p.lastName} onChange={(e) => updatePlayer(i, 'lastName', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="text" placeholder="Nickname" value={p.nickname} onChange={(e) => updatePlayer(i, 'nickname', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                  </div>
+                  <div className="flex gap-2 pr-6">
+                    <input type="tel" placeholder="Mobile" value={p.mobile} onChange={(e) => updatePlayer(i, 'mobile', e.target.value)} className="flex-[0.8] min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="email" placeholder="Email" value={p.email} onChange={(e) => updatePlayer(i, 'email', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                  </div>
                 </div>
               ))}
+              {players.length === 0 && <div className="text-center py-6 text-zinc-400 text-xs font-bold uppercase tracking-widest">No players extracted</div>}
             </div>
           </div>
 
           <div className="mt-6 shrink-0 space-y-4">
-            <label className="flex items-start gap-3 p-4 border border-emerald-200 bg-emerald-50 rounded-xl cursor-pointer">
-              <input type="checkbox" checked={hasConsent} onChange={(e) => setHasConsent(e.target.checked)} className="mt-1 w-5 h-5 accent-emerald-600" />
-              <span className="text-xs text-zinc-700 font-bold leading-relaxed">
-                I confirm that I am authorised to provide the contact details for these individuals and they (or their guardians) have consented to being contacted regarding team activities and fees.
-              </span>
-            </label>
+            
+            {/* Implied Consent Banner */}
+            <div className="flex items-start gap-3 p-3 border border-emerald-200 bg-emerald-50 rounded-xl transition-colors">
+              <i className="fa-solid fa-shield-halved text-emerald-600 mt-0.5 shrink-0"></i>
+              <p className="text-[11px] text-zinc-700 font-bold leading-relaxed m-0">
+                By importing, you confirm you are authorised to provide contact details for these individuals and they consent to being contacted regarding team activities and fees.
+              </p>
+            </div>
 
             <button 
               onClick={saveRoster}
-              disabled={isSaving || !hasConsent}
+              disabled={isSaving || players.length === 0}
               className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-md disabled:opacity-50 active:scale-95"
             >
-              {isSaving ? "Saving Profiles..." : "Confirm Squad"}
+              {isSaving ? "Saving Profiles..." : `Import ${players.filter(p => p.firstName.trim() !== "").length} Players`}
             </button>
           </div>
         </div>
