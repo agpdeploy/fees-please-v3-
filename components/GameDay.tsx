@@ -1,4 +1,3 @@
-// components/GameDay.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,13 +11,17 @@ export default function GameDay() {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
 
-  const [themeColor, setThemeColor] = useState("#10b981");
   const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  
   const [activeFixture, setActiveFixture] = useState<any>(null);
+  const [pastFixtures, setPastFixtures] = useState<any[]>([]);
+  const [showPastFixtures, setShowPastFixtures] = useState(false);
+  
   const [squad, setSquad] = useState<any[]>([]);
+  const [isSquadLoading, setIsSquadLoading] = useState(false); 
   
   // Payment States
   const [teamFees, setTeamFees] = useState({ member: 10, casual: 25 });
@@ -35,17 +38,23 @@ export default function GameDay() {
   // Square State
   const [isSquareEnabled, setIsSquareEnabled] = useState(false);
   
-  // Quick Add States
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
+  // Manage Squad States
+  const [isManageSquadOpen, setIsManageSquadOpen] = useState(false);
+  const [clubPlayers, setClubPlayers] = useState<any[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
 
   // Digital Transfer / PayID Modal States
   const [isPayIdModalOpen, setIsPayIdModalOpen] = useState(false);
   const [activePayIdPlayer, setActivePayIdPlayer] = useState<any>(null);
+
+  // Finalise Match Modal States
+  const [isFinaliseModalOpen, setIsFinaliseModalOpen] = useState(false);
+  const [finaliseStatus, setFinaliseStatus] = useState<'completed' | 'abandoned'>('completed');
+  const [chargeAbandonedFee, setChargeAbandonedFee] = useState(false);
   
-  // AI Modal State
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  // AI Modal States (Decoupled to handle past matches)
+  const [aiModalFixture, setAiModalFixture] = useState<any>(null);
+  const [aiModalSquad, setAiModalSquad] = useState<any[]>([]);
   
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -53,6 +62,14 @@ export default function GameDay() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500); 
   };
+
+  // --- PERMISSION CHECK ---
+  const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const isClubAdmin = currentClubRole === 'club_admin';
+  const isTeamCaptain = roles?.some((r: any) => r.role === 'team_admin' && r.team_id === selectedTeamId);
+  const canManage = isSuperAdmin || isClubAdmin || isTeamCaptain;
+  // -------------------------
 
   // --- SQUARE POS RETURN HANDLER ---
   useEffect(() => {
@@ -65,8 +82,15 @@ export default function GameDay() {
 
     if (dataString || androidTxId || androidError) {
       const pendingTxStr = localStorage.getItem('square_pending_tx');
+      
+      const cleanUrl = () => {
+        setTimeout(() => {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }, 50);
+      };
+
       if (!pendingTxStr) {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        cleanUrl();
         return;
       }
 
@@ -95,27 +119,26 @@ export default function GameDay() {
           }]).then(() => {
             localStorage.removeItem('square_pending_tx');
             showToast("Payment Successful!");
-            window.history.replaceState({}, document.title, window.location.pathname); 
+            cleanUrl();
             loadSquadData(); 
           });
         });
       } else {
-        showToast("Payment was cancelled or failed.", "error");
         localStorage.removeItem('square_pending_tx');
-        window.history.replaceState({}, document.title, window.location.pathname); 
+        cleanUrl();
+        showToast("Payment was cancelled or failed.", "error");
       }
     }
-  }, [activeFixture, activeClubId]);
+  }, []);
 
   useEffect(() => {
     if (activeClubId) {
       supabase.from('clubs')
-        .select('name, logo_url, theme_color, is_square_enabled, expense_label, pay_id_type, pay_id_value')
+        .select('name, logo_url, is_square_enabled, expense_label, pay_id_type, pay_id_value')
         .eq('id', activeClubId)
         .single()
         .then(({data}) => {
           if (data) {
-            if (data.theme_color) setThemeColor(data.theme_color);
             setClubInfo({ 
               name: data.name || 'FP', 
               logo: data.logo_url || '', 
@@ -148,7 +171,7 @@ export default function GameDay() {
       const { data } = await query;
       if (data) {
         setTeams(data);
-        if (data.length === 1) setSelectedTeamId(data[0].id); 
+        if (data.length > 0) setSelectedTeamId(data[0].id); 
       }
       setLoading(false);
     }
@@ -161,16 +184,23 @@ export default function GameDay() {
       const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
       if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
       
-      const { data: fixData } = await supabase
+      const { data: allFix } = await supabase
         .from('fixtures')
         .select('*')
-        .eq('team_id', selectedTeamId)
-        .not('status', 'in', '("completed","forfeited")')
-        .order('match_date', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .eq('team_id', selectedTeamId);
         
-      setActiveFixture(fixData || null);
+      if (allFix) {
+        const upcoming = allFix.filter(f => !['completed', 'forfeited', 'abandoned'].includes(f.status))
+          .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+        const past = allFix.filter(f => ['completed', 'forfeited', 'abandoned'].includes(f.status))
+          .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+
+        setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);
+        setPastFixtures(past);
+      } else {
+        setActiveFixture(null);
+        setPastFixtures([]);
+      }
     }
     loadTeamData();
   }, [selectedTeamId]);
@@ -178,14 +208,17 @@ export default function GameDay() {
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
     
+    setIsSquadLoading(true);
     const { data: fixtureTx } = await supabase.from('transactions').select('transaction_type').eq('fixture_id', activeFixture.id).eq('transaction_type', 'expense');
     const hasPaidUmpire = (fixtureTx?.length || 0) > 0;
     setIsUmpirePaid(hasPaidUmpire);
     if (hasPaidUmpire) setPayUmpire(false);
 
     const { data: squadRows } = await supabase.from('match_squads').select('player_id').eq('fixture_id', activeFixture.id);
-    if (squadRows && squadRows.length > 0) {
-      const playerIds = squadRows.map(row => row.player_id);
+    
+    const playerIds = squadRows ? [...new Set(squadRows.map(row => row.player_id))] : [];
+
+    if (playerIds.length > 0) {
       const { data: playerDetails } = await supabase.from("players").select("*").in("id", playerIds);
       
       if (playerDetails) {
@@ -233,25 +266,19 @@ export default function GameDay() {
     } else {
       setSquad([]);
     }
+    setIsSquadLoading(false);
   }
   
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
-  // --- MATCH STATUS ACTIONS ---
-  async function updateMatchStatus(status: 'completed' | 'forfeited') {
+  async function executeMatchFinalization() {
     if (!activeFixture) return;
-    
-    const confirmMsg = status === 'completed' 
-      ? "Finalize match? Unpaid fees will be added to player debts." 
-      : "Mark as Forfeit? No fees will be collected for this match.";
-      
-    if (!window.confirm(confirmMsg)) return;
-
     setIsProcessing(true);
 
     try {
-      // 1. If completing, bill the stragglers who haven't paid yet
-      if (status === 'completed') {
+      const shouldChargeFees = finaliseStatus === 'completed' || (finaliseStatus === 'abandoned' && chargeAbandonedFee);
+
+      if (shouldChargeFees) {
         const unpaidPlayers = squad.filter(p => !paidPlayerIds.includes(p.id));
         
         if (unpaidPlayers.length > 0) {
@@ -269,29 +296,49 @@ export default function GameDay() {
         }
       }
 
-      // 2. Update the fixture status
       const { error } = await supabase
         .from('fixtures')
-        .update({ status })
+        .update({ status: finaliseStatus })
         .eq('id', activeFixture.id);
 
       if (error) throw error;
 
-      showToast(status === 'completed' ? "Match Finalized & Debts Logged!" : "Match Forfeited");
-      setActiveFixture(null);
+      const successMsg = finaliseStatus === 'completed' 
+        ? "Match Finalised & Debts Logged!" 
+        : (chargeAbandonedFee ? "Match Abandoned & Debts Logged!" : "Match Abandoned");
+        
+      showToast(successMsg);
       
-      // Force reload to refresh the global debt state for the next game
-      setTimeout(() => window.location.reload(), 1000);
+      const { data: allFix } = await supabase
+        .from('fixtures')
+        .select('*')
+        .eq('team_id', selectedTeamId);
+        
+      if (allFix) {
+        // OVERRIDE: Manually patch the data locally to guarantee we don't accidentally load stale cache
+        const safeFixList = allFix.map(f => f.id === activeFixture.id ? { ...f, status: finaliseStatus } : f);
+
+        const upcoming = safeFixList.filter(f => !['completed', 'forfeited', 'abandoned'].includes(f.status))
+          .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+        const past = safeFixList.filter(f => ['completed', 'forfeited', 'abandoned'].includes(f.status))
+          .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+
+        setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);
+        setPastFixtures(past);
+      } else {
+        setActiveFixture(null);
+      }
+
+      setIsFinaliseModalOpen(false);
 
     } catch (err) {
       console.error("Finalization error:", err);
-      showToast("Error finalizing match", "error");
+      showToast("Error finalising match", "error");
     } finally {
       setIsProcessing(false);
     }
   }
 
-  // --- SQUARE TAP TO PAY ---
   const initiateTapToPay = (player: any) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (!isMobile) {
@@ -364,7 +411,6 @@ export default function GameDay() {
       const player = squad.find(p => p.id === id);
       if (!player) return;
       
-      // Current Match Fee + Any outstanding debt from the ledger
       const matchFee = player.is_member ? teamFees.member : teamFees.casual;
       const outstandingDebt = Math.max(0, playerDebts[id] || 0);
       const totalToCollect = matchFee + outstandingDebt;
@@ -374,28 +420,24 @@ export default function GameDay() {
     }
   }
 
-  // OPTIMISTIC BATCH PAYMENTS WITH OFFLINE QUEUE
   async function processBatchPayments() {
     if (selectedPlayers.length === 0 || !activeFixture || !activeClubId) return;
 
-    // 1. OPTIMISTIC UI UPDATE (Instant Gratification)
     const newlyPaidIds = selectedPlayers.map(p => p.id);
     setPaidPlayerIds(prev => [...prev, ...newlyPaidIds]);
-    setSelectedPlayerIds([]); // Clear selection instantly
+    setSelectedPlayerIds([]); 
     
     let umpirePaidNow = false;
     if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
-      setIsUmpirePaid(true); // Optimistic umpire update
+      setIsUmpirePaid(true); 
       setPayUmpire(false);
       umpirePaidNow = true;
     }
 
-    // Keep a copy of the payment data for the background sync, then clear UI
     const payloadData = { ...paymentData };
     setPaymentData({}); 
     showToast(`Saving...`);
 
-    // 2. PREPARE THE PAYLOAD
     const offlinePayload: any[] = [];
     
     for (const player of selectedPlayers) {
@@ -406,7 +448,7 @@ export default function GameDay() {
       if (isSquareEnabled && method === 'card') {
          const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
          if (userRole?.can_take_payments || profile?.role === 'super_admin' || profile?.role === 'club_admin') {
-            continue; // Skip Square transactions, they log on return
+            continue; 
          }
       }
 
@@ -424,19 +466,16 @@ export default function GameDay() {
 
     if (offlinePayload.length === 0) return;
 
-    // 3. BACKGROUND SYNC (The Real DB Call)
     try {
       const { error } = await supabase.from("transactions").insert(offlinePayload);
       if (error) throw error;
       
       showToast(`Fully Synced!`);
-      // Silently refresh true state from DB in background
       loadSquadData(); 
 
     } catch (err) {
       console.error("Network drop! Saving to offline queue:", err);
       
-      // 4. THE SAFETY NET (Offline Queue)
       const existingQueue = JSON.parse(localStorage.getItem('fp_offline_tx_queue') || '[]');
       localStorage.setItem('fp_offline_tx_queue', JSON.stringify([...existingQueue, ...offlinePayload]));
       
@@ -444,54 +483,65 @@ export default function GameDay() {
     }
   }
 
-  async function openQuickAdd() {
+  async function openManageSquad() {
     if (!activeClubId) return;
     const { data } = await supabase.from("players").select("*").eq("club_id", activeClubId);
     if (data) {
-      const currentIds = squad.map(p => p.id);
-      setAvailablePlayers(data.filter(p => !currentIds.includes(p.id)));
+      setClubPlayers(data);
     }
-    setPlayerSearch(""); // Reset search on open
-    setIsQuickAddOpen(true);
+    setPlayerSearch(""); 
+    setIsManageSquadOpen(true);
   }
 
-  async function addPlayerToMatch(playerId: string) {
+  async function toggleSquadMember(playerId: string) {
     if (!activeFixture) return;
-    await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
-    setIsQuickAddOpen(false);
-    setPlayerSearch("");
-    showToast("Player Added to Squad");
-    loadSquadData(); 
+    setIsProcessing(true);
+    
+    const isCurrentlyInSquad = squad.some(p => p.id === playerId);
+    
+    try {
+      if (isCurrentlyInSquad) {
+        await supabase.from("match_squads").delete().match({ fixture_id: activeFixture.id, player_id: playerId });
+      } else {
+        await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
+      }
+      await loadSquadData(); 
+    } catch (err: any) {
+      showToast("Error updating squad", "error");
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
-  // --- NEW: ON-THE-FLY PLAYER CREATION ---
   async function createAndAddPlayer(fullName: string) {
     if (!activeClubId || !activeFixture) return;
     setIsProcessing(true);
     
     try {
-      // Split the name. If they just type "Dave", last name defaults to "(Casual)"
       const parts = fullName.trim().split(' ');
       const firstName = parts[0];
       const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '(Casual)';
 
-      // 1. Insert into Players table
       const { data: newPlayer, error: playerError } = await supabase
         .from('players')
         .insert([{
           first_name: firstName,
           last_name: lastName,
           club_id: activeClubId,
-          is_member: false // Always add fly-ins as casuals
+          is_member: false 
         }])
         .select()
         .single();
 
       if (playerError) throw playerError;
 
-      // 2. Immediately add them to the match squad
       if (newPlayer) {
-        await addPlayerToMatch(newPlayer.id);
+        await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: newPlayer.id }]);
+        showToast("Player Created & Added");
+        setPlayerSearch("");
+        loadSquadData();
+        const { data } = await supabase.from("players").select("*").eq("club_id", activeClubId);
+        if (data) setClubPlayers(data);
       }
 
     } catch (err: any) {
@@ -501,13 +551,31 @@ export default function GameDay() {
     }
   }
 
-  const handleReportGenerated = () => {
-    if (activeFixture) {
-      setActiveFixture({
-        ...activeFixture,
-        ai_reports_generated: (activeFixture.ai_reports_generated || 0) + 1
-      });
+  async function openAiReporter(fixture: any) {
+    setIsProcessing(true);
+    try {
+      const { data: squadRows } = await supabase.from('match_squads').select('player_id').eq('fixture_id', fixture.id);
+      let fixtureSquad: any[] = [];
+      if (squadRows && squadRows.length > 0) {
+        const playerIds = squadRows.map(row => row.player_id);
+        const { data: playerDetails } = await supabase.from("players").select("*").in("id", playerIds);
+        fixtureSquad = playerDetails || [];
+      }
+      setAiModalSquad(fixtureSquad);
+      setAiModalFixture(fixture);
+    } catch (err) {
+      showToast("Error loading match data for AI", "error");
+    } finally {
+      setIsProcessing(false);
     }
+  }
+
+  const handleReportGenerated = () => {
+    if (activeFixture && aiModalFixture?.id === activeFixture.id) {
+      setActiveFixture({ ...activeFixture, ai_reports_generated: (activeFixture.ai_reports_generated || 0) + 1 });
+    }
+    setPastFixtures(prev => prev.map(f => f.id === aiModalFixture?.id ? { ...f, ai_reports_generated: (f.ai_reports_generated || 0) + 1 } : f));
+    setAiModalFixture((prev: any) => prev ? { ...prev, ai_reports_generated: (prev.ai_reports_generated || 0) + 1 } : null);
   };
 
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
@@ -532,7 +600,6 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* THE MANUAL OVERRIDE BANNER */}
       {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5 rounded-xl shadow-sm mb-6 flex flex-col items-center text-center animate-in slide-in-from-top-4">
           <i className="fa-solid fa-triangle-exclamation text-amber-500 text-2xl mb-2"></i>
@@ -547,11 +614,10 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* HALLUCINATION GUARD: Only show Admin dropdown if they are an admin */}
       {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.length > 1 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
-          <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Admin View</label>
-          <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+          <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Admin View</label>
+          <select value={selectedTeamId || ""} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
@@ -563,10 +629,7 @@ export default function GameDay() {
           
           <div className="flex justify-between items-center p-4 border-b border-zinc-100 dark:border-zinc-800">
             <div className="flex items-center gap-3">
-              <span 
-                className="text-[10px] font-black uppercase px-2.5 py-1 rounded text-white tracking-widest"
-                style={{ backgroundColor: themeColor }}
-              >
+              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded text-white tracking-widest bg-emerald-600 dark:bg-emerald-500">
                 {new Date(activeFixture.match_date).toDateString() === new Date().toDateString() ? 'Active' : 'Upcoming'}
               </span>
               <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
@@ -575,39 +638,43 @@ export default function GameDay() {
             </div>
             
             <div className="flex gap-2">
-              <button onClick={() => setIsAiModalOpen(true)} className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity">
-                <i className="fa-solid fa-wand-magic-sparkles text-xs"></i>
+              <button 
+                onClick={() => openAiReporter(activeFixture)} 
+                disabled={isProcessing}
+                className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
+              >
+                {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin text-xs"></i> : <i className="fa-solid fa-wand-magic-sparkles text-xs"></i>}
               </button>
-              <button onClick={openQuickAdd} className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center transition-colors">
+              <button onClick={openManageSquad} className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center transition-colors">
                 <i className="fa-solid fa-user-plus text-xs"></i>
               </button>
             </div>
           </div>
 
-          <div className="p-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
-                  {clubInfo.logo ? (
-                    <img src={clubInfo.logo} alt="Club Logo" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] font-black text-zinc-500">{clubInfo.name?.substring(0, 2).toUpperCase()}</span>
-                  )}
-                </div>
-                <span className="font-black text-sm uppercase tracking-wide text-zinc-900 dark:text-white">
-                  {currentTeamName}
-                </span>
+          <div className="p-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
+                {clubInfo.logo ? (
+                  <img src={clubInfo.logo} alt="Club Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-black text-zinc-500">{clubInfo.name?.substring(0, 2).toUpperCase()}</span>
+                )}
               </div>
+              <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white leading-tight break-words">
+                {currentTeamName}
+              </span>
             </div>
 
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-                  <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
-                </div>
-                <span className="font-black text-sm uppercase tracking-wide text-zinc-900 dark:text-white">
-                  {activeFixture.opponent}
-                </span>
+            <div className="shrink-0 px-2 text-center">
+              <span className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic uppercase tracking-widest">VS</span>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 flex-1">
+              <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
+                {activeFixture.opponent}
+              </span>
+              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
               </div>
             </div>
           </div>
@@ -620,22 +687,97 @@ export default function GameDay() {
           </div>
         </div>
       ) : selectedTeamId ? (
-        <div className="text-center py-10 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 transition-colors">
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No active fixtures found.</p>
+        <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-2 animate-in fade-in">
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-500 shadow-inner">
+            <i className="fa-solid fa-calendar-xmark text-3xl opacity-80"></i>
+          </div>
+          <h3 className="font-black uppercase tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-2">No Active Matches</h3>
+          
+          {canManage ? (
+            <>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[250px] leading-relaxed">
+                Your GameDay is empty. Let dAIve build your schedule instantly.
+              </p>
+              <button 
+                 onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'fixtures' }))}
+                 className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+              >
+                 <i className="fa-solid fa-wand-magic-sparkles"></i> Upload Draw
+              </button>
+            </>
+          ) : (
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
+              Waiting for your captain to add the schedule.
+            </p>
+          )}
         </div>
-      ) : null}
+      ) : (
+        <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-6 animate-in fade-in">
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-500 shadow-inner">
+            <i className="fa-solid fa-users-slash text-3xl opacity-80"></i>
+          </div>
+          <h3 className="font-black uppercase tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-2">No Teams Found</h3>
+          
+          {canManage ? (
+            <>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[250px] leading-relaxed">
+                Create a team first so you can start adding players and matches.
+              </p>
+              <button 
+                 onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'teams' }))}
+                 className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+              >
+                 <i className="fa-solid fa-users-viewfinder"></i> Create Team
+              </button>
+            </>
+          ) : (
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
+               Waiting for an admin to set up the club.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* --- PAYMENT & COLLECTION AREA --- */}
       {activeFixture && (
         <div className="mb-4 mt-8 border-t border-zinc-200 dark:border-zinc-800/50 pt-6 transition-colors">
           <div className="flex justify-between items-center mb-4 px-1">
-             <h2 className="text-[11px] font-black uppercase italic tracking-widest" style={{ color: themeColor }}>To Pay ({squadToPay.length})</h2>
+             <h2 className="text-[11px] font-black uppercase italic tracking-widest text-emerald-600 dark:text-emerald-500">To Pay ({squadToPay.length})</h2>
              <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400">Clear All</button>
           </div>
           
           <div className="flex flex-wrap gap-2.5 mb-6">
-            {squadToPay.length === 0 && squadPaid.length > 0 ? (
-              <div className="w-full text-center py-6 border border-dashed border-emerald-500/30 dark:border-emerald-900/50 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 transition-colors">
+            {isSquadLoading ? (
+               <div className="w-full text-center py-6">
+                 <i className="fa-solid fa-circle-notch fa-spin text-emerald-500 text-2xl"></i>
+               </div>
+            ) : squad.length === 0 ? (
+               <div className="w-full text-center py-8 px-6 border-2 border-dashed border-emerald-500/50 dark:border-emerald-900/50 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10 transition-colors flex flex-col items-center">
+                 <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-3 text-emerald-600 dark:text-emerald-500">
+                   <i className="fa-solid fa-clipboard-user text-xl"></i>
+                 </div>
+                 <h3 className="font-black uppercase tracking-widest text-xs text-emerald-800 dark:text-emerald-400 mb-1">Who's Playing?</h3>
+                 
+                 {canManage ? (
+                   <>
+                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 leading-relaxed">
+                       Select the players for this match so you can collect fees.
+                     </p>
+                     <button 
+                       onClick={openManageSquad}
+                       className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+                     >
+                       <i className="fa-solid fa-user-plus"></i> Select Team
+                     </button>
+                   </>
+                 ) : (
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 leading-relaxed">
+                      Waiting for your captain to assign the match players.
+                    </p>
+                 )}
+               </div>
+            ) : squadToPay.length === 0 && squadPaid.length > 0 ? (
+              <div className="w-full text-center py-6 border border-dashed border-emerald-500/30 dark:border-emerald-900/50 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 transition-colors animate-in zoom-in-95">
                 <i className="fa-solid fa-check-double text-2xl text-emerald-500 mb-2"></i>
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">All settled!</p>
               </div>
@@ -647,8 +789,7 @@ export default function GameDay() {
                   <button 
                     key={player.id} 
                     onClick={() => togglePlayerSelection(player.id)} 
-                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-black scale-[1.02]' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
-                    style={isSelected ? { backgroundColor: themeColor, boxShadow: `0 0 15px ${themeColor}4D` } : {}}
+                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                   >
                     {player.nickname || `${player.first_name} ${player.last_name?.charAt(0)}.`}
                     {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
@@ -669,7 +810,8 @@ export default function GameDay() {
         </div>
       )}
 
-      {selectedPlayers.length > 0 && (
+      {/* --- SELECTED PLAYERS PAYMENT PANEL --- */}
+      {activeFixture && selectedPlayers.length > 0 && (
         <div className="space-y-4 animate-in slide-in-from-bottom-6">
           {selectedPlayers.map(player => {
             const data = paymentData[player.id];
@@ -702,8 +844,6 @@ export default function GameDay() {
                     <button 
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
-                        
-                        // PERMISSION-BASED FALLBACK LOGIC
                         const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
                         const hasSquarePerms = userRole?.can_take_payments || profile.role === 'super_admin' || profile.role === 'club_admin';
 
@@ -723,14 +863,14 @@ export default function GameDay() {
                 </div>
                 <div className="bg-zinc-50 dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 flex justify-between items-center transition-colors">
                     <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
-                    <input type="number" value={data?.amount} onChange={(e) => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], amount: Number(e.target.value)}}))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
+                    <input type="number" value={data?.amount || ""} onChange={(e) => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], amount: Number(e.target.value)}}))} className="bg-transparent text-right text-2xl font-black text-emerald-500 outline-none w-24" />
                 </div>
               </div>
             );
           })}
           
           <div className="pt-4 space-y-4">
-            {activeFixture.umpire_fee > 0 && (
+            {activeFixture?.umpire_fee > 0 && (
               <div 
                 className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 cursor-pointer active:scale-[0.98]'}`} 
                 onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
@@ -742,7 +882,7 @@ export default function GameDay() {
                   <div>
                     <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Match Expense</span>
                     <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
-                      {clubInfo.expense_label || 'Umpire'} (${activeFixture.umpire_fee})
+                      {clubInfo.expense_label || 'Umpire'} (${activeFixture?.umpire_fee})
                     </span>
                   </div>
                 </div>
@@ -766,7 +906,7 @@ export default function GameDay() {
               </span>
             </div>
             
-            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50" style={{ backgroundColor: themeColor }}>
+            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white bg-emerald-600 dark:bg-emerald-500 font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50">
               {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
             </button>
           </div>
@@ -776,44 +916,128 @@ export default function GameDay() {
       {/* --- MATCH COMPLETION ACTIONS --- */}
       {activeFixture && selectedPlayerIds.length === 0 && (
         <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Match Workflow</h3>
-          <div className="flex gap-3">
-            <button 
-              onClick={() => updateMatchStatus('completed')} 
-              className="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-[10px] shadow-sm active:scale-95 transition-all"
-            >
-              Finalize Match
-            </button>
-            <button 
-              onClick={() => updateMatchStatus('forfeited')} 
-              className="flex-1 bg-zinc-100 dark:bg-zinc-900 text-red-600 dark:text-red-500 border border-zinc-200 dark:border-zinc-800 font-black py-4 rounded-xl uppercase tracking-widest text-[10px] active:scale-95 transition-all"
-            >
-              Match Forfeit
-            </button>
-          </div>
-          <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center italic">Finalizing hides the match from Game Day and logs all match data to the Ledger.</p>
+          <button 
+            onClick={() => { setFinaliseStatus('completed'); setChargeAbandonedFee(false); setIsFinaliseModalOpen(true); }} 
+            className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-sm active:scale-95 transition-all"
+          >
+            Finalise Match
+          </button>
+          <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center italic">
+            Closes the match and finalises the ledger.
+          </p>
         </div>
       )}
 
-      {/* --- QUICK ADD MODAL --- */}
-      {isQuickAddOpen && (
+      {/* --- PAST MATCHES TOGGLE --- */}
+      {pastFixtures.length > 0 && (
+        <div className="mt-6">
+           <button 
+              onClick={() => setShowPastFixtures(!showPastFixtures)}
+              className="w-full py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 flex items-center justify-between px-5 transition-colors hover:border-zinc-300 dark:hover:border-zinc-700"
+           >
+              <span>Past Matches ({pastFixtures.length})</span>
+              <i className={`fa-solid fa-chevron-${showPastFixtures ? 'up' : 'down'}`}></i>
+           </button>
+
+           {showPastFixtures && (
+              <div className="mt-3 space-y-2 animate-in slide-in-from-top-2 fade-in">
+                 {pastFixtures.map(pf => (
+                    <div key={pf.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex justify-between items-center shadow-sm transition-colors">
+                       <div className="flex-1 min-w-0 pr-4">
+                          <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-0.5">
+                             {new Date(pf.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                             <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
+                             <span className={pf.status === 'completed' ? 'text-emerald-500' : pf.status === 'forfeited' ? 'text-orange-500' : 'text-red-500'}>{pf.status}</span>
+                          </div>
+                          <div className="font-bold text-sm text-zinc-900 dark:text-white uppercase tracking-wide leading-tight break-words">
+                             VS {pf.opponent}
+                          </div>
+                       </div>
+                       <button 
+                          onClick={() => openAiReporter(pf)}
+                          disabled={isProcessing}
+                          className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm shrink-0 disabled:opacity-50"
+                          title="Generate Match Report"
+                       >
+                          {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
+                       </button>
+                    </div>
+                 ))}
+              </div>
+           )}
+        </div>
+      )}
+
+      {/* --- FINALISE MATCH MODAL --- */}
+      {isFinaliseModalOpen && activeFixture && (
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[400px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Wrap Up Match</h2>
+              <button onClick={() => setIsFinaliseModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors mb-2">
+                  <button onClick={() => setFinaliseStatus('completed')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${finaliseStatus === 'completed' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Played</button>
+                  <button onClick={() => setFinaliseStatus('abandoned')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${finaliseStatus === 'abandoned' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Abandoned</button>
+                </div>
+                
+                {finaliseStatus === 'abandoned' && (
+                  <div className="mt-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Charge Match Fees?</span>
+                     <button 
+                       onClick={() => setChargeAbandonedFee(!chargeAbandonedFee)}
+                       className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${chargeAbandonedFee ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                     >
+                       <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${chargeAbandonedFee ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                     </button>
+                  </div>
+                )}
+
+                <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed mt-3">
+                  {finaliseStatus === 'abandoned' && !chargeAbandonedFee
+                    ? "No match fees will be collected or added to player balances for this match."
+                    : `Any unpaid fees from today's squad (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
+                  }
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setIsFinaliseModalOpen(false)} className="flex-1 py-4 bg-zinc-200 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase tracking-widest transition-colors hover:bg-zinc-300 dark:hover:bg-zinc-800">Cancel</button>
+                <button 
+                  onClick={executeMatchFinalization} 
+                  disabled={isProcessing}
+                  className={`flex-1 py-4 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 disabled:opacity-50 ${finaliseStatus === 'completed' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}
+                >
+                  {isProcessing ? 'Saving...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- SELECT TEAM MODAL --- */}
+      {isManageSquadOpen && (
         <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Add to Squad</h2>
-              <button onClick={() => setIsQuickAddOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Select Team</h2>
+              <button onClick={() => setIsManageSquadOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             
             <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-24">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
-              <div className="space-y-2">
-                
-                {/* NEW: CREATE ON THE FLY BUTTON */}
-                {playerSearch.trim().length > 0 && (
+              <input type="text" placeholder="Search across club..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
+              
+              <div className="space-y-4">
+                {/* CREATE ON THE FLY BUTTON */}
+                {playerSearch.trim().length > 0 && !clubPlayers.some(p => `${p.first_name} ${p.last_name}`.toLowerCase() === playerSearch.trim().toLowerCase()) && (
                   <button 
                     onClick={() => createAndAddPlayer(playerSearch)}
                     disabled={isProcessing}
-                    className="w-full flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors text-left group mb-2 disabled:opacity-50"
+                    className="w-full flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors text-left group disabled:opacity-50"
                   >
                     <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
                       + Add "{playerSearch}"
@@ -822,13 +1046,27 @@ export default function GameDay() {
                   </button>
                 )}
 
-                {/* EXISTING PLAYER SEARCH LIST */}
-                {availablePlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => (
-                  <button key={p.id} onClick={() => addPlayerToMatch(p.id)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group">
-                    <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
-                    <i className="fa-solid fa-plus" style={{ color: themeColor }}></i>
-                  </button>
-                ))}
+                {/* COMPACT PILL BUTTON LIST */}
+                <div className="flex flex-wrap gap-2.5">
+                  {clubPlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
+                    const isInSquad = squad.some(s => s.id === p.id);
+                    return (
+                      <button 
+                        key={p.id} 
+                        onClick={() => toggleSquadMember(p.id)} 
+                        disabled={isProcessing}
+                        className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isInSquad ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
+                      >
+                        {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                        {isInSquad ? (
+                          <i className="fa-solid fa-check text-[10px]"></i>
+                        ) : (
+                          <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -840,7 +1078,7 @@ export default function GameDay() {
         <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[400px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95">
             <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Transfer</h2>
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Transfer</h2>
               <button onClick={() => setIsPayIdModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             
@@ -880,15 +1118,25 @@ export default function GameDay() {
         </div>
       )}
 
+      {/* --- SMART AI MODAL DECOUPLED FROM ACTIVE MATCH --- */}
       <AiReporterModal 
-        isOpen={isAiModalOpen} 
-        onClose={() => setIsAiModalOpen(false)} 
-        fixture={activeFixture}
-        squad={squad}
-        themeColor={themeColor}
+        isOpen={!!aiModalFixture} 
+        onClose={() => {
+          setAiModalFixture(null);
+          setAiModalSquad([]);
+        }} 
+        fixture={aiModalFixture}
+        squad={aiModalSquad}
+        themeColor="#10b981" 
         teamName={currentTeamName}
-        reportsGenerated={activeFixture?.ai_reports_generated || 0}
-        onReportIncrement={handleReportGenerated}
+        reportsGenerated={aiModalFixture?.ai_reports_generated || 0}
+        onReportIncrement={() => {
+          if (activeFixture && aiModalFixture?.id === activeFixture.id) {
+            setActiveFixture({ ...activeFixture, ai_reports_generated: (activeFixture.ai_reports_generated || 0) + 1 });
+          }
+          setPastFixtures(prev => prev.map(f => f.id === aiModalFixture?.id ? { ...f, ai_reports_generated: (f.ai_reports_generated || 0) + 1 } : f));
+          setAiModalFixture((prev: any) => prev ? { ...prev, ai_reports_generated: (prev.ai_reports_generated || 0) + 1 } : null);
+        }}
       />
     </div>
   );

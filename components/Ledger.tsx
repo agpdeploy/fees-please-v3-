@@ -1,7 +1,6 @@
-// components/Ledger.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
@@ -10,34 +9,33 @@ export default function Ledger() {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
 
-  const [themeColor, setThemeColor] = useState("#10b981");
-
   const [teams, setTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>("");
   
-  const [allPlayers, setAllPlayers] = useState<any[]>([]); // New: To populate global dropdown
+  const [allPlayers, setAllPlayers] = useState<any[]>([]); 
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState(""); 
   
   const [seasonAudit, setSeasonAudit] = useState<any[]>([]);
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
   const [overallNet, setOverallNet] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [showAllDebts, setShowAllDebts] = useState(false);
+  // Player Accounts & Feed States
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
+  const [accountSearch, setAccountSearch] = useState("");
+  const [showAllAudit, setShowAllAudit] = useState(false); 
+  const [searchTerm, setSearchTerm] = useState(""); 
+  const [visibleFeedCount, setVisibleFeedCount] = useState(10); // Pagination
 
   const [selectedFixture, setSelectedFixture] = useState<any>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   
-  // Existing specific player manual modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   
-  // New global manual modal
   const [isGlobalManualModalOpen, setIsGlobalManualModalOpen] = useState(false);
   const [globalSelectedPlayerId, setGlobalSelectedPlayerId] = useState("");
   
-  // Shared manual form state
   const [manualType, setManualType] = useState<'payment' | 'fee'>('payment');
   const [manualFixtureId, setManualFixtureId] = useState("");
   const [manualAmount, setManualAmount] = useState<number | "">("");
@@ -53,11 +51,7 @@ export default function Ledger() {
 
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('clubs').select('theme_color').eq('id', activeClubId).single().then(({data}) => {
-        if (data?.theme_color) setThemeColor(data.theme_color);
-      });
-      // Fetch all players to populate the global dropdown
-      supabase.from('players').select('id, first_name, last_name').eq('club_id', activeClubId).order('first_name').then(({data}) => {
+      supabase.from('players').select('id, first_name, last_name, nickname, default_team_id').eq('club_id', activeClubId).order('first_name').then(({data}) => {
         if (data) setAllPlayers(data);
       });
     }
@@ -97,56 +91,122 @@ export default function Ledger() {
     if (!activeTeamId) return;
     setIsLoading(true);
     
-    const { data: fixData } = await supabase.from("fixtures").select("*").eq("team_id", activeTeamId).order("match_date", { ascending: false });
-    if (fixData) setFixtures(fixData);
+    const [fixRes, txRes, playersRes] = await Promise.all([
+      supabase.from("fixtures").select("*").eq("team_id", activeTeamId).order("match_date", { ascending: false }),
+      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname ), fixtures ( opponent )`).eq("team_id", activeTeamId).order("created_at", { ascending: false }),
+      supabase.from("players").select('id, first_name, last_name, nickname').eq("default_team_id", activeTeamId)
+    ]);
 
-    const { data: txData, error } = await supabase
-      .from("transactions")
-      .select(`*, players ( id, first_name, last_name ), fixtures ( opponent )`)
-      .eq("team_id", activeTeamId)
-      .order("created_at", { ascending: false });
+    const fixData = fixRes.data || [];
+    const txData = txRes.data || [];
+    const teamPlayersData = playersRes.data || [];
 
-    if (error) { console.error(error); setIsLoading(false); return; }
+    setFixtures(fixData);
+    setTransactions(txData);
 
-    if (txData && fixData) {
-      setTransactions(txData);
-      let netTotal = 0;
-      const auditMap: Record<string, any> = {};
-      fixData.forEach(f => { auditMap[f.id] = { ...f, cash: 0, card: 0, fee: 0, net: 0 }; });
+    let netTotal = 0;
+    const auditMap: Record<string, any> = {};
+    fixData.forEach(f => { auditMap[f.id] = { ...f, cash: 0, card: 0, fee: 0, net: 0 }; });
 
-      const balances: Record<string, { id: string, name: string, owed: number }> = {};
+    const balances: Record<string, any> = {};
 
-      txData.forEach(tx => {
-        if (tx.fixture_id && auditMap[tx.fixture_id]) {
-          if (tx.transaction_type === 'payment') {
-            if (tx.payment_method === 'cash') auditMap[tx.fixture_id].cash += Number(tx.amount);
-            if (tx.payment_method === 'card') auditMap[tx.fixture_id].card += Number(tx.amount);
-          }
-          if (tx.transaction_type === 'expense') auditMap[tx.fixture_id].fee += Number(tx.amount);
+    teamPlayersData.forEach(p => {
+      balances[p.id] = { 
+        id: p.id, 
+        name: p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`.trim(), 
+        full_name: `${p.first_name} ${p.last_name}`, 
+        owed: 0,
+        total_paid: 0,
+        total_fees: 0
+      };
+    });
+
+    txData.forEach(tx => {
+      if (tx.fixture_id && auditMap[tx.fixture_id]) {
+        if (tx.transaction_type === 'payment') {
+          if (tx.payment_method === 'cash') auditMap[tx.fixture_id].cash += Number(tx.amount);
+          if (tx.payment_method === 'card') auditMap[tx.fixture_id].card += Number(tx.amount);
         }
+        if (tx.transaction_type === 'expense') auditMap[tx.fixture_id].fee += Number(tx.amount);
+      }
 
-        if (tx.player_id && tx.players) {
-          if (!balances[tx.player_id]) balances[tx.player_id] = { id: tx.player_id, name: `${tx.players.first_name} ${tx.players.last_name}`, owed: 0 };
-          if (tx.transaction_type === 'fee') balances[tx.player_id].owed += Number(tx.amount);
-          if (tx.transaction_type === 'payment') balances[tx.player_id].owed -= Number(tx.amount);
+      if (tx.player_id && tx.players) {
+        if (!balances[tx.player_id]) {
+          balances[tx.player_id] = { 
+            id: tx.player_id, 
+            name: tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim(), 
+            full_name: `${tx.players.first_name} ${tx.players.last_name}`, 
+            owed: 0,
+            total_paid: 0,
+            total_fees: 0
+          };
         }
-      });
+        if (tx.transaction_type === 'fee') {
+          balances[tx.player_id].owed += Number(tx.amount);
+          balances[tx.player_id].total_fees += Number(tx.amount);
+        }
+        if (tx.transaction_type === 'payment') {
+          balances[tx.player_id].owed -= Number(tx.amount);
+          balances[tx.player_id].total_paid += Number(tx.amount);
+        }
+      }
+    });
 
-      const auditArray = Object.values(auditMap).map(m => {
-        m.net = m.cash + m.card - m.fee;
-        netTotal += m.net;
-        return m;
-      }).sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+    const auditArray = Object.values(auditMap).map(m => {
+      m.net = m.cash + m.card - m.fee;
+      netTotal += m.net;
+      return m;
+    }).sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
-      setSeasonAudit(auditArray);
-      setOverallNet(netTotal);
-      
-      setPlayerBalances(Object.values(balances).filter(b => b.owed > 0.01).sort((a, b) => b.owed - a.owed));
-    }
+    setSeasonAudit(auditArray);
+    setOverallNet(netTotal);
+    
+    setPlayerBalances(Object.values(balances).sort((a: any, b: any) => {
+      if (b.owed !== a.owed) return b.owed - a.owed;
+      return a.name.localeCompare(b.name);
+    }));
+    
     setIsLoading(false);
   }
 
   useEffect(() => { fetchLedger(); }, [activeTeamId]);
+
+  // --- DERIVED GROUPED FEED ---
+  // Condenses transactions by Day + Player so they appear on a single clean line
+  const groupedFeed = useMemo(() => {
+    const map = new Map();
+    const groups: any[] = [];
+    
+    transactions.forEach(tx => {
+      const dateObj = new Date(tx.created_at);
+      const dateKey = dateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+      const isPlayer = !!tx.player_id;
+      const groupKey = isPlayer ? `${dateKey}_${tx.player_id}` : `${dateKey}_expense_${tx.id}`;
+
+      if (!map.has(groupKey)) {
+        const newGroup = {
+          id: groupKey,
+          date: dateObj,
+          dateString: dateKey,
+          player_id: tx.player_id,
+          player_name: tx.players ? (tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim()) : (tx.description || 'Club Expense'),
+          paid: 0,
+          fee: 0,
+          expense: 0,
+          isPlayer: isPlayer,
+        };
+        map.set(groupKey, newGroup);
+        groups.push(newGroup);
+      }
+
+      const g = map.get(groupKey);
+      if (tx.transaction_type === 'payment') g.paid += Number(tx.amount);
+      if (tx.transaction_type === 'fee') g.fee += Number(tx.amount);
+      if (tx.transaction_type === 'expense') g.expense += Number(tx.amount);
+    });
+
+    return groups.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [transactions]);
 
   const openPlayerDetails = (player: any) => {
     setSelectedPlayer(player);
@@ -181,27 +241,50 @@ export default function Ledger() {
       setManualAmount("");
       setManualNote("");
       setManualFixtureId("");
+      setVisibleFeedCount(10); // Reset pagination on new save
       
       if (isGlobal) {
         setIsGlobalManualModalOpen(false);
         setGlobalSelectedPlayerId("");
       } else {
         setIsManualModalOpen(false);
-        setSelectedPlayer(null); 
       }
       showToast("Transaction Recorded!");
     }
     setIsSaving(false);
   }
 
-  const filteredTransactions = transactions.filter(tx => {
-    const nameMatch = tx.players ? `${tx.players.first_name} ${tx.players.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-    const opponentMatch = tx.fixtures ? tx.fixtures.opponent.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-    const noteMatch = tx.description ? tx.description.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-    return nameMatch || opponentMatch || noteMatch || searchTerm === "";
+  // --- UI FILTER LOGIC ---
+  const filteredAccounts = playerBalances.filter(p => {
+    if (!showAllAccounts) return p.owed > 0.01;
+    if (accountSearch) {
+      return p.full_name.toLowerCase().includes(accountSearch.toLowerCase()) || 
+             p.name.toLowerCase().includes(accountSearch.toLowerCase());
+    }
+    return true;
   });
 
-  const displayedDebtors = showAllDebts ? playerBalances : playerBalances.slice(0, 3);
+  const displayedAccounts = (!showAllAccounts) ? filteredAccounts.slice(0, 3) : filteredAccounts;
+
+  const filteredFeed = groupedFeed.filter(g => 
+    g.player_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const displayedFeed = filteredFeed.slice(0, visibleFeedCount);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const pastGames = seasonAudit
+    .filter(a => new Date(a.match_date + 'T00:00:00').getTime() < today.getTime())
+    .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+
+  const futureGames = seasonAudit
+    .filter(a => new Date(a.match_date + 'T00:00:00').getTime() >= today.getTime())
+    .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+
+  const nextGame = futureGames.length > 0 ? futureGames[0] : null;
+  const relevantAudit = nextGame ? [nextGame, ...pastGames] : pastGames;
+  const displayedAudit = showAllAudit ? relevantAudit : relevantAudit.slice(0, 4);
 
   if (!activeClubId) return <div className="p-4 text-center text-zinc-500 uppercase tracking-widest text-xs font-black">Loading Ledger...</div>;
 
@@ -215,10 +298,9 @@ export default function Ledger() {
         </div>
       )}
 
-      {/* 1. TEAM SELECTOR */}
       {teams.length > 1 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
-          <label className="text-[10px] uppercase font-black tracking-widest block mb-2 ml-1" style={{ color: themeColor }}>Viewing Ledger As</label>
+          <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Viewing Ledger As</label>
           <select value={activeTeamId} onChange={(e) => setActiveTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -228,7 +310,6 @@ export default function Ledger() {
 
       {activeTeamId && !isLoading ? (
         <>
-          {/* THE NEW GLOBAL ADD BUTTON */}
           <button
             onClick={() => {
               setIsGlobalManualModalOpen(true);
@@ -238,17 +319,19 @@ export default function Ledger() {
               setManualFixtureId("");
               setGlobalSelectedPlayerId("");
             }}
-            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 p-4 rounded-xl shadow-sm text-sm font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group active:scale-95"
+            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 p-4 rounded-xl shadow-sm text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group active:scale-95"
           >
-            <i className="fa-solid fa-plus text-lg transition-transform group-hover:scale-110" style={{ color: themeColor }}></i>
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-white bg-emerald-600 dark:bg-emerald-500">
+              <i className="fa-solid fa-plus text-xs"></i>
+            </div>
             <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">Log Manual Transaction</span>
           </button>
 
-          {/* 2. SEASON AUDIT CARD */}
+          {/* --- SEASON AUDIT --- */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative overflow-hidden transition-colors">
-            <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: themeColor }}></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-emerald-500"></div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-black uppercase italic tracking-widest" style={{ color: themeColor }}>Season Audit</h2>
+              <h2 className="text-sm font-black uppercase italic tracking-widest text-emerald-600 dark:text-emerald-500">Season Audit</h2>
               <div className={`bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 py-1.5 text-sm font-black border border-zinc-200 dark:border-zinc-700 transition-colors ${overallNet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                 ${overallNet.toFixed(0)} NET
               </div>
@@ -265,50 +348,115 @@ export default function Ledger() {
                   </tr>
                 </thead>
                 <tbody>
-                  {seasonAudit.map((audit) => (
-                    <tr key={audit.id} onClick={() => setSelectedFixture(audit)} className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors">
-                      <td className="py-4 text-zinc-900 dark:text-white">{audit.opponent}</td>
-                      <td className="py-4 text-center text-zinc-500 dark:text-zinc-400">${audit.fee}</td>
-                      <td className="py-4 text-center text-emerald-500">${audit.cash}</td>
-                      <td className="py-4 text-center text-blue-500 dark:text-blue-400">${audit.card}</td>
-                      <td className={`py-4 text-right ${audit.net < 0 ? 'text-red-500' : 'text-emerald-500'}`}>${audit.net}</td>
-                    </tr>
-                  ))}
+                  {displayedAudit.map((audit) => {
+                    const isNextGame = nextGame && audit.id === nextGame.id;
+                    return (
+                      <tr key={audit.id} onClick={() => setSelectedFixture(audit)} className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors">
+                        <td className="py-4 text-zinc-900 dark:text-white flex items-center gap-2">
+                          {audit.opponent}
+                          {isNextGame && (
+                            <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[8px] px-1.5 py-0.5 rounded-md uppercase tracking-widest font-black">Next</span>
+                          )}
+                        </td>
+                        <td className="py-4 text-center text-zinc-500 dark:text-zinc-400">${audit.fee}</td>
+                        <td className="py-4 text-center text-emerald-500">${audit.cash}</td>
+                        <td className="py-4 text-center text-blue-500 dark:text-blue-400">${audit.card}</td>
+                        <td className={`py-4 text-right ${audit.net < 0 ? 'text-red-500' : 'text-emerald-500'}`}>${audit.net}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              {relevantAudit.length === 0 && (
+                <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-widest">
+                  No fixtures found
+                </div>
+              )}
             </div>
+
+            {relevantAudit.length > 4 && (
+              <button 
+                onClick={() => setShowAllAudit(!showAllAudit)}
+                className="w-full mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {showAllAudit ? 'Show Less' : `Show All History (${pastGames.length})`}
+              </button>
+            )}
           </div>
 
-          {/* 3. OUTSTANDING DEBTS CARD (PAGINATED) */}
+          {/* --- PLAYER ACCOUNTS / ROSTER HUB --- */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm overflow-hidden transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-red-500 tracking-widest mb-4">Outstanding Debts</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-[11px] font-black uppercase italic tracking-widest text-zinc-800 dark:text-zinc-200">
+                Player Accounts
+              </h2>
+              <button 
+                onClick={() => { setShowAllAccounts(!showAllAccounts); setAccountSearch(""); }} 
+                className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+              >
+                {showAllAccounts ? 'Show Debts Only' : 'Show All Transactions'}
+              </button>
+            </div>
+
+            {showAllAccounts && (
+              <div className="mb-4 animate-in slide-in-from-top-2 fade-in">
+                <div className="relative w-full">
+                  <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Search player..." 
+                    value={accountSearch} 
+                    onChange={(e) => setAccountSearch(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl pl-9 pr-4 py-3 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
-              {playerBalances.length === 0 ? (
-                <p className="text-xs text-zinc-500 font-bold uppercase text-center py-4 tracking-widest">All clear!</p>
+              {displayedAccounts.length === 0 ? (
+                <p className="text-xs text-zinc-500 font-bold uppercase text-center py-6 tracking-widest">
+                  {showAllAccounts ? "No players found." : "All clear! No debts."}
+                </p>
               ) : (
-                <>
-                  {displayedDebtors.map((player) => (
-                    <button key={player.id} onClick={() => openPlayerDetails(player)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 p-4 rounded-xl transition-all group">
-                      <span className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-emerald-500 transition-colors">{player.name}</span>
-                      <span className="text-sm font-black text-red-500">${player.owed.toFixed(2)}</span>
-                    </button>
-                  ))}
-                  
-                  {playerBalances.length > 3 && (
-                    <button 
-                      onClick={() => setShowAllDebts(!showAllDebts)}
-                      className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
-                    >
-                      {showAllDebts ? 'Show Less' : `Show ${playerBalances.length - 3} More`}
-                    </button>
-                  )}
-                </>
+                displayedAccounts.map((player) => (
+                  <button key={player.id} onClick={() => openPlayerDetails(player)} className="w-full flex justify-between items-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 p-4 rounded-xl transition-all group text-left">
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-emerald-500 transition-colors">
+                        {player.name}
+                      </div>
+                      <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1 flex gap-2">
+                        <span className="text-emerald-600 dark:text-emerald-500">Paid: ${player.total_paid.toFixed(0)}</span>
+                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                        <span className="text-red-500/80">Fees: ${player.total_fees.toFixed(0)}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {player.owed > 0.01 ? (
+                        <span className="text-sm font-black text-red-500">-${player.owed.toFixed(0)}</span>
+                      ) : player.owed < -0.01 ? (
+                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Credit +${Math.abs(player.owed).toFixed(0)}</span>
+                      ) : (
+                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Settled</span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+              
+              {!showAllAccounts && filteredAccounts.length > 3 && (
+                <button 
+                  onClick={() => setShowAllAccounts(true)}
+                  className="w-full py-3 mt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                >
+                  Show {filteredAccounts.length - 3} More Debts
+                </button>
               )}
             </div>
           </div>
 
-          {/* 4. GLOBAL SEARCH & ACTIVITY LIST */}
-          <div className="space-y-4">
+          {/* --- RECENT TRANSACTIONS (PAGINATED & CONDENSED) --- */}
+          <div className="space-y-3">
             <div className="flex justify-between items-end px-1">
               <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 italic">Recent Activity</h2>
               <div className="relative w-1/2">
@@ -324,26 +472,58 @@ export default function Ledger() {
             </div>
 
             <div className="space-y-2">
-              {filteredTransactions.slice(0, 30).map(tx => (
-                <div key={tx.id} onClick={() => openPlayerDetails({ id: tx.player_id, name: tx.players ? `${tx.players.first_name} ${tx.players.last_name}` : 'Unknown', owed: 0 })} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors shadow-sm">
-                  <div>
-                    <div className="font-bold text-zinc-900 dark:text-white text-sm">
-                      {tx.players ? `${tx.players.first_name} ${tx.players.last_name}` : (tx.description || 'Club Expense')}
+              {displayedFeed.map(group => {
+                const net = group.paid - group.fee;
+                return (
+                  <div 
+                    key={group.id} 
+                    onClick={() => group.isPlayer ? openPlayerDetails({ id: group.player_id, name: group.player_name, owed: 0 }) : null} 
+                    className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex justify-between items-center shadow-sm transition-colors ${group.isPlayer ? 'cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50' : ''}`}
+                  >
+                    <div className="flex-1">
+                      <div className="font-bold text-zinc-900 dark:text-white text-sm">
+                        {group.player_name}
+                      </div>
+                      <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex items-center gap-2">
+                        <span>{group.dateString}</span>
+                        {group.isPlayer && (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-500">Paid: ${group.paid}</span>
+                            <span>•</span>
+                            <span className="text-red-500/80">Fee: ${group.fee}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex items-center gap-2">
-                      <span>{new Date(tx.created_at).toLocaleDateString('en-GB')}</span>
-                      <span>•</span>
-                      <span className={tx.transaction_type === 'payment' ? 'text-emerald-500' : 'text-red-500/80'}>
-                        {tx.transaction_type === 'fee' ? 'Match Fee' : tx.transaction_type.toUpperCase()}
-                      </span>
+                    <div className="shrink-0 text-right ml-4">
+                      {group.isPlayer ? (
+                        <span className={`text-sm font-black ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          {net > 0 ? '+' : ''}${net.toFixed(0)}
+                        </span>
+                      ) : (
+                        <span className="text-sm font-black text-red-500">
+                          -${group.expense.toFixed(0)}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className={`text-sm font-black ${tx.transaction_type === 'payment' ? 'text-emerald-500' : 'text-zinc-500'}`}>
-                    {tx.transaction_type === 'payment' ? '+' : '-'}${tx.amount}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
+              
+              {displayedFeed.length === 0 && (
+                <p className="text-center text-zinc-400 dark:text-zinc-600 text-[10px] uppercase font-black py-8 transition-colors">No activity found.</p>
+              )}
             </div>
+
+            {visibleFeedCount < filteredFeed.length && (
+              <button 
+                onClick={() => setVisibleFeedCount(prev => prev + 10)}
+                className="w-full py-4 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 transition-colors shadow-sm"
+              >
+                Load More History
+              </button>
+            )}
           </div>
         </>
       ) : (
@@ -352,25 +532,25 @@ export default function Ledger() {
         </div>
       )}
 
-      {/* --- NEW: GLOBAL MANUAL TRANSACTION MODAL --- */}
+      {/* --- GLOBAL MANUAL ADD MODAL --- */}
       {isGlobalManualModalOpen && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>Log Transaction</h2>
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Log Transaction</h2>
               <button onClick={() => { setIsGlobalManualModalOpen(false); setManualAmount(""); setManualNote(""); setManualFixtureId(""); setGlobalSelectedPlayerId(""); }} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             
             <form onSubmit={(e) => handleManualSave(e, globalSelectedPlayerId, true)} className="p-5 space-y-4 pb-8">
                <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
-                 <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'text-white shadow-sm' : 'text-zinc-500'}`} style={manualType === 'payment' ? { backgroundColor: themeColor } : {}}>Payment (+)</button>
+                 <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Payment (+)</button>
                  <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
                </div>
 
                <select value={globalSelectedPlayerId} onChange={e => setGlobalSelectedPlayerId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors" required>
                  <option value="" disabled>-- Select Player --</option>
                  {allPlayers.map(p => (
-                   <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+                   <option key={p.id} value={p.id}>{p.nickname || `${p.first_name} ${p.last_name}`}</option>
                  ))}
                </select>
 
@@ -384,7 +564,7 @@ export default function Ledger() {
                <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-4 text-center text-xl font-black text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" required />
                <input type="text" placeholder="Method / Note (e.g. Bank Transfer, Cash)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                
-               <button type="submit" disabled={isSaving} className="w-full text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50 mt-2" style={{ backgroundColor: themeColor }}>
+               <button type="submit" disabled={isSaving} className="w-full bg-emerald-600 dark:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50 mt-2">
                  {isSaving ? 'Saving...' : 'Confirm Transaction'}
                </button>
             </form>
@@ -392,13 +572,13 @@ export default function Ledger() {
         </div>
       )}
 
-      {/* FIXTURE MODAL (Match Details) */}
+      {/* --- FIXTURE AUDIT MODAL --- */}
       {selectedFixture && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors">
               <div>
-                <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>VS {selectedFixture.opponent}</h2>
+                <h2 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">VS {selectedFixture.opponent}</h2>
                 <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1 flex gap-3">
                   <span>Cash: ${selectedFixture.cash}</span>
                   <span>Card: ${selectedFixture.card}</span>
@@ -408,24 +588,27 @@ export default function Ledger() {
               <button onClick={() => setSelectedFixture(null)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-2 pb-24">
-              {transactions.filter(tx => tx.fixture_id === selectedFixture.id).map(tx => (
-                <div key={tx.id} className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl flex justify-between items-center transition-colors">
-                   <span className="text-sm font-bold text-zinc-900 dark:text-white">{tx.players ? `${tx.players.first_name} ${tx.players.last_name?.charAt(0)}.` : tx.description}</span>
-                   <span className={`text-sm font-black ${tx.transaction_type === 'payment' ? 'text-emerald-500' : 'text-red-500'}`}>{tx.transaction_type === 'payment' ? '+' : '-'}${tx.amount}</span>
-                </div>
-              ))}
+              {transactions.filter(tx => tx.fixture_id === selectedFixture.id).map(tx => {
+                const displayName = tx.players ? (tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim()) : tx.description;
+                return (
+                  <div key={tx.id} className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl flex justify-between items-center transition-colors">
+                     <span className="text-sm font-bold text-zinc-900 dark:text-white">{displayName}</span>
+                     <span className={`text-sm font-black ${tx.transaction_type === 'payment' ? 'text-emerald-500' : 'text-red-500'}`}>{tx.transaction_type === 'payment' ? '+' : '-'}${tx.amount}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {/* PLAYER MODAL (History & Manual Add) */}
+      {/* --- INDIVIDUAL PLAYER HISTORY MODAL --- */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors">
               <div>
-                <h2 className="text-xl font-black italic uppercase tracking-tighter" style={{ color: themeColor }}>{selectedPlayer.name}</h2>
+                <h2 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">{selectedPlayer.name}</h2>
                 <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Transaction History</div>
               </div>
               <button onClick={() => {setSelectedPlayer(null); setIsManualModalOpen(false);}} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -434,7 +617,7 @@ export default function Ledger() {
             {isManualModalOpen ? (
               <form onSubmit={(e) => handleManualSave(e, selectedPlayer.id, false)} className="p-5 space-y-4 animate-in slide-in-from-right-4 pb-24">
                 <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
-                  <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'text-white shadow-sm' : 'text-zinc-500'}`} style={manualType === 'payment' ? { backgroundColor: themeColor } : {}}>Payment (+)</button>
+                  <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Payment (+)</button>
                   <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
                 </div>
 
@@ -448,32 +631,39 @@ export default function Ledger() {
                 <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-4 text-center text-xl font-black text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" required />
                 <input type="text" placeholder="Method / Note (e.g. Fine, Cash, Refund)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 
-                <button type="submit" disabled={isSaving} className="w-full text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50" style={{ backgroundColor: themeColor }}>
+                <button type="submit" disabled={isSaving} className="w-full bg-emerald-600 dark:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50 mt-2">
                   {isSaving ? 'Saving...' : 'Confirm Transaction'}
                 </button>
                 <button type="button" onClick={() => setIsManualModalOpen(false)} className="w-full text-[10px] text-zinc-500 hover:text-zinc-900 dark:hover:text-white uppercase font-black py-2 tracking-widest transition-colors">Back to History</button>
               </form>
             ) : (
               <div className="p-5 overflow-y-auto flex-1 space-y-3 pb-24">
-                <button onClick={() => setIsManualModalOpen(true)} className="w-full py-4 border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mb-2" style={{ color: themeColor }}>
+                <button onClick={() => setIsManualModalOpen(true)} className="w-full py-4 border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 transition-colors flex items-center justify-center gap-2 mb-2">
                   <i className="fa-solid fa-plus"></i> Add Manual Transaction
                 </button>
-                {transactions.filter(tx => tx.player_id === selectedPlayer.id).map(tx => (
-                  <div key={tx.id} className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex justify-between items-center transition-colors">
-                    <div>
-                      <div className="text-[8px] font-black uppercase text-zinc-500">
-                          {tx.transaction_type === 'fee' ? 'Charge' : 'Payment'}
+                
+                {groupedFeed.filter(g => g.player_id === selectedPlayer.id).map(group => {
+                  const net = group.paid - group.fee;
+                  return (
+                    <div key={group.id} className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex justify-between items-center transition-colors">
+                      <div className="flex-1">
+                        <div className="text-[10px] font-black uppercase text-zinc-900 dark:text-white">
+                            {group.dateString}
+                        </div>
+                        <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex gap-2">
+                           <span className="text-emerald-500">Paid: ${group.paid}</span>
+                           <span>•</span>
+                           <span className="text-red-500/80">Fee: ${group.fee}</span>
+                        </div>
                       </div>
-                      <div className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5">
-                          {tx.fixtures ? `Match: ${tx.fixtures.opponent}` : (tx.description || 'Manual Entry')}
-                      </div>
+                      <span className={`text-sm font-black shrink-0 ml-4 ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          {net > 0 ? '+' : ''}${net.toFixed(0)}
+                      </span>
                     </div>
-                    <span className={`text-sm font-black ${tx.transaction_type === 'payment' ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {tx.transaction_type === 'payment' ? '+' : '-'}${tx.amount}
-                    </span>
-                  </div>
-                ))}
-                {transactions.filter(tx => tx.player_id === selectedPlayer.id).length === 0 && (
+                  );
+                })}
+
+                {groupedFeed.filter(g => g.player_id === selectedPlayer.id).length === 0 && (
                     <p className="text-center text-zinc-400 dark:text-zinc-600 text-[10px] uppercase font-black py-8 transition-colors">No history found.</p>
                 )}
               </div>

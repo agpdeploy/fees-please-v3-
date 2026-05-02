@@ -285,7 +285,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
                 <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime || ""} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 <div className="flex-1 relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-                  <input type="number" placeholder={expenseLabel || "Umpire Fee"} value={umpireFee} onChange={(e) => setUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input type="number" placeholder={expenseLabel || "Umpire Fee"} value={umpireFee ?? ""} onChange={(e) => setUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
               </div>
               <input type="text" placeholder="Location" value={fixtureLocation || ""} onChange={(e) => setFixtureLocation(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
@@ -458,7 +458,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, ope
            <input type="text" placeholder="Notes" value={editForm.notes || ""} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
            <div className="flex-[0.6] relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs">$</span>
-              <input type="number" placeholder={expenseLabel} value={editForm.umpire_fee} onChange={(e) => setEditForm({...editForm, umpire_fee: e.target.value === '' ? '' : Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-6 pr-2 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <input type="number" placeholder={expenseLabel} value={editForm.umpire_fee ?? ""} onChange={(e) => setEditForm({...editForm, umpire_fee: e.target.value === '' ? '' : Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-6 pr-2 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
            </div>
         </div>
 
@@ -488,7 +488,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, ope
         </div>
       </div>
       <button onClick={() => openSquadModal(fixture)} className="w-full py-2 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-        <i className="fa-solid fa-users"></i> Pre-Game Squad
+        <i className="fa-solid fa-users"></i> Match Players
       </button>
     </div>
   );

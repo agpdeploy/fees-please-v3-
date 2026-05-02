@@ -16,8 +16,10 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
   const [players, setPlayers] = useState<DraftPlayer[]>([]);
-  // We only need upload and review modes now
-  const [mode, setMode] = useState<'upload' | 'review'>('upload');
+  
+  // Refactored to match the unified dAIve vs Manual state
+  const [isBulkMode, setIsBulkMode] = useState(true);
+  const [bulkModeState, setBulkModeState] = useState<'upload' | 'review'>('upload');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
     // --------------------------
 
     setLoading(true);
-    setMode('review'); 
+    setBulkModeState('review'); 
 
     try {
       let payload = {};
@@ -132,7 +134,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
     } catch (error: any) {
       console.error("Failed to extract:", error);
       alert("Couldn't parse the file data. Switching to manual entry!");
-      setMode('review');
+      setBulkModeState('review');
       setPlayers([{ firstName: "", lastName: "", nickname: "", email: "", mobile: "" }]);
     } finally {
       setLoading(false);
@@ -172,7 +174,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
         first_name: p.firstName,
         last_name: p.lastName,
         nickname: p.nickname || null,
-        email: p.email || null,
+        email: p.email ? p.email.toLowerCase().trim() : null,
         mobile_number: p.mobile || null,
         is_member: true
       }));
@@ -189,34 +191,41 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
   return (
     <div className="h-full flex flex-col p-8 bg-zinc-50 overflow-y-auto">
       <div className="text-center mb-8 shrink-0">
-        <h2 className="text-3xl font-black tracking-tight text-zinc-900 uppercase italic">Build Your Squad</h2>
-        <p className="text-zinc-500 mt-2">Add your players. You can always edit this later.</p>
+        <h2 className="text-3xl font-black tracking-tight text-zinc-900 uppercase italic">Add Players</h2>
+        <p className="text-zinc-500 mt-2">Add your initial players. You can always edit this later.</p>
       </div>
 
-      {mode === 'upload' && !loading && (
-        <>
-          <div className="relative group border-2 border-dashed border-emerald-500 rounded-3xl p-10 text-center hover:bg-emerald-50 transition-colors bg-white shadow-sm cursor-pointer mx-auto w-full max-w-lg">
-            <input type="file" accept="image/*,.csv,.pdf" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-            
-            {/* dAIve UI */}
-            <div className="w-20 h-20 mx-auto bg-emerald-100 rounded-full flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-              <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-600"></i>
-            </div>
-            <h3 className="font-black uppercase tracking-widest text-emerald-800 text-lg mb-1">Give it to dAIve</h3>
-            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Auto-Extract PDF, CSV, or Image</p>
+      <div className="w-full max-w-2xl mx-auto flex bg-zinc-100 border border-zinc-200 rounded-xl p-1 mb-6 transition-colors">
+        <button
+          onClick={() => setIsBulkMode(true)}
+          className={`flex-1 py-3 text-[10px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+        >
+          <i className="fa-solid fa-wand-magic-sparkles"></i> dAIve UPLOAD
+        </button>
+        <button
+          onClick={() => {
+            setIsBulkMode(false);
+            if (players.length === 0) {
+              setPlayers([{ firstName: "", lastName: "", nickname: "", email: "", mobile: "" }]);
+            }
+          }}
+          className={`flex-1 py-3 text-[10px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${!isBulkMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+        >
+          <i className="fa-solid fa-keyboard"></i> MANUAL ENTRY
+        </button>
+      </div>
+
+      {isBulkMode && bulkModeState === 'upload' && !loading && (
+        <div className="relative group border-2 border-dashed border-emerald-500 rounded-3xl p-10 text-center hover:bg-emerald-50 transition-colors bg-white shadow-sm cursor-pointer mx-auto w-full max-w-2xl">
+          <input type="file" accept="image/*,.csv,.pdf" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+          
+          <div className="w-20 h-20 mx-auto bg-emerald-100 rounded-full flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+            <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-600"></i>
           </div>
-          <div className="mt-8 text-center">
-             <button 
-                onClick={() => { 
-                  setMode('review'); 
-                  setPlayers([{ firstName: "", lastName: "", nickname: "", email: "", mobile: "" }]); 
-                }} 
-                className="text-xs font-bold text-zinc-400 uppercase tracking-widest hover:text-emerald-600 transition-colors underline"
-              >
-               Skip upload and add manually
-             </button>
-          </div>
-        </>
+          {/* Removed 'uppercase' class to preserve dAIve casing */}
+          <h3 className="font-black tracking-widest text-emerald-800 text-lg mb-1">GIVE IT TO dAIve</h3>
+          <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Auto-Extract PDF, CSV, or Image</p>
+        </div>
       )}
 
       {loading && (
@@ -226,15 +235,18 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
         </div>
       )}
 
-      {mode === 'review' && !loading && (
+      {/* Renders the grid for BOTH Reviewing a dAIve Upload AND Manual Entry */}
+      {((isBulkMode && bulkModeState === 'review') || !isBulkMode) && !loading && (
         <div className="w-full max-w-2xl mx-auto flex flex-col h-full pb-10 animate-in slide-in-from-bottom-4 fade-in">
           
-          <button 
-            onClick={() => { setMode('upload'); setPlayers([]); }} 
-            className="self-start mb-4 text-xs font-bold text-zinc-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center"
-          >
-            <i className="fa-solid fa-arrow-left mr-2"></i> Try Upload Again
-          </button>
+          {isBulkMode && (
+            <button 
+              onClick={() => { setBulkModeState('upload'); setPlayers([]); }} 
+              className="self-start mb-4 text-xs font-bold text-zinc-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center"
+            >
+              <i className="fa-solid fa-arrow-left mr-2"></i> Try Upload Again
+            </button>
+          )}
 
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden flex-1 flex flex-col">
             <div className="bg-zinc-900 px-4 py-3 flex justify-between items-center text-white shrink-0">
@@ -247,15 +259,15 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
                 <div key={i} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-zinc-200 shadow-sm relative">
                   <button onClick={() => removePlayer(i)} className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50"><i className="fa-solid fa-xmark"></i></button>
                   
-                  {/* min-w-0 applied to fix overflow, matching PlayersTab styling */}
                   <div className="flex gap-2 pr-6">
-                    <input type="text" placeholder="First" value={p.firstName} onChange={(e) => updatePlayer(i, 'firstName', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
-                    <input type="text" placeholder="Last" value={p.lastName} onChange={(e) => updatePlayer(i, 'lastName', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
-                    <input type="text" placeholder="Nickname" value={p.nickname} onChange={(e) => updatePlayer(i, 'nickname', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    {/* ADDED || "" TO ALL INPUTS */}
+                    <input type="text" placeholder="First" value={p.firstName || ""} onChange={(e) => updatePlayer(i, 'firstName', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="text" placeholder="Last" value={p.lastName || ""} onChange={(e) => updatePlayer(i, 'lastName', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="text" placeholder="Nickname" value={p.nickname || ""} onChange={(e) => updatePlayer(i, 'nickname', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
                   </div>
                   <div className="flex gap-2 pr-6">
-                    <input type="tel" placeholder="Mobile" value={p.mobile} onChange={(e) => updatePlayer(i, 'mobile', e.target.value)} className="flex-[0.8] min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
-                    <input type="email" placeholder="Email" value={p.email} onChange={(e) => updatePlayer(i, 'email', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="tel" placeholder="Mobile" value={p.mobile || ""} onChange={(e) => updatePlayer(i, 'mobile', e.target.value)} className="flex-[0.8] min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
+                    <input type="email" placeholder="Email" value={p.email || ""} onChange={(e) => updatePlayer(i, 'email', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 transition-colors" />
                   </div>
                 </div>
               ))}
@@ -264,8 +276,6 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
           </div>
 
           <div className="mt-6 shrink-0 space-y-4">
-            
-            {/* Implied Consent Banner */}
             <div className="flex items-start gap-3 p-3 border border-emerald-200 bg-emerald-50 rounded-xl transition-colors">
               <i className="fa-solid fa-shield-halved text-emerald-600 mt-0.5 shrink-0"></i>
               <p className="text-[11px] text-zinc-700 font-bold leading-relaxed m-0">
@@ -278,7 +288,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
               disabled={isSaving || players.length === 0}
               className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-md disabled:opacity-50 active:scale-95"
             >
-              {isSaving ? "Saving Profiles..." : `Import ${players.filter(p => p.firstName.trim() !== "").length} Players`}
+              {isSaving ? "Saving Profiles..." : `Save ${players.filter(p => p.firstName.trim() !== "").length} Players`}
             </button>
           </div>
         </div>

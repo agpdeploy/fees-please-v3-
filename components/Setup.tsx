@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import PlayersTab from "@/components/PlayersTab";
-import FixturesTab from "@/components/FixturesTab"; // IMPORTANT: Added this import
+import FixturesTab from "@/components/FixturesTab"; 
 
 interface SetupProps {
   activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures';
@@ -40,8 +40,6 @@ export default function Setup({ activeTab }: SetupProps) {
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(70);
   
   const [expenseLabel, setExpenseLabel] = useState("Umpire Fee");
-  const [themeColor, setThemeColor] = useState("#10b981");
-  const [themeFont, setThemeFont] = useState("Inter");
   
   const [squareAccessToken, setSquareAccessToken] = useState("");
   const [squareLocationId, setSquareLocationId] = useState("");
@@ -52,12 +50,11 @@ export default function Setup({ activeTab }: SetupProps) {
   const [payIdValue, setPayIdValue] = useState("");
 
   const [teamName, setTeamName] = useState("");
-  
   const [memberFee, setMemberFee] = useState<number | "">(10);
   const [casualFee, setCasualFee] = useState<number | "">(25);
-  
   const [teamSeasonStart, setTeamSeasonStart] = useState("");
   const [teamSeasonEnd, setTeamSeasonEnd] = useState("");
+  // Keper the team color picker as teams still need an identifier dot
   const [primaryColor, setPrimaryColor] = useState("#10b981");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
@@ -124,8 +121,6 @@ export default function Setup({ activeTab }: SetupProps) {
       setDefaultCasualFee(clubData.default_casual_fee !== undefined ? clubData.default_casual_fee : 25);
       setExpenseLabel(clubData.expense_label || "Umpire Fee");
       setDefaultUmpireFee(clubData.default_umpire_fee !== undefined ? clubData.default_umpire_fee : 70);
-      setThemeColor(clubData.theme_color || "#10b981");
-      setThemeFont(clubData.theme_font || "Inter");
       setSquareAccessToken(clubData.square_access_token || "");
       setSquareLocationId(clubData.square_location_id || "");
       setIsSquareEnabled(clubData.is_square_enabled || false);
@@ -217,8 +212,6 @@ export default function Setup({ activeTab }: SetupProps) {
       default_casual_fee: defaultCasualFee === "" ? 0 : defaultCasualFee, 
       expense_label: expenseLabel, 
       default_umpire_fee: defaultUmpireFee === "" ? 0 : defaultUmpireFee,
-      theme_color: themeColor, 
-      theme_font: themeFont,
       square_access_token: squareAccessToken,
       square_location_id: squareLocationId,
       is_square_enabled: isSquareEnabled,
@@ -305,7 +298,7 @@ export default function Setup({ activeTab }: SetupProps) {
     setEditingTeamId(null); 
     setMemberFee(defaultMemberFee || 10); 
     setCasualFee(defaultCasualFee || 25); 
-    setPrimaryColor(themeColor); 
+    setPrimaryColor("#10b981"); 
     setTeamSeasonStart(seasonStart); 
     setTeamSeasonEnd(seasonEnd); 
   }
@@ -340,6 +333,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
   async function openRosterModal(team: any) { setActiveRosterTeam(team); setPlayerSearch(""); setRosterPlayerIds(players.filter(p => p.default_team_id === team.id).map(p => p.id)); setIsRosterModalOpen(true); }
   function toggleRosterPlayer(playerId: string) { setRosterPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); }
+  
   async function saveTeamRoster() {
     setIsSaving(true);
     const currentIds = players.filter(p => p.default_team_id === activeRosterTeam.id).map(p => p.id);
@@ -347,14 +341,15 @@ export default function Setup({ activeTab }: SetupProps) {
     const addedIds = rosterPlayerIds.filter(id => !currentIds.includes(id));
     if (removedIds.length > 0) await supabase.from("players").update({ default_team_id: null }).in("id", removedIds);
     if (addedIds.length > 0) await supabase.from("players").update({ default_team_id: activeRosterTeam.id }).in("id", addedIds);
-    await loadClubData(); setIsSaving(false); setIsRosterModalOpen(false); showToast(`${activeRosterTeam.name} Roster Updated!`);
+    await loadClubData(); setIsSaving(false); setIsRosterModalOpen(false); showToast(`${activeRosterTeam.name} Players Updated!`);
   }
   
   async function openSquadModal(fixture: any) { setActiveSquadFixture(fixture); setPlayerSearch(""); const { data } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); setSquadPlayerIds(data ? data.map(row => row.player_id) : []); setIsSquadModalOpen(true); }
   function toggleSquadPlayer(playerId: string) { setSquadPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); }
+  
   async function saveSquad() { 
     setIsSaving(true); await supabase.from("match_squads").delete().eq("fixture_id", activeSquadFixture.id); 
-    if (squadPlayerIds.length > 0) { const inserts = squadPlayerIds.map(playerId => ({ fixture_id: activeSquadFixture.id, player_id: playerId })); const { error } = await supabase.from("match_squads").insert(inserts); if (error) showToast(error.message, "error"); else showToast("Squad updated for match!"); } 
+    if (squadPlayerIds.length > 0) { const inserts = squadPlayerIds.map(playerId => ({ fixture_id: activeSquadFixture.id, player_id: playerId })); const { error } = await supabase.from("match_squads").insert(inserts); if (error) showToast(error.message, "error"); else showToast("Match Players updated!"); } 
     setIsSaving(false); setIsSquadModalOpen(false); 
   }
   
@@ -369,7 +364,6 @@ export default function Setup({ activeTab }: SetupProps) {
     );
   }
 
-  // The Onboarding Interceptor (Updated for Light Mode)
   if (!clubId && profile?.role !== 'super_admin') {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 animate-in zoom-in-95 fade-in duration-500">
@@ -390,7 +384,7 @@ export default function Setup({ activeTab }: SetupProps) {
               <input 
                 type="text" 
                 placeholder="e.g. Ferny Districts CC" 
-                value={clubName} 
+                value={clubName || ""} 
                 onChange={(e) => setClubName(e.target.value)} 
                 className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
               />
@@ -453,7 +447,7 @@ export default function Setup({ activeTab }: SetupProps) {
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Organization Name</label>
-                <input type="text" value={clubName} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo (Auto-Squares to 300px)</label>
@@ -475,22 +469,22 @@ export default function Setup({ activeTab }: SetupProps) {
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Season Name</label>
-                <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                <input type="text" placeholder="e.g. Winter 2026" value={seasonName || ""} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Start Date</label>
-                  <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
+                  <input type="date" value={seasonStart || ""} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
                 </div>
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global End Date</label>
-                  <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
+                  <input type="date" value={seasonEnd || ""} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <div className="flex-[2]">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Expense Label</label>
-                  <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel || ""} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
                 <div className="flex-1">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Amount</label>
@@ -499,7 +493,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <input 
                       type="number" 
                       placeholder="70" 
-                      value={defaultUmpireFee} 
+                      value={defaultUmpireFee ?? ""} 
                       onChange={(e) => setDefaultUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} 
                       className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                     />
@@ -511,7 +505,7 @@ export default function Setup({ activeTab }: SetupProps) {
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Member Fee ($)</label>
                   <input 
                     type="number" 
-                    value={defaultMemberFee} 
+                    value={defaultMemberFee ?? ""} 
                     onChange={(e) => setDefaultMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
                     className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                   />
@@ -520,7 +514,7 @@ export default function Setup({ activeTab }: SetupProps) {
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Casual Fee ($)</label>
                   <input 
                     type="number" 
-                    value={defaultCasualFee} 
+                    value={defaultCasualFee ?? ""} 
                     onChange={(e) => setDefaultCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
                     className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                   />
@@ -540,11 +534,11 @@ export default function Setup({ activeTab }: SetupProps) {
                 <>
                   <div>
                     <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Access Token</label>
-                    <input type="password" placeholder="EAAA..." value={squareAccessToken} onChange={(e) => setSquareAccessToken(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                    <input type="password" placeholder="EAAA..." value={squareAccessToken || ""} onChange={(e) => setSquareAccessToken(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                   </div>
                   <div>
                     <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Location ID</label>
-                    <input type="text" placeholder="L..." value={squareLocationId} onChange={(e) => setSquareLocationId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                    <input type="text" placeholder="L..." value={squareLocationId || ""} onChange={(e) => setSquareLocationId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                   </div>
                 </>
               )}
@@ -559,7 +553,7 @@ export default function Setup({ activeTab }: SetupProps) {
                 <div className="w-1/3">
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Transfer Type</label>
                   <select 
-                    value={payIdType} 
+                    value={payIdType || ""} 
                     onChange={(e) => setPayIdType(e.target.value as any)} 
                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                   >
@@ -572,34 +566,12 @@ export default function Setup({ activeTab }: SetupProps) {
                   <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Payment Details</label>
                   <input 
                     type="text" 
-                    value={payIdValue} 
+                    value={payIdValue || ""} 
                     onChange={(e) => setPayIdValue(e.target.value)} 
                     placeholder={payIdType === 'mobile' ? 'e.g. 0400 000 000' : payIdType === 'email' ? 'e.g. admin@club.com' : 'e.g. BSB: 123-456 ACC: 12345678'}
                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                   />
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">App Appearance</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Primary Theme Color</label>
-                <div className="flex gap-3">
-                  <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="w-14 h-12 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0 transition-colors" />
-                  <input type="text" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-mono transition-colors" />
-                </div>
-              </div>
-              <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Typography (Google Font)</label>
-                <select value={themeFont} onChange={(e) => setThemeFont(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
-                  <option value="Inter">Inter (Modern Default)</option>
-                  <option value="Roboto">Roboto (Clean)</option>
-                  <option value="Poppins">Poppins (Geometric)</option>
-                  <option value="Montserrat">Montserrat (Bold)</option>
-                </select>
               </div>
             </div>
           </div>
@@ -652,7 +624,7 @@ export default function Setup({ activeTab }: SetupProps) {
               <input 
                 type="email" 
                 placeholder="User's Email Address" 
-                value={inviteEmail} 
+                value={inviteEmail || ""} 
                 onChange={(e) => setInviteEmail(e.target.value)} 
                 className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
               />
@@ -674,7 +646,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
               {inviteRole === 'team_admin' && (
                 <select 
-                  value={inviteTeamId} 
+                  value={inviteTeamId || ""} 
                   onChange={(e) => setInviteTeamId(e.target.value)} 
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 animate-in slide-in-from-top-2 transition-colors"
                 >
@@ -728,7 +700,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 transition-colors">
                       <div className="flex gap-2">
                         <select 
-                          value={editRoleAssigned} 
+                          value={editRoleAssigned || ""} 
                           onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
                           className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                         >
@@ -738,7 +710,7 @@ export default function Setup({ activeTab }: SetupProps) {
                         
                         {editRoleAssigned === 'team_admin' && (
                           <select 
-                            value={editRoleTeamId} 
+                            value={editRoleTeamId || ""} 
                             onChange={(e) => setEditRoleTeamId(e.target.value)} 
                             className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                           >
@@ -777,15 +749,15 @@ export default function Setup({ activeTab }: SetupProps) {
             {editingTeamId && <button onClick={resetTeamForm} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>}
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4">{editingTeamId ? 'Edit Team' : 'Add New Team'}</h2>
             <div className="flex gap-3 mb-3">
-              <input type="text" placeholder="Team Name" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-12 h-[46px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0 transition-colors" />
+              <input type="text" placeholder="Team Name" value={teamName || ""} onChange={(e) => setTeamName(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <input type="color" value={primaryColor || "#10b981"} onChange={(e) => setPrimaryColor(e.target.value)} className="w-12 h-[46px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0 transition-colors" />
             </div>
             <div className="flex gap-3 mb-3">
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Member Fee ($)</label>
                 <input 
                   type="number" 
-                  value={memberFee} 
+                  value={memberFee ?? ""} 
                   onChange={(e) => setMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
                 />
@@ -794,7 +766,7 @@ export default function Setup({ activeTab }: SetupProps) {
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Casual Fee ($)</label>
                 <input 
                   type="number" 
-                  value={casualFee} 
+                  value={casualFee ?? ""} 
                   onChange={(e) => setCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
                 />
@@ -804,11 +776,11 @@ export default function Setup({ activeTab }: SetupProps) {
             <div className="flex gap-3 mb-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override Start Date</label>
-                <input type="date" value={teamSeasonStart} onChange={(e) => setTeamSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
+                <input type="date" value={teamSeasonStart || ""} onChange={(e) => setTeamSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
               </div>
               <div className="flex-1">
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override End Date</label>
-                <input type="date" value={teamSeasonEnd} onChange={(e) => setTeamSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
+                <input type="date" value={teamSeasonEnd || ""} onChange={(e) => setTeamSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
               </div>
             </div>
             <button onClick={saveTeam} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingTeamId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
@@ -836,7 +808,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     </div>
                   </div>
                   <button onClick={() => openRosterModal(t)} className="w-full py-2.5 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-                    <i className="fa-solid fa-clipboard-user"></i> Bulk Assign Roster
+                    <i className="fa-solid fa-clipboard-user"></i> Assign Team Players
                   </button>
                 </div>
               );
@@ -875,11 +847,11 @@ export default function Setup({ activeTab }: SetupProps) {
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">SQUAD: {activeSquadFixture.opponent}</h2>
+              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">MATCH PLAYERS: {activeSquadFixture.opponent}</h2>
               <button onClick={() => setIsSquadModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <input type="text" placeholder="Search player..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <input type="text" placeholder="Search player..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <div>
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3">Core Team</h3>
                 <div className="space-y-2">
@@ -911,7 +883,7 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
             <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
               <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Update Squad'}</button>
+              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Update Match Players'}</button>
             </div>
           </div>
         </div>
@@ -921,11 +893,11 @@ export default function Setup({ activeTab }: SetupProps) {
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">{activeRosterTeam.name} Roster</h2>
+              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">{activeRosterTeam.name} Players</h2>
               <button onClick={() => setIsRosterModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <input type="text" placeholder="Search..." value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <input type="text" placeholder="Search..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <div className="space-y-2">
                 {players.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
                   const isSelected = rosterPlayerIds.includes(p.id);
@@ -940,7 +912,7 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
             <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
               <button onClick={() => setIsRosterModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Save Roster'}</button>
+              <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Save Players'}</button>
             </div>
           </div>
         </div>
