@@ -1,4 +1,4 @@
-// Deploy version 5.6 - Offline Hook + Captain Wizard Bypass
+// Deploy version 5.7 - Ironclad Onboarding Gatekeeper
 "use client";
 
 import { useState, useEffect } from "react";
@@ -39,6 +39,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showClubMenu, setShowClubMenu] = useState(false);
   
+  // Default to true so no one sneaks past while data loads
   const [showOnboarding, setShowOnboarding] = useState(true); 
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
   const [allClubs, setAllClubs] = useState<any[]>([]);
@@ -128,28 +129,38 @@ export default function Home() {
     }
   }, [profile, isAdmin, activeTab]);
 
+  // --- IRONCLAD GATEKEEPER LOGIC ---
   useEffect(() => {
     if (profileLoading) return;
 
+    // 1. Super Admins bypass everything
     if (profile?.role === 'super_admin') {
       setShowOnboarding(false);
       return;
     }
 
+    // 2. If they specifically have the flag set to true, let them in
     if (profile?.onboarding_completed === true) {
       setShowOnboarding(false);
       return;
     }
 
+    // 3. Are they an existing Club Admin or Team Captain who somehow missed the flag?
     const hasAdminOrCaptainRole = roles?.some((r: any) => ['club_admin', 'team_admin'].includes(r.role));
     
     if (hasAdminOrCaptainRole) {
-      setShowOnboarding(false);
+      setShowOnboarding(false); 
       if (profile?.id) {
+        // Silently patch their profile so they don't get checked again
         supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then();
       }
       return;
     }
+
+    // 4. If they made it here, they are either a completely brand new user 
+    //    or a user who hasn't finished the setup flow.
+    setShowOnboarding(true);
+
   }, [profile, profileLoading, roles]);
 
   useEffect(() => {
@@ -158,20 +169,18 @@ export default function Home() {
     return () => window.removeEventListener('trigger-onboarding', triggerWizard);
   }, []);
 
-  // --- THE NEW EVENT LISTENER FOR GAMEDAY EMPTY STATES ---
   useEffect(() => {
     const handleNavigateSetup = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail) {
-        setSetupTab(customEvent.detail); // e.g., 'fixtures' or 'players'
-        handleTabChange('setup'); // Jump to the Setup tab
+        setSetupTab(customEvent.detail);
+        handleTabChange('setup'); 
       }
     };
     
     window.addEventListener('navigate-setup', handleNavigateSetup);
     return () => window.removeEventListener('navigate-setup', handleNavigateSetup);
   }, []);
-  // -------------------------------------------------------
 
   const handleLogout = async () => {
     setIsSidebarOpen(false);
@@ -209,6 +218,8 @@ export default function Home() {
     );
   }
 
+  // --- WIZARD RENDER BLOCK ---
+  // We strictly enforce that if showOnboarding is true, they CANNOT bypass this screen.
   if (showOnboarding) {
     return (
       <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
