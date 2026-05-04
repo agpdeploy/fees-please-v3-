@@ -22,7 +22,8 @@ export default function Ledger() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Player Accounts & Feed States
-  const [showAllAccounts, setShowAllAccounts] = useState(false);
+  const [viewMode, setViewMode] = useState<'debts' | 'all'>('debts');
+  const [isListExpanded, setIsListExpanded] = useState(false);
   const [accountSearch, setAccountSearch] = useState("");
   const [showAllAudit, setShowAllAudit] = useState(false); 
   const [searchTerm, setSearchTerm] = useState(""); 
@@ -172,14 +173,13 @@ export default function Ledger() {
   useEffect(() => { fetchLedger(); }, [activeTeamId]);
 
   // --- DERIVED GROUPED FEED ---
-  // Condenses transactions by Day + Player so they appear on a single clean line
   const groupedFeed = useMemo(() => {
     const map = new Map();
     const groups: any[] = [];
     
     transactions.forEach(tx => {
       const dateObj = new Date(tx.created_at);
-      const dateKey = dateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+      const dateKey = dateObj.toLocaleDateString('en-GB'); 
       const isPlayer = !!tx.player_id;
       const groupKey = isPlayer ? `${dateKey}_${tx.player_id}` : `${dateKey}_expense_${tx.id}`;
 
@@ -241,7 +241,7 @@ export default function Ledger() {
       setManualAmount("");
       setManualNote("");
       setManualFixtureId("");
-      setVisibleFeedCount(10); // Reset pagination on new save
+      setVisibleFeedCount(10); 
       
       if (isGlobal) {
         setIsGlobalManualModalOpen(false);
@@ -256,15 +256,17 @@ export default function Ledger() {
 
   // --- UI FILTER LOGIC ---
   const filteredAccounts = playerBalances.filter(p => {
-    if (!showAllAccounts) return p.owed > 0.01;
+    if (viewMode === 'debts' && p.owed <= 0.01) return false;
     if (accountSearch) {
-      return p.full_name.toLowerCase().includes(accountSearch.toLowerCase()) || 
-             p.name.toLowerCase().includes(accountSearch.toLowerCase());
+      const term = accountSearch.toLowerCase();
+      return p.full_name.toLowerCase().includes(term) || 
+             p.name.toLowerCase().includes(term);
     }
     return true;
   });
 
-  const displayedAccounts = (!showAllAccounts) ? filteredAccounts.slice(0, 3) : filteredAccounts;
+  const displayedAccounts = (!isListExpanded && !accountSearch) ? filteredAccounts.slice(0, 3) : filteredAccounts;
+  const hiddenAccountsCount = filteredAccounts.length - displayedAccounts.length;
 
   const filteredFeed = groupedFeed.filter(g => 
     g.player_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -275,16 +277,41 @@ export default function Ledger() {
   today.setHours(0, 0, 0, 0);
 
   const pastGames = seasonAudit
-    .filter(a => new Date(a.match_date + 'T00:00:00').getTime() < today.getTime())
+    .filter(a => ['completed', 'forfeited', 'abandoned'].includes(a.status) || new Date(a.match_date + 'T00:00:00').getTime() < today.getTime())
     .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
   const futureGames = seasonAudit
-    .filter(a => new Date(a.match_date + 'T00:00:00').getTime() >= today.getTime())
+    .filter(a => !['completed', 'forfeited', 'abandoned'].includes(a.status) && new Date(a.match_date + 'T00:00:00').getTime() >= today.getTime())
     .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
 
   const nextGame = futureGames.length > 0 ? futureGames[0] : null;
   const relevantAudit = nextGame ? [nextGame, ...pastGames] : pastGames;
   const displayedAudit = showAllAudit ? relevantAudit : relevantAudit.slice(0, 4);
+
+  // --- DERIVED MODAL FIXTURE FEED ---
+  const fixtureTx = selectedFixture ? transactions.filter(tx => tx.fixture_id === selectedFixture.id) : [];
+  const fixturePlayerMap = new Map();
+  const fixtureOtherTx: any[] = [];
+  
+  fixtureTx.forEach(tx => {
+    if (tx.player_id) {
+      if (!fixturePlayerMap.has(tx.player_id)) {
+        fixturePlayerMap.set(tx.player_id, {
+          id: tx.player_id,
+          name: tx.players ? (tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim()) : 'Unknown Player',
+          paid: 0,
+          fee: 0
+        });
+      }
+      const p = fixturePlayerMap.get(tx.player_id);
+      if (tx.transaction_type === 'payment') p.paid += Number(tx.amount);
+      if (tx.transaction_type === 'fee') p.fee += Number(tx.amount);
+    } else {
+      fixtureOtherTx.push(tx);
+    }
+  });
+
+  const groupedFixturePlayers = Array.from(fixturePlayerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
   if (!activeClubId) return <div className="p-4 text-center text-zinc-500 uppercase tracking-widest text-xs font-black">Loading Ledger...</div>;
 
@@ -310,23 +337,6 @@ export default function Ledger() {
 
       {activeTeamId && !isLoading ? (
         <>
-          <button
-            onClick={() => {
-              setIsGlobalManualModalOpen(true);
-              setManualType('payment');
-              setManualAmount("");
-              setManualNote("");
-              setManualFixtureId("");
-              setGlobalSelectedPlayerId("");
-            }}
-            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 p-4 rounded-xl shadow-sm text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group active:scale-95"
-          >
-            <div className="w-6 h-6 rounded-full flex items-center justify-center text-white bg-emerald-600 dark:bg-emerald-500">
-              <i className="fa-solid fa-plus text-xs"></i>
-            </div>
-            <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">Log Manual Transaction</span>
-          </button>
-
           {/* --- SEASON AUDIT --- */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative overflow-hidden transition-colors">
             <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-emerald-500"></div>
@@ -391,14 +401,18 @@ export default function Ledger() {
                 Player Accounts
               </h2>
               <button 
-                onClick={() => { setShowAllAccounts(!showAllAccounts); setAccountSearch(""); }} 
+                onClick={() => { 
+                  setViewMode(prev => prev === 'debts' ? 'all' : 'debts'); 
+                  setIsListExpanded(false);
+                  setAccountSearch(""); 
+                }} 
                 className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
               >
-                {showAllAccounts ? 'Show Debts Only' : 'Show All Transactions'}
+                {viewMode === 'debts' ? 'Show All Accounts' : 'Show Debts Only'}
               </button>
             </div>
 
-            {showAllAccounts && (
+            {viewMode === 'all' && (
               <div className="mb-4 animate-in slide-in-from-top-2 fade-in">
                 <div className="relative w-full">
                   <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
@@ -416,7 +430,7 @@ export default function Ledger() {
             <div className="space-y-2">
               {displayedAccounts.length === 0 ? (
                 <p className="text-xs text-zinc-500 font-bold uppercase text-center py-6 tracking-widest">
-                  {showAllAccounts ? "No players found." : "All clear! No debts."}
+                  {viewMode === 'all' ? "No players found." : "All clear! No debts."}
                 </p>
               ) : (
                 displayedAccounts.map((player) => (
@@ -444,20 +458,35 @@ export default function Ledger() {
                 ))
               )}
               
-              {!showAllAccounts && filteredAccounts.length > 3 && (
+              {hiddenAccountsCount > 0 && (
                 <button 
-                  onClick={() => setShowAllAccounts(true)}
+                  onClick={() => setIsListExpanded(true)}
                   className="w-full py-3 mt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
-                  Show {filteredAccounts.length - 3} More Debts
+                  Show {hiddenAccountsCount} More {viewMode === 'debts' ? 'Debts' : 'Accounts'}
                 </button>
               )}
             </div>
           </div>
 
           {/* --- RECENT TRANSACTIONS (PAGINATED & CONDENSED) --- */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-end px-1">
+          <div className="space-y-4">
+            <button
+              onClick={() => {
+                setIsGlobalManualModalOpen(true);
+                setManualType('payment');
+                setManualAmount("");
+                setManualNote("");
+                setManualFixtureId("");
+                setGlobalSelectedPlayerId("");
+              }}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
+            >
+              <i className="fa-solid fa-plus text-sm"></i>
+              Log Manual Transaction
+            </button>
+
+            <div className="flex justify-between items-end px-1 pt-2 border-t border-zinc-200 dark:border-zinc-800">
               <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 italic">Recent Activity</h2>
               <div className="relative w-1/2">
                 <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-[10px]"></i>
@@ -572,11 +601,11 @@ export default function Ledger() {
         </div>
       )}
 
-      {/* --- FIXTURE AUDIT MODAL --- */}
+      {/* --- FIXTURE AUDIT MODAL (UPDATED UX) --- */}
       {selectedFixture && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
-            <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80dvh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
+            <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors bg-zinc-50 dark:bg-zinc-900/50 shrink-0">
               <div>
                 <h2 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">VS {selectedFixture.opponent}</h2>
                 <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1 flex gap-3">
@@ -587,16 +616,42 @@ export default function Ledger() {
               </div>
               <button onClick={() => setSelectedFixture(null)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-2 pb-24">
-              {transactions.filter(tx => tx.fixture_id === selectedFixture.id).map(tx => {
-                const displayName = tx.players ? (tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim()) : tx.description;
+            <div className="p-5 overflow-y-auto flex-1 space-y-2">
+              {groupedFixturePlayers.map(p => {
+                const net = p.paid - p.fee;
                 return (
-                  <div key={tx.id} className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl flex justify-between items-center transition-colors">
-                     <span className="text-sm font-bold text-zinc-900 dark:text-white">{displayName}</span>
-                     <span className={`text-sm font-black ${tx.transaction_type === 'payment' ? 'text-emerald-500' : 'text-red-500'}`}>{tx.transaction_type === 'payment' ? '+' : '-'}${tx.amount}</span>
+                  <div key={p.id} className="bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl flex justify-between items-center shadow-sm transition-colors">
+                     <div>
+                        <div className="text-sm font-bold text-zinc-900 dark:text-white">{p.name}</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest mt-1 flex gap-2">
+                           <span className="text-emerald-600 dark:text-emerald-500">Paid: ${p.paid}</span>
+                           <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                           <span className="text-red-500/80">Fee: ${p.fee}</span>
+                        </div>
+                     </div>
+                     <span className={`text-sm font-black ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                       {net > 0 ? '+' : ''}${net}
+                     </span>
                   </div>
                 );
               })}
+              
+              {/* Render any non-player expenses tied to the fixture (e.g. Umpire) */}
+              {fixtureOtherTx.map(tx => (
+                <div key={tx.id} className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl flex justify-between items-center transition-colors mt-4">
+                   <div>
+                      <div className="text-sm font-bold text-zinc-900 dark:text-white">{tx.description || 'Match Expense'}</div>
+                      <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500">Other / Umpire</div>
+                   </div>
+                   <span className="text-sm font-black text-red-500">-${tx.amount}</span>
+                </div>
+              ))}
+
+              {groupedFixturePlayers.length === 0 && fixtureOtherTx.length === 0 && (
+                <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-widest">
+                  No activity recorded
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -605,8 +660,8 @@ export default function Ledger() {
       {/* --- INDIVIDUAL PLAYER HISTORY MODAL --- */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
-            <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80dvh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
+            <div className="p-5 flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 transition-colors shrink-0">
               <div>
                 <h2 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">{selectedPlayer.name}</h2>
                 <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Transaction History</div>
@@ -615,7 +670,7 @@ export default function Ledger() {
             </div>
             
             {isManualModalOpen ? (
-              <form onSubmit={(e) => handleManualSave(e, selectedPlayer.id, false)} className="p-5 space-y-4 animate-in slide-in-from-right-4 pb-24">
+              <form onSubmit={(e) => handleManualSave(e, selectedPlayer.id, false)} className="p-5 space-y-4 animate-in slide-in-from-right-4 overflow-y-auto flex-1">
                 <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                   <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Payment (+)</button>
                   <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
@@ -637,9 +692,9 @@ export default function Ledger() {
                 <button type="button" onClick={() => setIsManualModalOpen(false)} className="w-full text-[10px] text-zinc-500 hover:text-zinc-900 dark:hover:text-white uppercase font-black py-2 tracking-widest transition-colors">Back to History</button>
               </form>
             ) : (
-              <div className="p-5 overflow-y-auto flex-1 space-y-3 pb-24">
-                <button onClick={() => setIsManualModalOpen(true)} className="w-full py-4 border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 transition-colors flex items-center justify-center gap-2 mb-2">
-                  <i className="fa-solid fa-plus"></i> Add Manual Transaction
+              <div className="p-5 overflow-y-auto flex-1 space-y-3">
+                <button onClick={() => setIsManualModalOpen(true)} className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mb-2">
+                  <i className="fa-solid fa-plus text-sm"></i> Add Manual Transaction
                 </button>
                 
                 {groupedFeed.filter(g => g.player_id === selectedPlayer.id).map(group => {

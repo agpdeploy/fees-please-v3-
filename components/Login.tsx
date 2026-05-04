@@ -13,8 +13,12 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // UPDATED: Added /auth/callback so Next.js can process the session
         redirectTo: `${window.location.origin}/auth/callback`,
+        // FIX: This query parameter forces Google to prompt the user to select an account
+        // instead of automatically logging them in with a cached session.
+        queryParams: {
+          prompt: 'select_account'
+        }
       },
     });
     if (error) setError(error.message);
@@ -28,7 +32,6 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { 
-        // UPDATED: Added /auth/callback for Magic Links too
         emailRedirectTo: `${window.location.origin}/auth/callback` 
       },
     });

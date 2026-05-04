@@ -1,4 +1,4 @@
-// Deploy version 5.7 - Ironclad Onboarding Gatekeeper
+// Deploy version 5.9.3 - Router Safe Hydration & Deadlock Fix
 "use client";
 
 import { useState, useEffect } from "react";
@@ -39,10 +39,21 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showClubMenu, setShowClubMenu] = useState(false);
   
-  // Default to true so no one sneaks past while data loads
   const [showOnboarding, setShowOnboarding] = useState(true); 
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
   const [allClubs, setAllClubs] = useState<any[]>([]);
+
+  // --- VERBOSE DIAGNOSTIC LOGGING ---
+  useEffect(() => {
+    console.log("🕵️ GATEKEEPER STATE UPDATE:", {
+      isCheckingAuth,
+      session: !!session,
+      profileLoading,
+      hasProfile: !!profile,
+      rolesCount: roles?.length || 0,
+      showOnboarding
+    });
+  }, [isCheckingAuth, session, profileLoading, profile, roles, showOnboarding]);
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
@@ -67,42 +78,70 @@ export default function Home() {
     setIsDaiveOpen(false); 
   };
 
+  // --- THE CIRCUIT BREAKER AUTH CHECK (ROUTER SAFE) ---
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsCheckingAuth(false);
-    }, 4000);
+    let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsCheckingAuth(false);
-      clearTimeout(timer);
-    }).catch(err => {
-      console.error("Auth initialization error:", err);
-      setIsCheckingAuth(false);
-      clearTimeout(timer);
-    });
+    async function initAuth() {
+      console.log("🚀 AUTH: Starting initialization...");
+      
+      const timeoutId = setTimeout(() => {
+        if (isMounted) {
+          console.error("🚨 AUTH: Deadlock detected! Supabase took too long to respond. Forcing to Login.");
+          setIsCheckingAuth(false);
+        }
+      }, 5000);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        clearTimeout(timeoutId); 
+        
+        if (isMounted) {
+          setSession(session);
+          setIsCheckingAuth(false);
+          console.log("🔓 AUTH: Session Resolved:", !!session);
+          
+          // Use a slight delay before cleaning the URL to ensure the router has initialized
+          if (session && typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+             setTimeout(() => {
+               if (isMounted) {
+                 window.history.replaceState(null, '', window.location.pathname);
+               }
+             }, 500);
+          }
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("❌ AUTH: Init Error:", err);
+        if (isMounted) setIsCheckingAuth(false);
+      }
+    }
+
+    // Delay the initial fetch slightly to allow Next.js hydration to complete
+    const startDelay = setTimeout(() => {
+      initAuth();
+    }, 100);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setIsCheckingAuth(false); 
-      clearTimeout(timer);
-
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-          window.history.replaceState(null, '', window.location.pathname);
-        }
+      console.log("⚡ AUTH: Event Fired:", event);
+      if (isMounted) {
+        setSession(session);
+        setIsCheckingAuth(false);
       }
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(startDelay);
       subscription.unsubscribe();
-      clearTimeout(timer);
     };
   }, []);
 
   useEffect(() => {
-    if (!activeClubId && profile?.role !== 'super_admin') {
-      if (profile?.club_id) {
+    if (!activeClubId) {
+      if (profile?.role === 'super_admin') {
+        if (allClubs.length > 0) setActiveClubId(allClubs[0].id);
+      } else if (profile?.club_id) {
         setActiveClubId(profile.club_id);
       } else if (roles && roles.length > 0) {
         setActiveClubId(roles[0].club_id);
@@ -121,7 +160,7 @@ export default function Home() {
       };
       fetchClubMeta();
     }
-  }, [profile, roles, activeClubId, setActiveClubId]);
+  }, [profile, roles, activeClubId, setActiveClubId, allClubs]);
 
   useEffect(() => {
     if (profile && !isAdmin && activeTab === 'setup') {
@@ -133,32 +172,26 @@ export default function Home() {
   useEffect(() => {
     if (profileLoading) return;
 
-    // 1. Super Admins bypass everything
     if (profile?.role === 'super_admin') {
       setShowOnboarding(false);
       return;
     }
 
-    // 2. If they specifically have the flag set to true, let them in
     if (profile?.onboarding_completed === true) {
       setShowOnboarding(false);
       return;
     }
 
-    // 3. Are they an existing Club Admin or Team Captain who somehow missed the flag?
     const hasAdminOrCaptainRole = roles?.some((r: any) => ['club_admin', 'team_admin'].includes(r.role));
     
     if (hasAdminOrCaptainRole) {
       setShowOnboarding(false); 
       if (profile?.id) {
-        // Silently patch their profile so they don't get checked again
         supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then();
       }
       return;
     }
 
-    // 4. If they made it here, they are either a completely brand new user 
-    //    or a user who hasn't finished the setup flow.
     setShowOnboarding(true);
 
   }, [profile, profileLoading, roles]);
@@ -186,15 +219,15 @@ export default function Home() {
     setIsSidebarOpen(false);
     setIsCheckingAuth(true); 
     try {
-      await supabase.auth.signOut();
       if (typeof window !== 'undefined') {
         localStorage.clear();
         sessionStorage.clear();
       }
+      await supabase.auth.signOut();
     } catch (error) {
       console.error("Logout Error:", error);
     } finally {
-      window.location.href = '/'; 
+      window.location.replace('/'); 
     }
   };
 
@@ -213,13 +246,12 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
         <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
-        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Loading Workspace...</div>
+        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Loading Organization...</div>
       </div>
     );
   }
 
   // --- WIZARD RENDER BLOCK ---
-  // We strictly enforce that if showOnboarding is true, they CANNOT bypass this screen.
   if (showOnboarding) {
     return (
       <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
@@ -235,8 +267,8 @@ export default function Home() {
   }
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
-                      currentClubRole === 'club_admin' ? 'Club Admin' : 
-                      currentClubRole === 'team_admin' ? 'Team Captain' : 'Player';
+                      currentClubRole === 'club_admin' ? 'Club Manager' : 
+                      currentClubRole === 'team_admin' ? 'Team Manager' : 'Player';
 
   const userMeta = session?.user?.user_metadata;
   const avatarUrl = userMeta?.avatar_url;
@@ -270,7 +302,7 @@ export default function Home() {
           <div>
             <h1 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Fees Please</h1>
             <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-0.5">
-              <span className="truncate max-w-[160px]">{clubMeta.name || 'Select Workspace'}</span>
+              <span className="truncate max-w-[160px]">{clubMeta.name || 'Select Club'}</span>
               {uniqueClubs.length > 1 && <i className="fa-solid fa-caret-down text-zinc-400"></i>}
             </div>
           </div>
@@ -286,7 +318,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowClubMenu(false)}></div>
           <div className="w-full max-w-[320px] bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl relative z-10 animate-in slide-in-from-top-4 fade-in duration-200 overflow-hidden">
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50">
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Switch Workspace</h3>
+               <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Switch Club</h3>
                <button onClick={() => setShowClubMenu(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>
             </div>
             <div className="p-2 max-h-[60vh] overflow-y-auto">
@@ -375,7 +407,7 @@ export default function Home() {
             <div className="flex-1 py-4 space-y-1">
               {isAdmin && (
                 <div className="mb-2">
-                  <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Administration</div>
+                  <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Management</div>
                   <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                     <i className="fa-solid fa-sliders w-5 text-center"></i> Configuration
                   </button>

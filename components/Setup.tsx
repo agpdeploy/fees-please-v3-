@@ -49,13 +49,11 @@ export default function Setup({ activeTab }: SetupProps) {
   const [payIdType, setPayIdType] = useState<'mobile' | 'email' | 'bank_account'>('mobile');
   const [payIdValue, setPayIdValue] = useState("");
 
+  // TEAM STATE
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [memberFee, setMemberFee] = useState<number | "">(10);
   const [casualFee, setCasualFee] = useState<number | "">(25);
-  const [teamSeasonStart, setTeamSeasonStart] = useState("");
-  const [teamSeasonEnd, setTeamSeasonEnd] = useState("");
-  // Keper the team color picker as teams still need an identifier dot
-  const [primaryColor, setPrimaryColor] = useState("#10b981");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
   const [isSquadModalOpen, setIsSquadModalOpen] = useState(false);
@@ -182,7 +180,7 @@ export default function Setup({ activeTab }: SetupProps) {
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !clubId || clubId === 'new') {
-      return showToast("Please save the organization name first to generate an ID.", "error");
+      return showToast("Please save the club name first to generate an ID.", "error");
     }
     
     if (file.size > 10 * 1024 * 1024) return showToast("File too large. Maximum size is 10MB.", "error");
@@ -242,7 +240,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
   async function handleInviteUser() {
     if (!inviteEmail) return showToast("Please enter an email address", "error");
-    if (inviteRole === 'team_admin' && !inviteTeamId) return showToast("Please select a team for the captain", "error");
+    if (inviteRole === 'team_admin' && !inviteTeamId) return showToast("Please select a team for the manager", "error");
     setIsSaving(true); showToast("Sending invite...");
     try {
       const response = await fetch('/api/invite', {
@@ -298,20 +296,15 @@ export default function Setup({ activeTab }: SetupProps) {
     setEditingTeamId(null); 
     setMemberFee(defaultMemberFee || 10); 
     setCasualFee(defaultCasualFee || 25); 
-    setPrimaryColor("#10b981"); 
-    setTeamSeasonStart(seasonStart); 
-    setTeamSeasonEnd(seasonEnd); 
+    setIsTeamModalOpen(false);
   }
 
   function startEditingTeam(t: any) { 
     setTeamName(t.name); 
     setMemberFee(t.member_fee !== undefined ? t.member_fee : 10); 
     setCasualFee(t.casual_fee !== undefined ? t.casual_fee : 25); 
-    setPrimaryColor(t.primary_color || "#10b981"); 
-    setTeamSeasonStart(t.season_start || ""); 
-    setTeamSeasonEnd(t.season_end || ""); 
     setEditingTeamId(t.id); 
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+    setIsTeamModalOpen(true);
   }
   
   async function saveTeam() {
@@ -320,28 +313,53 @@ export default function Setup({ activeTab }: SetupProps) {
       name: teamName, 
       member_fee: memberFee === "" ? 0 : memberFee, 
       casual_fee: casualFee === "" ? 0 : casualFee, 
-      primary_color: primaryColor, 
-      club_id: clubId, 
-      season_start: teamSeasonStart || null, 
-      season_end: teamSeasonEnd || null
+      club_id: clubId
     };
+    
+    setIsSaving(true);
     let error;
-    if (editingTeamId) { const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); error = res.error; } 
-    else { const res = await supabase.from("teams").insert([payload]); error = res.error; }
-    if (error) showToast(error.message, "error"); else { showToast("Team saved successfully!"); resetTeamForm(); loadClubData(); }
+    if (editingTeamId) { 
+      const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); 
+      error = res.error; 
+    } else { 
+      const res = await supabase.from("teams").insert([payload]); 
+      error = res.error; 
+    }
+    
+    setIsSaving(false);
+    if (error) {
+      showToast(error.message, "error"); 
+    } else { 
+      showToast("Team saved successfully!"); 
+      resetTeamForm(); 
+      loadClubData(); 
+    }
   }
 
-  async function openRosterModal(team: any) { setActiveRosterTeam(team); setPlayerSearch(""); setRosterPlayerIds(players.filter(p => p.default_team_id === team.id).map(p => p.id)); setIsRosterModalOpen(true); }
-  function toggleRosterPlayer(playerId: string) { setRosterPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); }
+  async function openRosterModal(team: any) { 
+    setActiveRosterTeam(team); 
+    setPlayerSearch(""); 
+    setRosterPlayerIds(players.filter(p => p.default_team_id === team.id).map(p => p.id)); 
+    setIsRosterModalOpen(true); 
+  }
+  
+  function toggleRosterPlayer(playerId: string) { 
+    setRosterPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); 
+  }
   
   async function saveTeamRoster() {
     setIsSaving(true);
     const currentIds = players.filter(p => p.default_team_id === activeRosterTeam.id).map(p => p.id);
     const removedIds = currentIds.filter(id => !rosterPlayerIds.includes(id));
     const addedIds = rosterPlayerIds.filter(id => !currentIds.includes(id));
+    
     if (removedIds.length > 0) await supabase.from("players").update({ default_team_id: null }).in("id", removedIds);
     if (addedIds.length > 0) await supabase.from("players").update({ default_team_id: activeRosterTeam.id }).in("id", addedIds);
-    await loadClubData(); setIsSaving(false); setIsRosterModalOpen(false); showToast(`${activeRosterTeam.name} Players Updated!`);
+    
+    await loadClubData(); 
+    setIsSaving(false); 
+    setIsRosterModalOpen(false); 
+    showToast(`${activeRosterTeam.name} Roster Updated!`);
   }
   
   async function openSquadModal(fixture: any) { setActiveSquadFixture(fixture); setPlayerSearch(""); const { data } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); setSquadPlayerIds(data ? data.map(row => row.player_id) : []); setIsSquadModalOpen(true); }
@@ -372,12 +390,12 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
         <h1 className="text-2xl font-black italic uppercase tracking-tighter text-zinc-900 dark:text-white mb-2">Welcome!</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm text-center mb-8 max-w-xs">
-          It looks like you don't belong to an organization yet. What would you like to do?
+          It looks like you don't belong to a club yet. What would you like to do?
         </p>
         
         <div className="w-full max-w-sm space-y-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
-            <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1"><i className="fa-solid fa-plus text-emerald-500 mr-2"></i> Register New Organization</h3>
+            <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1"><i className="fa-solid fa-plus text-emerald-500 mr-2"></i> Register New Club</h3>
             <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-4 leading-relaxed">Create a brand new workspace for your club or team.</p>
             
             <div className="space-y-3">
@@ -393,19 +411,25 @@ export default function Setup({ activeTab }: SetupProps) {
                 disabled={isSaving || !clubName} 
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-sm disabled:opacity-50"
               >
-                {isSaving ? "Creating..." : "Create Organization"}
+                {isSaving ? "Creating..." : "Create Club"}
               </button>
             </div>
           </div>
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm text-center">
             <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1">Looking for your team?</h3>
-            <p className="text-zinc-500 text-xs mb-0">Ask your Club Admin to send an invite to <strong className="text-zinc-800 dark:text-zinc-300">{profile?.email}</strong></p>
+            <p className="text-zinc-500 text-xs mb-0">Ask your Club Manager to send an invite to <strong className="text-zinc-800 dark:text-zinc-300">{profile?.email}</strong></p>
           </div>
         </div>
       </div>
     );
   }
+
+  // Derived filtered state for the Roster Modal
+  const filteredRosterPlayers = players.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase()));
+  const currentTeamPlayers = filteredRosterPlayers.filter(p => p.default_team_id === activeRosterTeam?.id);
+  const unassignedPlayers = filteredRosterPlayers.filter(p => p.default_team_id === null);
+  const otherTeamPlayers = filteredRosterPlayers.filter(p => p.default_team_id !== activeRosterTeam?.id && p.default_team_id !== null);
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
@@ -423,7 +447,7 @@ export default function Setup({ activeTab }: SetupProps) {
             <i className="fa-solid fa-crown"></i>
           </div>
           <div className="flex-1">
-            <label className="text-[9px] text-zinc-500 font-black uppercase tracking-widest block mb-1">God Mode: Active Organization</label>
+            <label className="text-[9px] text-zinc-500 font-black uppercase tracking-widest block mb-1">God Mode: Active Club</label>
             <select 
               value={clubId || ''} 
               onChange={(e) => {
@@ -433,7 +457,7 @@ export default function Setup({ activeTab }: SetupProps) {
               className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors"
             >
               {allClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value="new">+ Create New Organization...</option>
+              <option value="new">+ Create New Club...</option>
             </select>
           </div>
         </div>
@@ -446,7 +470,7 @@ export default function Setup({ activeTab }: SetupProps) {
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Organization Name</label>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Name</label>
                 <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               <div>
@@ -516,7 +540,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     type="number" 
                     value={defaultCasualFee ?? ""} 
                     onChange={(e) => setDefaultCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
                   />
                 </div>
               </div>
@@ -604,14 +628,14 @@ export default function Setup({ activeTab }: SetupProps) {
           </div>
 
           <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md disabled:opacity-50">
-            {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Organization")}
+            {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Club")}
           </button>
         </div>
       )}
 
       {(!clubId || clubId === 'new') && activeTab !== 'config' && (
         <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mt-6 shadow-sm transition-colors">
-          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your organization configuration first.</p>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your club configuration first.</p>
         </div>
       )}
 
@@ -634,13 +658,13 @@ export default function Setup({ activeTab }: SetupProps) {
                   onClick={() => setInviteRole('club_admin')} 
                   className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-all ${inviteRole === 'club_admin' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                 >
-                  Club Admin
+                  Club Manager
                 </button>
                 <button 
                   onClick={() => setInviteRole('team_admin')} 
                   className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-all ${inviteRole === 'team_admin' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                 >
-                  Team Captain
+                  Team Manager
                 </button>
               </div>
 
@@ -678,7 +702,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <div>
                       <div className="font-bold text-zinc-900 dark:text-white text-sm">{user.email}</div>
                       <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${user.role === 'club_admin' ? 'text-blue-500 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                        {user.role === 'club_admin' ? 'Club Admin' : 'Team Captain'}
+                        {user.role === 'club_admin' ? 'Club Manager' : 'Team Manager'}
                         {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
                       </div>
                     </div>
@@ -704,8 +728,8 @@ export default function Setup({ activeTab }: SetupProps) {
                           onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
                           className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                         >
-                          <option value="club_admin">Club Admin</option>
-                          <option value="team_admin">Team Captain</option>
+                          <option value="club_admin">Club Manager</option>
+                          <option value="team_admin">Team Manager</option>
                         </select>
                         
                         {editRoleAssigned === 'team_admin' && (
@@ -742,77 +766,135 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
       )}
 
-      {/* --- TEAMS TAB (CLEANED UP) --- */}
+      {/* --- TEAMS TAB (REVAMPED UX) --- */}
       {clubId && clubId !== 'new' && activeTab === 'teams' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            {editingTeamId && <button onClick={resetTeamForm} className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>}
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4">{editingTeamId ? 'Edit Team' : 'Add New Team'}</h2>
-            <div className="flex gap-3 mb-3">
-              <input type="text" placeholder="Team Name" value={teamName || ""} onChange={(e) => setTeamName(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              <input type="color" value={primaryColor || "#10b981"} onChange={(e) => setPrimaryColor(e.target.value)} className="w-12 h-[46px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-1 py-1 cursor-pointer shrink-0 transition-colors" />
-            </div>
-            <div className="flex gap-3 mb-3">
-              <div className="flex-1">
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Member Fee ($)</label>
-                <input 
-                  type="number" 
-                  value={memberFee ?? ""} 
-                  onChange={(e) => setMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Casual Fee ($)</label>
-                <input 
-                  type="number" 
-                  value={casualFee ?? ""} 
-                  onChange={(e) => setCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
-                />
-              </div>
-            </div>
+          
+          <button
+            onClick={() => {
+              resetTeamForm();
+              setIsTeamModalOpen(true);
+            }}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <i className="fa-solid fa-plus text-sm"></i>
+            Add New Team
+          </button>
 
-            <div className="flex gap-3 mb-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
-              <div className="flex-1">
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override Start Date</label>
-                <input type="date" value={teamSeasonStart || ""} onChange={(e) => setTeamSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
-              </div>
-              <div className="flex-1">
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Override End Date</label>
-                <input type="date" value={teamSeasonEnd || ""} onChange={(e) => setTeamSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
-              </div>
-            </div>
-            <button onClick={saveTeam} className={`w-full font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all text-white shadow-md ${editingTeamId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-              {editingTeamId ? 'Update Team' : 'Create Team'}
-            </button>
-          </div>
           <div className="space-y-3">
-            {teams.map(t => {
-              const assignedCaptain = clubUsers.find(u => u.team_id === t.id && u.role === 'team_admin');
-              return (
-                <div key={t.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: t.primary_color || '#10b981' }}></div>
-                      <div>
-                        <div className="font-black text-zinc-900 dark:text-white text-sm uppercase tracking-wide">{t.name}</div>
-                        <div className="text-[10px] text-zinc-500 font-bold mt-0.5">
-                          CAPTAIN: {assignedCaptain ? assignedCaptain.email : 'Unassigned'} • M: ${t.member_fee} • C: ${t.casual_fee}
+            {teams.length === 0 ? (
+              <div className="text-center p-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
+                <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No teams created yet.</p>
+              </div>
+            ) : (
+              teams.map(t => {
+                const assignedManager = clubUsers.find(u => u.team_id === t.id && u.role === 'team_admin');
+                return (
+                  <div key={t.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm transition-colors group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <div className="font-black text-zinc-900 dark:text-white text-lg uppercase tracking-wide group-hover:text-emerald-500 transition-colors">
+                          {t.name}
+                        </div>
+                        <div className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest flex items-center gap-2">
+                          <span className="text-emerald-600 dark:text-emerald-500">M: ${t.member_fee}</span>
+                          <span>•</span>
+                          <span className="text-zinc-400">C: ${t.casual_fee}</span>
+                          {clubRecord?.season_name && (
+                            <>
+                              <span>•</span>
+                              <span className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-400">
+                                {clubRecord.season_name}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div className="text-[9px] text-zinc-400 uppercase tracking-widest mt-2">
+                          MANAGER: <span className="font-bold text-zinc-600 dark:text-zinc-300">{assignedManager ? assignedManager.email : 'Unassigned'}</span>
                         </div>
                       </div>
+                      
+                      <div className="flex gap-2 shrink-0 ml-4">
+                        <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center">
+                          <i className="fa-solid fa-pen text-xs"></i>
+                        </button>
+                        <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
+                          <i className="fa-solid fa-trash text-xs"></i>
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-                      <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
-                    </div>
+                    
+                    <button onClick={() => openRosterModal(t)} className="w-full py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
+                      <i className="fa-solid fa-clipboard-user"></i> Assign Team Players
+                    </button>
                   </div>
-                  <button onClick={() => openRosterModal(t)} className="w-full py-2.5 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-                    <i className="fa-solid fa-clipboard-user"></i> Assign Team Players
-                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD / EDIT TEAM MODAL --- */}
+      {isTeamModalOpen && (
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 transition-colors">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">
+                {editingTeamId ? 'Edit Team' : 'Add New Team'}
+              </h2>
+              <button onClick={() => { setIsTeamModalOpen(false); resetTeamForm(); }} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                <i className="fa-solid fa-xmark text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4 pb-8">
+              <div>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Team Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Bin Chickens" 
+                  value={teamName || ""} 
+                  onChange={(e) => setTeamName(e.target.value)} 
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Member Fee ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                    <input 
+                      type="number" 
+                      value={memberFee ?? ""} 
+                      onChange={(e) => setMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                  </div>
                 </div>
-              );
-            })}
+                <div className="flex-1">
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Casual Fee ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                    <input 
+                      type="number" 
+                      value={casualFee ?? ""} 
+                      onChange={(e) => setCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={saveTeam} 
+                disabled={isSaving || !teamName}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md disabled:opacity-50 mt-2"
+              >
+                {isSaving ? "Saving..." : (editingTeamId ? 'Update Team' : 'Create Team')}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -889,27 +971,83 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
       )}
 
+      {/* --- NEW ROSTER MODAL (MATCHES SQUAD UX) --- */}
       {isRosterModalOpen && activeRosterTeam && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">{activeRosterTeam.name} Players</h2>
-              <button onClick={() => setIsRosterModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">{activeRosterTeam.name} Roster</h2>
+              <button onClick={() => setIsRosterModalOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <input type="text" placeholder="Search..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              <div className="space-y-2">
-                {players.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
-                  const isSelected = rosterPlayerIds.includes(p.id);
-                  return (
-                    <div key={p.id} onClick={() => toggleRosterPlayer(p.id)} className="flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800/50 p-4 rounded-xl cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                      <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name}</span>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors ${isSelected ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
+            
+            <div className="p-5 overflow-y-auto flex-1 space-y-6 pb-24">
+              <input 
+                type="text" 
+                placeholder="Search across club..." 
+                value={playerSearch || ""} 
+                onChange={(e) => setPlayerSearch(e.target.value)} 
+                className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" 
+              />
+              
+              <div className="space-y-6">
+                {/* CURRENT TEAM */}
+                {currentTeamPlayers.length > 0 && (
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Current Squad</h3>
+                    <div className="flex flex-wrap gap-2.5">
+                      {currentTeamPlayers.map(p => {
+                        const isSelected = rosterPlayerIds.includes(p.id);
+                        return (
+                          <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
+                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* UNASSIGNED PLAYERS */}
+                {unassignedPlayers.length > 0 && (
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-3">Unassigned Players</h3>
+                    <div className="flex flex-wrap gap-2.5">
+                      {unassignedPlayers.map(p => {
+                        const isSelected = rosterPlayerIds.includes(p.id);
+                        return (
+                          <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
+                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* OTHER TEAMS */}
+                {otherTeamPlayers.length > 0 && (
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-500 mb-3">Assigned to Other Teams</h3>
+                    <div className="flex flex-wrap gap-2.5">
+                      {otherTeamPlayers.map(p => {
+                        const isSelected = rosterPlayerIds.includes(p.id);
+                        const otherTeamName = teams.find(t => t.id === p.default_team_id)?.name;
+                        return (
+                          <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
+                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                            {!isSelected && <span className="text-[9px] text-orange-500 normal-case tracking-normal ml-1">({otherTeamName})</span>}
+                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+            
             <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
               <button onClick={() => setIsRosterModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
               <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Save Players'}</button>

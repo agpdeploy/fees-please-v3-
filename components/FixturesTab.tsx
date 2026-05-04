@@ -239,6 +239,11 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
     }
   }
 
+  // Calculate the specifically filtered fixtures for the selected team
+  const displayedFixtures = fixtureTeamId 
+    ? fixtures.filter(f => f.team_id === fixtureTeamId)
+    : fixtures;
+
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
@@ -391,7 +396,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
 
       {/* FIXTURE LIST */}
       <div className="space-y-2">
-        {fixtures.map(f => (
+        {displayedFixtures.map(f => (
           <FixtureRow 
             key={f.id} 
             fixture={f} 
@@ -402,6 +407,11 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
             openSquadModal={openSquadModal}
           />
         ))}
+        {displayedFixtures.length === 0 && fixtureTeamId && (
+          <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs font-bold uppercase tracking-widest">
+            No matches found for this team
+          </div>
+        )}
       </div>
     </div>
   );

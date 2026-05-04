@@ -229,10 +229,19 @@ export default function GameDay() {
         const paidToday: string[] = []; 
         if (txData) {
           txData.forEach(tx => {
-            if (tx.transaction_type === 'fee') debts[tx.player_id] = (debts[tx.player_id] || 0) + Number(tx.amount);
+            if (tx.transaction_type === 'fee') {
+              debts[tx.player_id] = (debts[tx.player_id] || 0) + Number(tx.amount);
+              // Any fee for today's match means they've been processed
+              if (tx.fixture_id === activeFixture.id && !paidToday.includes(tx.player_id)) {
+                paidToday.push(tx.player_id);
+              }
+            }
             if (tx.transaction_type === 'payment') {
               debts[tx.player_id] = (debts[tx.player_id] || 0) - Number(tx.amount);
-              if (tx.fixture_id === activeFixture.id) paidToday.push(tx.player_id);
+              // Or if they made a manual payment today
+              if (tx.fixture_id === activeFixture.id && !paidToday.includes(tx.player_id)) {
+                paidToday.push(tx.player_id);
+              }
             }
           });
         }
@@ -272,7 +281,13 @@ export default function GameDay() {
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
   async function executeMatchFinalization() {
-    if (!activeFixture) return;
+    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
+    
+    if (!activeFixture || !resolvedClubId) {
+      showToast("Missing required club context. Refresh and try again.", "error");
+      return;
+    }
+    
     setIsProcessing(true);
 
     try {
@@ -286,7 +301,7 @@ export default function GameDay() {
             player_id: player.id,
             team_id: selectedTeamId,
             fixture_id: activeFixture.id,
-            club_id: activeClubId,
+            club_id: resolvedClubId,
             amount: player.is_member ? teamFees.member : teamFees.casual,
             transaction_type: 'fee'
           }));
@@ -315,7 +330,6 @@ export default function GameDay() {
         .eq('team_id', selectedTeamId);
         
       if (allFix) {
-        // OVERRIDE: Manually patch the data locally to guarantee we don't accidentally load stale cache
         const safeFixList = allFix.map(f => f.id === activeFixture.id ? { ...f, status: finaliseStatus } : f);
 
         const upcoming = safeFixList.filter(f => !['completed', 'forfeited', 'abandoned'].includes(f.status))
@@ -340,10 +354,11 @@ export default function GameDay() {
   }
 
   const initiateTapToPay = (player: any) => {
+    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (!isMobile) {
-      return showToast("Tap-to-Pay requires a mobile phone.", "error");
-    }
+    
+    if (!isMobile) return showToast("Tap-to-Pay requires a mobile phone.", "error");
+    if (!resolvedClubId) return showToast("Missing club selection.", "error");
 
     const netAmount = paymentData[player.id]?.amount || 0;
     if (netAmount <= 0) return showToast("Amount must be > $0", "error");
@@ -359,7 +374,7 @@ export default function GameDay() {
     const feeAmount = player.is_member ? teamFees.member : teamFees.casual;
 
     localStorage.setItem('square_pending_tx', JSON.stringify({
-      player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: activeClubId, amount: netAmount, fee_amount: feeAmount 
+      player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: resolvedClubId, amount: netAmount, fee_amount: feeAmount 
     }));
 
     const callbackUrl = window.location.origin + '/';
@@ -412,8 +427,11 @@ export default function GameDay() {
       if (!player) return;
       
       const matchFee = player.is_member ? teamFees.member : teamFees.casual;
-      const outstandingDebt = Math.max(0, playerDebts[id] || 0);
-      const totalToCollect = matchFee + outstandingDebt;
+      const currentBalance = playerDebts[id] || 0; 
+      
+      // If currentBalance is negative (credit), it subtracts from the fee. 
+      // Math.max ensures it never drops below $0 to collect.
+      const totalToCollect = Math.max(0, matchFee + currentBalance);
 
       setSelectedPlayerIds(prev => [...prev, id]);
       setPaymentData(prev => ({ ...prev, [id]: { amount: totalToCollect, method: 'cash' } }));
@@ -421,7 +439,12 @@ export default function GameDay() {
   }
 
   async function processBatchPayments() {
-    if (selectedPlayers.length === 0 || !activeFixture || !activeClubId) return;
+    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
+    
+    if (selectedPlayers.length === 0 || !activeFixture || !resolvedClubId) {
+       showToast("Unable to save: Missing active club data.", "error");
+       return;
+    }
 
     const newlyPaidIds = selectedPlayers.map(p => p.id);
     setPaidPlayerIds(prev => [...prev, ...newlyPaidIds]);
@@ -445,20 +468,25 @@ export default function GameDay() {
       const amount = payloadData[player.id]?.amount || 0;
       const fee = player.is_member ? teamFees.member : teamFees.casual;
       
-      if (isSquareEnabled && method === 'card') {
-         const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
+      if (isSquareEnabled && method === 'card' && amount > 0) {
+         const userRole = roles?.find((r: any) => r.club_id === resolvedClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
          if (userRole?.can_take_payments || profile?.role === 'super_admin' || profile?.role === 'club_admin') {
             continue; 
          }
       }
 
-      offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: fee, transaction_type: 'fee' });
-      offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, amount: amount, transaction_type: 'payment', payment_method: method });
+      // Always charge the match fee
+      offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: fee, transaction_type: 'fee' });
+      
+      // Only log a payment if they actually handed over cash/card today
+      if (amount > 0) {
+        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method });
+      }
     }
     
     if (umpirePaidNow) {
       offlinePayload.push({ 
-        team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: activeClubId, 
+        team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, 
         amount: activeFixture.umpire_fee, transaction_type: 'expense', 
         payment_method: 'cash', description: clubInfo.expense_label || 'Match Expense' 
       });
@@ -484,8 +512,10 @@ export default function GameDay() {
   }
 
   async function openManageSquad() {
-    if (!activeClubId) return;
-    const { data } = await supabase.from("players").select("*").eq("club_id", activeClubId);
+    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
+    if (!resolvedClubId) return;
+    
+    const { data } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
     if (data) {
       setClubPlayers(data);
     }
@@ -493,6 +523,7 @@ export default function GameDay() {
     setIsManageSquadOpen(true);
   }
 
+  // --- REVERTED: Clean Insert for RLS ---
   async function toggleSquadMember(playerId: string) {
     if (!activeFixture) return;
     setIsProcessing(true);
@@ -501,20 +532,37 @@ export default function GameDay() {
     
     try {
       if (isCurrentlyInSquad) {
-        await supabase.from("match_squads").delete().match({ fixture_id: activeFixture.id, player_id: playerId });
+        const { error } = await supabase.from("match_squads").delete().match({ fixture_id: activeFixture.id, player_id: playerId });
+        if (error) {
+            console.error("Supabase Delete Error:", error);
+            throw error;
+        }
       } else {
-        await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
+        const { error } = await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
+        if (error) {
+            console.error("Supabase Insert Error:", error);
+            throw error;
+        }
       }
       await loadSquadData(); 
     } catch (err: any) {
-      showToast("Error updating squad", "error");
+      console.error("Full toggleSquadMember Error:", err);
+      // More specific error message for permission issues
+      if (err?.code === '42501' || err?.message?.includes('403')) {
+          showToast("Permission denied. You must be a Team Manager to edit this squad.", "error");
+      } else {
+          showToast("Error updating squad. Please try logging out and back in.", "error");
+      }
     } finally {
       setIsProcessing(false);
     }
   }
 
+  // --- REVERTED: Clean Insert for RLS ---
   async function createAndAddPlayer(fullName: string) {
-    if (!activeClubId || !activeFixture) return;
+    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
+    if (!resolvedClubId || !activeFixture) return;
+    
     setIsProcessing(true);
     
     try {
@@ -527,25 +575,39 @@ export default function GameDay() {
         .insert([{
           first_name: firstName,
           last_name: lastName,
-          club_id: activeClubId,
+          club_id: resolvedClubId,
           is_member: false 
         }])
         .select()
         .single();
 
-      if (playerError) throw playerError;
+      if (playerError) {
+          console.error("Supabase Player Creation Error:", playerError);
+          throw playerError;
+      }
 
       if (newPlayer) {
-        await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: newPlayer.id }]);
+        const { error: squadError } = await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: newPlayer.id }]);
+        
+        if (squadError) {
+             console.error("Supabase Squad Insert Error:", squadError);
+             throw squadError;
+        }
+        
         showToast("Player Created & Added");
         setPlayerSearch("");
         loadSquadData();
-        const { data } = await supabase.from("players").select("*").eq("club_id", activeClubId);
+        const { data } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
         if (data) setClubPlayers(data);
       }
 
     } catch (err: any) {
-      showToast(err.message || "Failed to create player", "error");
+      console.error("Full createAndAddPlayer Error:", err);
+      if (err?.code === '42501' || err?.message?.includes('403')) {
+          showToast("Permission denied. You must be a Team Manager to add players.", "error");
+      } else {
+          showToast(err.message || "Failed to create player", "error");
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -616,7 +678,7 @@ export default function GameDay() {
 
       {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.length > 1 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
-          <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Admin View</label>
+          <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Manager View</label>
           <select value={selectedTeamId || ""} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -707,7 +769,7 @@ export default function GameDay() {
             </>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-              Waiting for your captain to add the schedule.
+              Waiting for your Team Manager to add the schedule.
             </p>
           )}
         </div>
@@ -732,7 +794,7 @@ export default function GameDay() {
             </>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-               Waiting for an admin to set up the club.
+               Waiting for a Club Manager to set up the club.
             </p>
           )}
         </div>
@@ -772,7 +834,7 @@ export default function GameDay() {
                    </>
                  ) : (
                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 leading-relaxed">
-                      Waiting for your captain to assign the match players.
+                      Waiting for your Team Manager to assign the match players.
                     </p>
                  )}
                </div>
@@ -784,7 +846,7 @@ export default function GameDay() {
             ) : (
               squadToPay.map(player => {
                 const isSelected = selectedPlayerIds.includes(player.id);
-                const debt = Math.max(0, playerDebts[player.id] || 0);
+                const currentBalance = playerDebts[player.id] || 0;
                 return (
                   <button 
                     key={player.id} 
@@ -792,7 +854,8 @@ export default function GameDay() {
                     className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                   >
                     {player.nickname || `${player.first_name} ${player.last_name?.charAt(0)}.`}
-                    {debt > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
+                    {currentBalance > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
+                    {currentBalance < 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
                   </button>
                 );
               })
@@ -815,7 +878,7 @@ export default function GameDay() {
         <div className="space-y-4 animate-in slide-in-from-bottom-6">
           {selectedPlayers.map(player => {
             const data = paymentData[player.id];
-            const debt = Math.max(0, playerDebts[player.id] || 0);
+            const currentBalance = playerDebts[player.id] || 0;
             const matchFee = player.is_member ? teamFees.member : teamFees.casual;
 
             return (
@@ -827,8 +890,9 @@ export default function GameDay() {
                       {player.nickname || `${player.first_name} ${player.last_name}`}
                     </h3>
                     <div className="flex gap-2 mt-1 text-[9px] font-black uppercase tracking-widest">
-                      {debt > 0 && <span className="text-red-500">Debt: ${debt}</span>}
-                      <span className="text-emerald-500">Fee: ${matchFee}</span>
+                      {currentBalance > 0 && <span className="text-red-500">Debt: ${currentBalance}</span>}
+                      {currentBalance < 0 && <span className="text-emerald-500">Credit: ${Math.abs(currentBalance)}</span>}
+                      <span className="text-zinc-500">Fee: ${matchFee}</span>
                     </div>
                   </div>
                   

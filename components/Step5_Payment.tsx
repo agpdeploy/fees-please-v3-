@@ -1,3 +1,4 @@
+// components/Step5_Payment.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -83,7 +84,7 @@ export default function Step5_Payment({ clubId, onNext }: { clubId: string, onNe
     setPhase('PROCESSING');
     
     setTimeout(() => {
-      addMessage('assistant', "Locked in! Finalizing your organization setup now...");
+      addMessage('assistant', "Locked in! Finalizing your club setup now...");
       saveAndComplete(payIdType, input);
     }, 500);
   };

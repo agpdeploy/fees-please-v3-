@@ -10,37 +10,45 @@ export function useProfile() {
     let isMounted = true 
 
     async function getProfile() {
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log("📡 useProfile: Fetching session...");
       
-      if (!session) {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session) {
+        console.log("📡 useProfile: No session found or session error.", sessionError);
         if (isMounted) setLoading(false)
         return
       }
 
+      console.log("📡 useProfile: Found session for", session.user.id);
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (authError || !user) {
-        console.error("AUTH ERROR:", authError);
+        console.error("❌ AUTH ERROR:", authError);
         if (isMounted) setLoading(false);
         return;
       }
 
-      console.log("1. AUTH USER ID:", user.id);
-
-      // THE FIX: Changed .single() to .maybeSingle() to prevent 406 crashes
+      console.log("📡 useProfile: Fetching profile data...");
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle() 
+      
+      if (profileError) {
+        console.error("❌ DB Profile Error:", profileError);
+      }
 
+      console.log("📡 useProfile: Fetching roles data...");
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('*, clubs(id, name, logo_url)')
         .eq('user_id', user.id)
       
-      console.log("2. DB PROFILE DATA:", profileData, "| ERROR:", profileError);
-      console.log("3. DB ROLES DATA:", rolesData, "| ERROR:", rolesError);
+      if (rolesError) {
+        console.error("❌ DB Roles Error:", rolesError);
+      }
 
       const isSuper = rolesData?.some(r => r.role === 'super_admin');
       const adminRole = rolesData?.find(r => r.role === 'club_admin');
@@ -49,15 +57,14 @@ export function useProfile() {
       const finalProfile = {
         id: user.id,
         email: user.email,
-        // If profileData is null because of .maybeSingle(), this safely defaults to an empty object
         ...(profileData || {}), 
         role: isSuper ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
         club_id: adminRole?.club_id || teamRole?.club_id || null,
         team_id: teamRole?.team_id || null
       };
 
-      console.log("4. FINAL ASSEMBLED PROFILE:", finalProfile);
-
+      console.log("📡 useProfile: Success. Profile Assembled.");
+      
       if (isMounted) {
         setProfile(finalProfile)
         setRoles(rolesData || [])
@@ -67,8 +74,15 @@ export function useProfile() {
 
     getProfile()
 
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+         getProfile();
+      }
+    })
+
     return () => {
       isMounted = false 
+      authListener.subscription.unsubscribe()
     }
   }, [])
 

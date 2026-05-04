@@ -1,3 +1,4 @@
+// components/Step2_Branding.tsx
 "use client";
 
 import { useState } from "react";
@@ -84,7 +85,7 @@ export default function Step2_Branding({ onNext, clubId }: { onNext: () => void,
     <div className="h-full flex flex-col p-8 items-center justify-center text-center space-y-8 bg-zinc-50">
       <div>
         <h2 className="text-3xl font-black tracking-tight text-zinc-900 uppercase italic">Make it Official</h2>
-        <p className="text-zinc-500 mt-2">Upload your organization logo.</p>
+        <p className="text-zinc-500 mt-2">Upload your club logo.</p>
       </div>
 
       {error && <div className="text-red-500 text-xs font-bold bg-red-50 p-2 rounded border border-red-200">{error}</div>}
