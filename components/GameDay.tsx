@@ -22,6 +22,7 @@ export default function GameDay() {
   
   const [squad, setSquad] = useState<any[]>([]);
   const [isSquadLoading, setIsSquadLoading] = useState(false); 
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   
   // Payment States
   const [teamFees, setTeamFees] = useState({ member: 10, casual: 25 });
@@ -513,14 +514,23 @@ export default function GameDay() {
 
   async function openManageSquad() {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
-    if (!resolvedClubId) return;
+    if (!resolvedClubId || !activeFixture) return;
     
-    const { data } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
-    if (data) {
-      setClubPlayers(data);
+    setIsProcessing(true);
+    
+    // Fetch all players for the club
+    const { data: playersData } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
+    if (playersData) {
+      setClubPlayers(playersData);
     }
+
+    // Fetch availability for this specific match
+    const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", activeFixture.id);
+    setAvailabilityData(availData || []);
+
     setPlayerSearch(""); 
     setIsManageSquadOpen(true);
+    setIsProcessing(false);
   }
 
   // --- REVERTED: Clean Insert for RLS ---
@@ -1110,27 +1120,60 @@ export default function GameDay() {
                   </button>
                 )}
 
-                {/* COMPACT PILL BUTTON LIST */}
-                <div className="flex flex-wrap gap-2.5">
-                  {clubPlayers.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
-                    const isInSquad = squad.some(s => s.id === p.id);
-                    return (
-                      <button 
-                        key={p.id} 
-                        onClick={() => toggleSquadMember(p.id)} 
-                        disabled={isProcessing}
-                        className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isInSquad ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
-                      >
-                        {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
-                        {isInSquad ? (
-                          <i className="fa-solid fa-check text-[10px]"></i>
-                        ) : (
-                          <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Categorized Sections */}
+                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
+                  const sectionPlayers = clubPlayers.filter(p => {
+                    const avail = availabilityData.find(a => a.player_id === p.id);
+                    const status = avail ? avail.status : 'no_reply';
+
+                    // Relevant if in team, already in squad, or explicitly replied
+                    const isRelevant = p.default_team_id === selectedTeamId || squad.some(s => s.id === p.id) || avail !== undefined;
+                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
+
+                    if (playerSearch) {
+                      return status === section && matchesSearch;
+                    } else {
+                      return status === section && isRelevant;
+                    }
+                  });
+
+                  if (sectionPlayers.length === 0) return null;
+
+                  const config = {
+                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
+                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
+                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
+                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
+
+                  return (
+                    <div key={section} className="mb-4">
+                      <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} mb-3 flex items-center gap-2`}>
+                        <i className={`fa-solid ${config.icon}`}></i> {config.label}
+                      </h3>
+                      <div className="flex flex-wrap gap-2.5">
+                        {sectionPlayers.map(p => {
+                          const isInSquad = squad.some(s => s.id === p.id);
+                          return (
+                            <button 
+                              key={p.id} 
+                              onClick={() => toggleSquadMember(p.id)} 
+                              disabled={isProcessing}
+                              className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isInSquad ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
+                            >
+                              {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                              {isInSquad ? (
+                                <i className="fa-solid fa-check text-[10px]"></i>
+                              ) : (
+                                <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

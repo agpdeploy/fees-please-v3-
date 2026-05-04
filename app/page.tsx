@@ -8,6 +8,8 @@ import { useActiveClub } from "../contexts/ClubContext";
 import GameDay from "../components/GameDay";
 import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
+import Analytics from "../components/Analytics"; 
+import MyTeam from "../components/MyTeam"; // <-- NEW IMPORT
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
 import OnboardingFlow from "../components/OnboardingFlow"; 
@@ -32,8 +34,11 @@ export default function Home() {
   const { profile, roles, loading: profileLoading } = useProfile();
   const { activeClubId, setActiveClubId } = useActiveClub();
   
+  // --- ROLE CHECKING LOGIC ---
   const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
   const isAdmin = profile?.role === 'super_admin' || currentClubRole === 'club_admin';
+  const isTeamAdmin = roles?.some((r: any) => r.role === 'team_admin' && r.club_id === activeClubId);
+  const canManage = isAdmin || isTeamAdmin; // Anyone with Management rights
   
   const [clubMeta, setClubMeta] = useState({ name: 'FP', logo: '' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -101,7 +106,6 @@ export default function Home() {
           setIsCheckingAuth(false);
           console.log("🔓 AUTH: Session Resolved:", !!session);
           
-          // Use a slight delay before cleaning the URL to ensure the router has initialized
           if (session && typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
              setTimeout(() => {
                if (isMounted) {
@@ -117,7 +121,6 @@ export default function Home() {
       }
     }
 
-    // Delay the initial fetch slightly to allow Next.js hydration to complete
     const startDelay = setTimeout(() => {
       initAuth();
     }, 100);
@@ -348,6 +351,8 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto">
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
+          {activeTab === "analytics" && <div className="p-4"><Analytics /></div>}
+          {activeTab === "my-team" && <div className="p-4"><MyTeam /></div>}
           {activeTab === "setup" && isAdmin && <div className="p-4"><Setup activeTab={setupTab} /></div>}
         </div>
 
@@ -366,8 +371,8 @@ export default function Home() {
           <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
             <i className="fa-solid fa-wallet text-2xl mb-1"></i><span>Ledger</span>
           </button>
-          <button onClick={() => handleTabChange("daive")} className={`flex-1 flex flex-col items-center transition-colors ${isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-robot text-2xl mb-1"></i><span>dAIve</span>
+          <button onClick={() => handleTabChange("analytics")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "analytics" ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            <i className="fa-solid fa-chart-simple text-2xl mb-1"></i><span>Insights</span>
           </button>
         </div>
       </nav>
@@ -405,24 +410,38 @@ export default function Home() {
             </div>
 
             <div className="flex-1 py-4 space-y-1">
-              {isAdmin && (
+              {canManage && (
                 <div className="mb-2">
                   <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Management</div>
-                  <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-sliders w-5 text-center"></i> Configuration
+                  
+                  {/* NEW MY TEAM BUTTON */}
+                  <button onClick={() => { handleTabChange('my-team'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'my-team' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                    <i className="fa-solid fa-users w-5 text-center"></i> My Team
                   </button>
-                  <button onClick={() => { handleTabChange('setup'); setSetupTab('access'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'access' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-shield-halved w-5 text-center"></i> Access
+
+                  <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                    <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
                   </button>
-                  <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
-                  </button>
-                  <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
-                  </button>
-                  <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
-                  </button>
+
+                  {isAdmin && (
+                    <>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-sliders w-5 text-center"></i> Configuration
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('access'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'access' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-shield-halved w-5 text-center"></i> Access
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

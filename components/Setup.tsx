@@ -28,9 +28,20 @@ export default function Setup({ activeTab }: SetupProps) {
   const [editRoleAssigned, setEditRoleAssigned] = useState<'club_admin' | 'team_admin'>('club_admin');
   const [editRoleTeamId, setEditRoleTeamId] = useState<string>("");
 
+  // CONFIG STATE
   const [clubName, setClubName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  
+  // SPONSOR STATE
+  const [sponsor1Logo, setSponsor1Logo] = useState("");
+  const [sponsor1Url, setSponsor1Url] = useState("");
+  const [sponsor2Logo, setSponsor2Logo] = useState("");
+  const [sponsor2Url, setSponsor2Url] = useState("");
+  const [sponsor3Logo, setSponsor3Logo] = useState("");
+  const [sponsor3Url, setSponsor3Url] = useState("");
+  const [isUploadingSponsor, setIsUploadingSponsor] = useState(false);
+
   const [seasonName, setSeasonName] = useState("");
   const [seasonStart, setSeasonStart] = useState("");
   const [seasonEnd, setSeasonEnd] = useState("");
@@ -59,6 +70,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [isSquadModalOpen, setIsSquadModalOpen] = useState(false);
   const [activeSquadFixture, setActiveSquadFixture] = useState<any>(null);
   const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [activeRosterTeam, setActiveRosterTeam] = useState<any>(null);
@@ -130,7 +142,21 @@ export default function Setup({ activeTab }: SetupProps) {
     if (usersData) setClubUsers(usersData);
 
     const { data: teamData } = await supabase.from("teams").select("*").eq("club_id", clubId).order("name");
-    if (teamData) setTeams(teamData);
+    if (teamData) {
+      setTeams(teamData);
+      // Fetch sponsor data from the first team (assuming global club sponsors for now)
+      if (teamData.length > 0) {
+         const { data: sponsorData } = await supabase.from("public_team_profiles").select("*").eq("team_id", teamData[0].id).single();
+         if (sponsorData) {
+            setSponsor1Logo(sponsorData.sponsor_1_logo || "");
+            setSponsor1Url(sponsorData.sponsor_1_url || "");
+            setSponsor2Logo(sponsorData.sponsor_2_logo || "");
+            setSponsor2Url(sponsorData.sponsor_2_url || "");
+            setSponsor3Logo(sponsorData.sponsor_3_logo || "");
+            setSponsor3Url(sponsorData.sponsor_3_url || "");
+         }
+      }
+    }
 
     const { data: fixData } = await supabase.from("fixtures").select("*, teams(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
     if (fixData) setFixtures(fixData);
@@ -151,7 +177,7 @@ export default function Setup({ activeTab }: SetupProps) {
     }
   }, [clubId]);
 
-  const cropAndCompressImage = (file: File): Promise<File> => {
+  const cropAndCompressImage = (file: File, isLogo: boolean = true): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -160,15 +186,27 @@ export default function Setup({ activeTab }: SetupProps) {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const size = Math.min(img.width, img.height);
-          canvas.width = 300; canvas.height = 300;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return reject("Canvas error");
-          const startX = (img.width - size) / 2; const startY = (img.height - size) / 2;
-          ctx.drawImage(img, startX, startY, size, size, 0, 0, 300, 300);
+          
+          if (isLogo) {
+             const size = Math.min(img.width, img.height);
+             canvas.width = 300; canvas.height = 300;
+             const ctx = canvas.getContext("2d");
+             if (!ctx) return reject("Canvas error");
+             const startX = (img.width - size) / 2; const startY = (img.height - size) / 2;
+             ctx.drawImage(img, startX, startY, size, size, 0, 0, 300, 300);
+          } else {
+             // Sponsors: keep aspect ratio, max width 400
+             const scale = Math.min(400 / img.width, 1);
+             canvas.width = img.width * scale;
+             canvas.height = img.height * scale;
+             const ctx = canvas.getContext("2d");
+             if (!ctx) return reject("Canvas error");
+             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          }
+          
           canvas.toBlob((blob) => {
             if (!blob) return reject("Blob error");
-            resolve(new File([blob], "logo.webp", { type: "image/webp" }));
+            resolve(new File([blob], "image.webp", { type: "image/webp" }));
           }, "image/webp", 0.8);
         };
         img.onerror = () => reject("Image format invalid");
@@ -177,24 +215,30 @@ export default function Setup({ activeTab }: SetupProps) {
     });
   };
 
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'sponsor1' | 'sponsor2' | 'sponsor3') {
     const file = e.target.files?.[0];
-    if (!file || !clubId || clubId === 'new') {
-      return showToast("Please save the club name first to generate an ID.", "error");
-    }
+    if (!file || !clubId || clubId === 'new') return showToast("Please save the club name first.", "error");
+    if (file.size > 10 * 1024 * 1024) return showToast("File too large. Max 10MB.", "error");
     
-    if (file.size > 10 * 1024 * 1024) return showToast("File too large. Maximum size is 10MB.", "error");
-    setIsUploadingLogo(true); showToast("Processing & Compressing Image...");
+    if (type === 'logo') setIsUploadingLogo(true);
+    else setIsUploadingSponsor(true);
+    
+    showToast("Processing Image...");
     try {
-      const processedFile = await cropAndCompressImage(file);
-      const fileName = `${clubId}-${Math.random()}.webp`;
+      const processedFile = await cropAndCompressImage(file, type === 'logo');
+      const fileName = `${clubId}-${type}-${Math.random()}.webp`;
       const { error: uploadError } = await supabase.storage.from('logos').upload(fileName, processedFile);
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('logos').getPublicUrl(fileName);
-      setLogoUrl(data.publicUrl);
-      showToast("Logo Uploaded! Hit Save Below.");
+      
+      if (type === 'logo') setLogoUrl(data.publicUrl);
+      if (type === 'sponsor1') setSponsor1Logo(data.publicUrl);
+      if (type === 'sponsor2') setSponsor2Logo(data.publicUrl);
+      if (type === 'sponsor3') setSponsor3Logo(data.publicUrl);
+      
+      showToast("Uploaded! Hit Save Configuration.");
     } catch (err: any) { showToast(err.message || "Upload failed", "error"); } 
-    finally { setIsUploadingLogo(false); }
+    finally { setIsUploadingLogo(false); setIsUploadingSponsor(false); }
   }
 
   async function saveConfig() {
@@ -219,8 +263,24 @@ export default function Setup({ activeTab }: SetupProps) {
     
     if (clubId && clubId !== 'new') {
       const { error } = await supabase.from("clubs").update(payload).eq("id", clubId);
-      if (error) showToast(error.message, "error"); 
-      else window.location.reload();
+      if (error) { showToast(error.message, "error"); return; }
+      
+      // Update Public Storefronts for ALL teams in this club
+      const { data: clubTeams } = await supabase.from('teams').select('id, name').eq('club_id', clubId);
+      if (clubTeams && clubTeams.length > 0) {
+        const storefrontPayload = clubTeams.map(t => ({ 
+           team_id: t.id, 
+           team_name: t.name, 
+           club_logo_url: logoUrl,
+           sponsor_1_logo: sponsor1Logo, sponsor_1_url: sponsor1Url,
+           sponsor_2_logo: sponsor2Logo, sponsor_2_url: sponsor2Url,
+           sponsor_3_logo: sponsor3Logo, sponsor_3_url: sponsor3Url
+        }));
+        const { error: storeError } = await supabase.from('public_team_profiles').upsert(storefrontPayload);
+        if (storeError) console.error("Storefront Sync Error:", storeError);
+      }
+      
+      window.location.reload();
     } else {
       const { data: newClub, error } = await supabase.from("clubs").insert([{ ...payload, slug: generatedSlug }]).select().single();
       if (error) { 
@@ -318,18 +378,30 @@ export default function Setup({ activeTab }: SetupProps) {
     
     setIsSaving(true);
     let error;
+    let savedTeamId = editingTeamId;
     if (editingTeamId) { 
       const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); 
       error = res.error; 
     } else { 
-      const res = await supabase.from("teams").insert([payload]); 
+      const res = await supabase.from("teams").insert([payload]).select().single(); 
       error = res.error; 
+      if (res.data) savedTeamId = res.data.id;
     }
     
     setIsSaving(false);
     if (error) {
       showToast(error.message, "error"); 
     } else { 
+      if (savedTeamId) {
+        await supabase.from("public_team_profiles").upsert({
+          team_id: savedTeamId,
+          team_name: teamName,
+          club_logo_url: logoUrl || clubRecord?.logo_url,
+          sponsor_1_logo: sponsor1Logo, sponsor_1_url: sponsor1Url,
+          sponsor_2_logo: sponsor2Logo, sponsor_2_url: sponsor2Url,
+          sponsor_3_logo: sponsor3Logo, sponsor_3_url: sponsor3Url
+        });
+      }
       showToast("Team saved successfully!"); 
       resetTeamForm(); 
       loadClubData(); 
@@ -362,16 +434,44 @@ export default function Setup({ activeTab }: SetupProps) {
     showToast(`${activeRosterTeam.name} Roster Updated!`);
   }
   
-  async function openSquadModal(fixture: any) { setActiveSquadFixture(fixture); setPlayerSearch(""); const { data } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); setSquadPlayerIds(data ? data.map(row => row.player_id) : []); setIsSquadModalOpen(true); }
-  function toggleSquadPlayer(playerId: string) { setSquadPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); }
-  
-  async function saveSquad() { 
-    setIsSaving(true); await supabase.from("match_squads").delete().eq("fixture_id", activeSquadFixture.id); 
-    if (squadPlayerIds.length > 0) { const inserts = squadPlayerIds.map(playerId => ({ fixture_id: activeSquadFixture.id, player_id: playerId })); const { error } = await supabase.from("match_squads").insert(inserts); if (error) showToast(error.message, "error"); else showToast("Match Players updated!"); } 
-    setIsSaving(false); setIsSquadModalOpen(false); 
+  async function openSquadModal(fixture: any) { 
+    setActiveSquadFixture(fixture); 
+    setPlayerSearch(""); 
+    
+    // Fetch assigned squad
+    const { data: squadData } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); 
+    setSquadPlayerIds(squadData ? squadData.map(row => row.player_id) : []); 
+
+    // Fetch availability data for this fixture
+    const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", fixture.id);
+    setAvailabilityData(availData || []);
+
+    setIsSquadModalOpen(true); 
+  }
+
+  function toggleSquadPlayer(playerId: string) { 
+    setSquadPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); 
   }
   
-  async function deleteItem(table: string, id: string) { if (!window.confirm("Are you sure?")) return; await supabase.from(table).delete().eq("id", id); showToast("Item deleted."); loadClubData(); }
+  async function saveSquad() { 
+    setIsSaving(true); 
+    await supabase.from("match_squads").delete().eq("fixture_id", activeSquadFixture.id); 
+    if (squadPlayerIds.length > 0) { 
+      const inserts = squadPlayerIds.map(playerId => ({ fixture_id: activeSquadFixture.id, player_id: playerId })); 
+      const { error } = await supabase.from("match_squads").insert(inserts); 
+      if (error) showToast(error.message, "error"); 
+      else showToast("Match Players updated!"); 
+    } 
+    setIsSaving(false); 
+    setIsSquadModalOpen(false); 
+  }
+  
+  async function deleteItem(table: string, id: string) { 
+    if (!window.confirm("Are you sure?")) return; 
+    await supabase.from(table).delete().eq("id", id); 
+    showToast("Item deleted."); 
+    loadClubData(); 
+  }
 
   if (profileLoading) {
     return (
@@ -425,7 +525,6 @@ export default function Setup({ activeTab }: SetupProps) {
     );
   }
 
-  // Derived filtered state for the Roster Modal
   const filteredRosterPlayers = players.filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase()));
   const currentTeamPlayers = filteredRosterPlayers.filter(p => p.default_team_id === activeRosterTeam?.id);
   const unassignedPlayers = filteredRosterPlayers.filter(p => p.default_team_id === null);
@@ -466,24 +565,59 @@ export default function Setup({ activeTab }: SetupProps) {
       {/* --- CONFIG TAB --- */}
       {activeTab === 'config' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+          
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding</h2>
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding & Sponsors</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Name</label>
                 <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
+              
               <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo (Auto-Squares to 300px)</label>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo</label>
                 <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 p-3 rounded-xl transition-colors">
                   {logoUrl ? <img src={logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-cover bg-white" /> : <div className="w-12 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500"><i className="fa-solid fa-image"></i></div>}
                   <div className="flex-1">
-                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" id="logo-upload" disabled={isUploadingLogo || !clubId || clubId === 'new'} />
+                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logo')} className="hidden" id="logo-upload" disabled={isUploadingLogo || !clubId || clubId === 'new'} />
                     <label htmlFor="logo-upload" className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-block ${isUploadingLogo || !clubId || clubId === 'new' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed' : 'bg-zinc-800 dark:bg-zinc-700 text-white hover:bg-zinc-700 dark:hover:bg-zinc-600 cursor-pointer shadow-sm'}`}>
-                      {(!clubId || clubId === 'new') ? "Save club name first to upload logo" : (isUploadingLogo ? "Compressing..." : "Upload New Image")}
+                      {(!clubId || clubId === 'new') ? "Save club name first" : (isUploadingLogo ? "Processing..." : "Upload Logo")}
                     </label>
                   </div>
                 </div>
+              </div>
+
+              {/* SPONSOR UPLOADS */}
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/50 space-y-4">
+                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-2">Club Sponsors (Public Page)</label>
+                 
+                 {[
+                   { id: 'sponsor1', num: 1, logo: sponsor1Logo, url: sponsor1Url, setUrl: setSponsor1Url, clear: () => {setSponsor1Logo(""); setSponsor1Url("")} },
+                   { id: 'sponsor2', num: 2, logo: sponsor2Logo, url: sponsor2Url, setUrl: setSponsor2Url, clear: () => {setSponsor2Logo(""); setSponsor2Url("")} },
+                   { id: 'sponsor3', num: 3, logo: sponsor3Logo, url: sponsor3Url, setUrl: setSponsor3Url, clear: () => {setSponsor3Logo(""); setSponsor3Url("")} }
+                 ].map((s) => (
+                   <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
+                      <div className="flex gap-3">
+                         <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative group">
+                            {s.logo ? (
+                               <>
+                                 <img src={s.logo} className="w-full h-full object-contain p-1" />
+                                 <button onClick={s.clear} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="fa-solid fa-trash text-xs"></i></button>
+                               </>
+                            ) : <i className="fa-solid fa-image text-zinc-400"></i>}
+                         </div>
+                         <div className="flex-1 space-y-2">
+                           <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor || !clubId || clubId === 'new'} />
+                           <div className="flex justify-between items-center">
+                              <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors ${!clubId || clubId === 'new' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30'}`}>
+                                 {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
+                              </label>
+                           </div>
+                           <input type="url" placeholder="https://..." value={s.url} onChange={(e) => s.setUrl(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                         </div>
+                      </div>
+                   </div>
+                 ))}
               </div>
             </div>
           </div>
@@ -598,33 +732,6 @@ export default function Setup({ activeTab }: SetupProps) {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* APP VERSION & CACHE WIPE */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors text-center space-y-3">
-            <h2 className="text-[11px] font-black uppercase italic text-zinc-500 mb-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">System Info</h2>
-            <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400">
-               <span>Version: {process.env.NEXT_PUBLIC_APP_VERSION || 'dev-local'}</span>
-               <span>Build: {process.env.NEXT_PUBLIC_BUILD_TIME ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleDateString() : 'N/A'}</span>
-            </div>
-            <button
-               onClick={async () => {
-                  if ('caches' in window) {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(cacheNames.map(name => caches.delete(name)));
-                  }
-                  if ('serviceWorker' in navigator) {
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    for (const registration of registrations) {
-                      await registration.unregister();
-                    }
-                  }
-                  window.location.reload();
-               }}
-               className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-xl text-[10px] font-black uppercase transition-colors flex items-center justify-center gap-2"
-            >
-               <i className="fa-solid fa-arrows-rotate"></i> Force App Update
-            </button>
           </div>
 
           <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md disabled:opacity-50">
@@ -815,6 +922,13 @@ export default function Setup({ activeTab }: SetupProps) {
                       </div>
                       
                       <div className="flex gap-2 shrink-0 ml-4">
+                        <button onClick={() => {
+                          const link = `${window.location.origin}/t/${t.id}`;
+                          navigator.clipboard.writeText(link);
+                          showToast("Team Link Copied!");
+                        }} className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-colors flex items-center justify-center" title="Copy Public Availability Link">
+                          <i className="fa-solid fa-link text-xs"></i>
+                        </button>
                         <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center">
                           <i className="fa-solid fa-pen text-xs"></i>
                         </button>
@@ -929,43 +1043,74 @@ export default function Setup({ activeTab }: SetupProps) {
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">MATCH PLAYERS: {activeSquadFixture.opponent}</h2>
+              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">MATCH SQUAD: {activeSquadFixture.opponent}</h2>
               <button onClick={() => setIsSquadModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <input type="text" placeholder="Search player..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3">Core Team</h3>
-                <div className="space-y-2">
-                  {players.filter(p => p.default_team_id === activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
-                    const isSelected = squadPlayerIds.includes(p.id);
-                    return (
-                      <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800/50 p-4 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                        <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors ${isSelected ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3">Other Members</h3>
-                <div className="space-y-2">
-                  {players.filter(p => p.default_team_id !== activeSquadFixture.team_id).filter(p => `${p.first_name} ${p.last_name} ${p.nickname}`.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
-                    const isSelected = squadPlayerIds.includes(p.id);
-                    return (
-                      <div key={p.id} onClick={() => toggleSquadPlayer(p.id)} className="flex justify-between items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800/50 p-4 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                        <span className="font-bold text-zinc-900 dark:text-white text-sm">{p.first_name} {p.last_name} {p.nickname && <span className="text-zinc-500 font-normal italic ml-1">"{p.nickname}"</span>}</span>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors ${isSelected ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{isSelected ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus"></i>}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            
+            <div className="p-5 overflow-y-auto flex-1 space-y-6 pb-24">
+              <input 
+                type="text" 
+                placeholder="Search players..." 
+                value={playerSearch || ""} 
+                onChange={(e) => setPlayerSearch(e.target.value)} 
+                className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+              />
+
+              {/* Categorized Sections */}
+              {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
+                const sectionPlayers = players.filter(p => {
+                  const avail = availabilityData.find(a => a.player_id === p.id);
+                  const status = avail ? avail.status : 'no_reply';
+                  const isRelevant = p.default_team_id === activeSquadFixture.team_id || squadPlayerIds.includes(p.id) || avail !== undefined;
+                  const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
+
+                  if (playerSearch) {
+                    return status === section && matchesSearch;
+                  } else {
+                    return status === section && isRelevant;
+                  }
+                });
+
+                if (sectionPlayers.length === 0) return null;
+
+                const config = {
+                  yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
+                  maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
+                  no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                  no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
+                }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
+
+                return (
+                  <div key={section}>
+                    <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} mb-3 flex items-center gap-2`}>
+                      <i className={`fa-solid ${config.icon}`}></i> {config.label}
+                    </h3>
+                    <div className="flex flex-wrap gap-2.5">
+                      {sectionPlayers.map(p => {
+                        const isSelected = squadPlayerIds.includes(p.id);
+                        return (
+                          <button 
+                            key={p.id} 
+                            onClick={() => toggleSquadPlayer(p.id)} 
+                            disabled={isSaving} 
+                            className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
+                          >
+                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            
             <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
               <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Update Match Players'}</button>
+              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">
+                {isSaving ? 'Saving...' : 'Save Match Squad'}
+              </button>
             </div>
           </div>
         </div>
