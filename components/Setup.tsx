@@ -319,8 +319,21 @@ export default function Setup({ activeTab }: SetupProps) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to invite user');
+      
+      // OPTIMISTIC UI: Inject the user immediately so they appear before the database round-trip finishes
+      const teamObj = inviteRole === 'team_admin' ? { name: teams.find(t => t.id === inviteTeamId)?.name || '' } : undefined;
+      setClubUsers(prev => [...prev, {
+        id: `temp-${Date.now()}`,
+        email: inviteEmail,
+        role: inviteRole,
+        team_id: inviteRole === 'team_admin' ? inviteTeamId : undefined,
+        can_take_payments: false,
+        teams: teamObj
+      }]);
+
       showToast(`Invite sent to ${inviteEmail}!`);
-      setInviteEmail(""); setInviteTeamId(""); loadClubData(); 
+      setInviteEmail(""); setInviteTeamId(""); 
+      loadClubData(); 
     } catch (err: any) { showToast(err.message, "error"); } 
     finally { setIsSaving(false); }
   }
@@ -357,14 +370,19 @@ export default function Setup({ activeTab }: SetupProps) {
 
   async function handleRemoveRole(roleId: string) {
     if (!window.confirm("Are you sure you want to revoke this access rule?")) return;
+    
+    // Optimistic UI Removal
+    setClubUsers(prev => prev.filter(user => user.id !== roleId));
+
     const { data, error } = await supabase.from("user_roles").delete().eq('id', roleId).select();
     if (error) {
        showToast(error.message, "error");
+       loadClubData(); // Revert on error
     } else if (!data || data.length === 0) {
        showToast("Security Block: Permission Denied to delete roles.", "error");
+       loadClubData(); // Revert on error
     } else { 
        showToast("Access revoked."); 
-       loadClubData(); 
     }
   }
 
