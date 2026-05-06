@@ -11,9 +11,18 @@ interface SetupProps {
   activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures';
 }
 
+interface UserRole {
+  id: string;
+  email: string;
+  role: 'club_admin' | 'team_admin';
+  team_id?: string;
+  can_take_payments: boolean;
+  teams?: { name: string };
+}
+
 export default function Setup({ activeTab }: SetupProps) {
   const [clubRecord, setClubRecord] = useState<any>(null);
-  const [clubUsers, setClubUsers] = useState<any[]>([]); 
+  const [clubUsers, setClubUsers] = useState<UserRole[]>([]); 
   const [teams, setTeams] = useState<any[]>([]);
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
@@ -31,7 +40,7 @@ export default function Setup({ activeTab }: SetupProps) {
   // CONFIG STATE
   const [clubName, setClubName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [announcement, setAnnouncement] = useState(""); // <-- ADDED ANNOUNCEMENT STATE
+  const [announcement, setAnnouncement] = useState(""); 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   
   // SPONSOR STATE
@@ -125,7 +134,7 @@ export default function Setup({ activeTab }: SetupProps) {
       setClubRecord(clubData);
       setClubName(clubData.name || "");
       setLogoUrl(clubData.logo_url || "");
-      setAnnouncement(clubData.announcement || ""); // <-- FETCH ANNOUNCEMENT
+      setAnnouncement(clubData.announcement || "");
       setSeasonName(clubData.season_name || "");
       setSeasonStart(clubData.season_start || "");
       setSeasonEnd(clubData.season_end || "");
@@ -141,12 +150,11 @@ export default function Setup({ activeTab }: SetupProps) {
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
-    if (usersData) setClubUsers(usersData);
+    if (usersData) setClubUsers(usersData as UserRole[]);
 
     const { data: teamData } = await supabase.from("teams").select("*").eq("club_id", clubId).order("name");
     if (teamData) {
       setTeams(teamData);
-      // Fetch sponsor data from the first team (assuming global club sponsors for now)
       if (teamData.length > 0) {
          const { data: sponsorData } = await supabase.from("public_team_profiles").select("*").eq("team_id", teamData[0].id).single();
          if (sponsorData) {
@@ -197,7 +205,6 @@ export default function Setup({ activeTab }: SetupProps) {
              const startX = (img.width - size) / 2; const startY = (img.height - size) / 2;
              ctx.drawImage(img, startX, startY, size, size, 0, 0, 300, 300);
           } else {
-             // Sponsors: keep aspect ratio, max width 400
              const scale = Math.min(400 / img.width, 1);
              canvas.width = img.width * scale;
              canvas.height = img.height * scale;
@@ -249,7 +256,7 @@ export default function Setup({ activeTab }: SetupProps) {
     const payload = { 
       name: clubName, 
       logo_url: logoUrl,
-      announcement: announcement, // <-- SAVE ANNOUNCEMENT
+      announcement: announcement,
       season_name: seasonName, 
       season_start: seasonStart || null, 
       season_end: seasonEnd || null, 
@@ -268,7 +275,6 @@ export default function Setup({ activeTab }: SetupProps) {
       const { error } = await supabase.from("clubs").update(payload).eq("id", clubId);
       if (error) { showToast(error.message, "error"); return; }
       
-      // Update Public Storefronts for ALL teams in this club
       const { data: clubTeams } = await supabase.from('teams').select('id, name').eq('club_id', clubId);
       if (clubTeams && clubTeams.length > 0) {
         const storefrontPayload = clubTeams.map(t => ({ 
@@ -320,17 +326,28 @@ export default function Setup({ activeTab }: SetupProps) {
   }
 
   async function saveRoleUpdate(roleId: string) {
+    if (editRoleAssigned === 'team_admin' && !editRoleTeamId) {
+       return showToast("Please select a team.", "error");
+    }
+
     setIsSaving(true);
-    const payload = {
-      role: editRoleAssigned,
-      team_id: editRoleAssigned === 'team_admin' ? editRoleTeamId : null
-    };
     
-    const { error } = await supabase.from('user_roles').update(payload).eq('id', roleId);
+    // EXPLICIT PAYLOAD: Ensure null team_id is pushed to Postgres if promoting to club_admin
+    const payload: any = { role: editRoleAssigned };
+    if (editRoleAssigned === 'club_admin') {
+       payload.team_id = null;
+    } else {
+       payload.team_id = editRoleTeamId;
+    }
+
+    const { data, error } = await supabase.from('user_roles').update(payload).eq('id', roleId).select();
     
     setIsSaving(false);
+    
     if (error) {
       showToast(error.message, "error");
+    } else if (!data || data.length === 0) {
+      showToast("Security Block: Permission Denied to edit roles.", "error");
     } else {
       showToast("Role updated successfully!");
       setEditingRoleId(null);
@@ -340,18 +357,30 @@ export default function Setup({ activeTab }: SetupProps) {
 
   async function handleRemoveRole(roleId: string) {
     if (!window.confirm("Are you sure you want to revoke this access rule?")) return;
-    const { error } = await supabase.from("user_roles").delete().eq('id', roleId);
-    if (error) showToast(error.message, "error");
-    else { showToast("Access revoked."); loadClubData(); }
+    const { data, error } = await supabase.from("user_roles").delete().eq('id', roleId).select();
+    if (error) {
+       showToast(error.message, "error");
+    } else if (!data || data.length === 0) {
+       showToast("Security Block: Permission Denied to delete roles.", "error");
+    } else { 
+       showToast("Access revoked."); 
+       loadClubData(); 
+    }
   }
 
   async function togglePaymentPermission(roleId: string, currentStatus: boolean) {
+    // Optimistic UI Update
     setClubUsers(prev => prev.map(user => user.id === roleId ? { ...user, can_take_payments: !currentStatus } : user));
-    const { error } = await supabase.from("user_roles").update({ can_take_payments: !currentStatus }).eq('id', roleId);
-    if (error) {
+    
+    const { data, error } = await supabase.from("user_roles").update({ can_take_payments: !currentStatus }).eq('id', roleId).select();
+    
+    if (error || !data || data.length === 0) {
+      // Revert UI if it failed or got blocked by RLS
       setClubUsers(prev => prev.map(user => user.id === roleId ? { ...user, can_take_payments: currentStatus } : user));
-      showToast(error.message, "error");
-    } else { showToast(!currentStatus ? "Payment permission granted." : "Payment permission revoked."); }
+      showToast(error ? error.message : "Security Block: Permission Denied.", "error");
+    } else { 
+      showToast(!currentStatus ? "Payment permission granted." : "Payment permission revoked."); 
+    }
   }
 
   function resetTeamForm() { 
@@ -441,11 +470,9 @@ export default function Setup({ activeTab }: SetupProps) {
     setActiveSquadFixture(fixture); 
     setPlayerSearch(""); 
     
-    // Fetch assigned squad
     const { data: squadData } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); 
     setSquadPlayerIds(squadData ? squadData.map(row => row.player_id) : []); 
 
-    // Fetch availability data for this fixture
     const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", fixture.id);
     setAvailabilityData(availData || []);
 
@@ -533,6 +560,8 @@ export default function Setup({ activeTab }: SetupProps) {
   const unassignedPlayers = filteredRosterPlayers.filter(p => p.default_team_id === null);
   const otherTeamPlayers = filteredRosterPlayers.filter(p => p.default_team_id !== activeRosterTeam?.id && p.default_team_id !== null);
 
+  const uniqueEmails = Array.from(new Set(clubUsers.map(user => user.email)));
+
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
       
@@ -542,7 +571,6 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
       )}
 
-      {/* GOD MODE CLUB PICKER */}
       {profile?.role === 'super_admin' && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm mb-6 flex items-center gap-4 transition-colors">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
@@ -568,16 +596,11 @@ export default function Setup({ activeTab }: SetupProps) {
       {/* --- CONFIG TAB --- */}
       {activeTab === 'config' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
-          
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding & Sponsors</h2>
             <div className="space-y-4">
-              
-              {/* ANNOUNCEMENT FIELD */}
               <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">
-                  Active Club Announcement
-                </label>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Active Club Announcement</label>
                 <textarea 
                   value={announcement} 
                   onChange={(e) => setAnnouncement(e.target.value)} 
@@ -585,9 +608,7 @@ export default function Setup({ activeTab }: SetupProps) {
                   rows={2}
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors resize-none"
                 />
-                <p className="text-[8px] text-zinc-400 mt-1 ml-1 font-bold uppercase tracking-widest">
-                  This appears at the very top of all team landing pages.
-                </p>
+                <p className="text-[8px] text-zinc-400 mt-1 ml-1 font-bold uppercase tracking-widest">This appears at the very top of all team landing pages.</p>
               </div>
 
               <div>
@@ -608,7 +629,6 @@ export default function Setup({ activeTab }: SetupProps) {
                 </div>
               </div>
 
-              {/* SPONSOR UPLOADS */}
               <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/50 space-y-4">
                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-2">Club Sponsors (Public Page)</label>
                  
@@ -724,7 +744,6 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
-          {/* MANUAL PAYMENT DETAILS (ORG LEVEL) */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Club Level)</h2>
             <div className="space-y-4">
@@ -771,7 +790,7 @@ export default function Setup({ activeTab }: SetupProps) {
       {clubId && clubId !== 'new' && activeTab === 'access' && (
         <div className="space-y-6 animate-in fade-in">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Invite User / Grant Access</h2>
+            <h2 className="text-[11px] font-black uppercase italic text-zinc-800 dark:text-zinc-200 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Add Admins</h2>
             <div className="space-y-4">
               <input 
                 type="email" 
@@ -812,83 +831,106 @@ export default function Setup({ activeTab }: SetupProps) {
                 disabled={isSaving || !inviteEmail}
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50 shadow-md"
               >
-                {isSaving ? "Processing..." : "Grant Access"}
+                {isSaving ? "Processing..." : "Invite Admin"}
               </button>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Permissions Ledger</h3>
-            {clubUsers.length === 0 ? (
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Current Admins</h3>
+            {uniqueEmails.length === 0 ? (
               <div className="text-center py-6 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors">
                 <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No assigned roles found.</p>
               </div>
             ) : (
-              clubUsers.map(user => (
-                <div key={user.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-bold text-zinc-900 dark:text-white text-sm">{user.email}</div>
-                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${user.role === 'club_admin' ? 'text-blue-500 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                        {user.role === 'club_admin' ? 'Club Manager' : 'Team Manager'}
-                        {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
-                      </div>
+              uniqueEmails.map((email) => {
+                const userRolesForEmail = clubUsers.filter(u => u.email === email);
+                
+                // Cross-reference with the players array to display their linked name
+                const linkedPlayer = players.find(p => p.email && p.email.toLowerCase() === email.toLowerCase());
+
+                return (
+                  <div key={email} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors">
+                    <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2 flex flex-col">
+                      {linkedPlayer ? (
+                        <>
+                          <div className="font-bold text-zinc-900 dark:text-white text-sm uppercase tracking-wide flex items-center gap-2">
+                            <span>{linkedPlayer.first_name} {linkedPlayer.last_name}</span>
+                            {linkedPlayer.nickname && <span className="text-zinc-400 dark:text-zinc-500 text-xs italic font-normal normal-case">"{linkedPlayer.nickname}"</span>}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 font-bold mt-0.5">{email}</div>
+                        </>
+                      ) : (
+                        <div className="font-bold text-zinc-900 dark:text-white text-sm">{email}</div>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => {
-                        setEditingRoleId(user.id);
-                        setEditRoleAssigned(user.role);
-                        setEditRoleTeamId(user.team_id || "");
-                      }} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center">
-                        <i className="fa-solid fa-pen text-xs"></i>
-                      </button>
-                      <button onClick={() => handleRemoveRole(user.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
-                        <i className="fa-solid fa-trash text-xs"></i>
-                      </button>
+                    <div className="space-y-2">
+                      {userRolesForEmail.map((user) => (
+                        <div key={user.id} className="flex flex-col bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-100 dark:border-zinc-700/50">
+                          <div className="flex justify-between items-center">
+                            <div className={`text-[9px] font-black uppercase tracking-widest ${user.role === 'club_admin' ? 'text-blue-500 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
+                              {user.role === 'club_admin' ? 'Club Manager' : 'Team Manager'}
+                              {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => {
+                                setEditingRoleId(user.id);
+                                setEditRoleAssigned(user.role);
+                                setEditRoleTeamId(user.team_id || "");
+                              }} className="w-7 h-7 rounded-md bg-zinc-200 dark:bg-zinc-700 text-zinc-500 hover:text-blue-600 transition-colors flex items-center justify-center">
+                                <i className="fa-solid fa-pen text-[10px]"></i>
+                              </button>
+                              <button onClick={() => handleRemoveRole(user.id)} className="w-7 h-7 rounded-md bg-zinc-200 dark:bg-zinc-700 text-zinc-500 hover:text-red-500 transition-colors flex items-center justify-center">
+                                <i className="fa-solid fa-trash text-[10px]"></i>
+                              </button>
+                            </div>
+                          </div>
+
+                          {editingRoleId === user.id && (
+                            <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                              <div className="flex gap-2">
+                                <select 
+                                  value={editRoleAssigned || ""} 
+                                  onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
+                                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500"
+                                >
+                                  <option value="club_admin">Club Manager</option>
+                                  <option value="team_admin">Team Manager</option>
+                                </select>
+                                
+                                {editRoleAssigned === 'team_admin' && (
+                                  <select 
+                                    value={editRoleTeamId || ""} 
+                                    onChange={(e) => setEditRoleTeamId(e.target.value)} 
+                                    className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500"
+                                  >
+                                    <option value="">-- Select Team --</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                  </select>
+                                )}
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingRoleId(null)} className="flex-1 py-1.5 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 text-zinc-700 dark:text-zinc-300 rounded-lg text-[10px] font-black uppercase transition-colors">Cancel</button>
+                                <button onClick={() => saveRoleUpdate(user.id)} className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase transition-colors">Save</button>
+                              </div>
+                            </div>
+                          )}
+
+                          {user.role !== 'club_admin' && editingRoleId !== user.id && (
+                            <div className="flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2 transition-colors">
+                              <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">Square Payments</span>
+                              <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-colors shadow-sm ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'}`}>
+                                {user.can_take_payments ? 'Enabled' : 'Disabled'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
-
-                  {editingRoleId === user.id && (
-                    <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 transition-colors">
-                      <div className="flex gap-2">
-                        <select 
-                          value={editRoleAssigned || ""} 
-                          onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
-                          className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
-                        >
-                          <option value="club_admin">Club Manager</option>
-                          <option value="team_admin">Team Manager</option>
-                        </select>
-                        
-                        {editRoleAssigned === 'team_admin' && (
-                          <select 
-                            value={editRoleTeamId || ""} 
-                            onChange={(e) => setEditRoleTeamId(e.target.value)} 
-                            className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
-                          >
-                            <option value="">-- Select Team --</option>
-                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                          </select>
-                        )}
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditingRoleId(null)} className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase transition-colors">Cancel</button>
-                        <button onClick={() => saveRoleUpdate(user.id)} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase transition-colors">Save</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {user.role !== 'club_admin' && editingRoleId !== user.id && (
-                    <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-1 transition-colors">
-                      <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">Square Payments</span>
-                      <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg transition-colors shadow-sm ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500'}`}>
-                        {user.can_take_payments ? 'Enabled' : 'Disabled'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -1040,6 +1082,7 @@ export default function Setup({ activeTab }: SetupProps) {
           clubId={clubId} 
           teams={teams} 
           players={players} 
+          clubUsers={clubUsers} 
           loadClubData={loadClubData} 
           showToast={showToast} 
         />

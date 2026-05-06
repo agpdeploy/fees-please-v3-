@@ -429,7 +429,7 @@ export default function Home() {
                         <i className="fa-solid fa-sliders w-5 text-center"></i> Configuration
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('access'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'access' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-shield-halved w-5 text-center"></i> Access
+                        <i className="fa-solid fa-shield-halved w-5 text-center"></i> Admins
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); setIsSidebarOpen(false); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams

@@ -25,12 +25,12 @@ export async function POST(req: Request) {
     let userId = null;
     let isNewUser = false;
 
-    // 1. Check if this user already exists in our system
+    // 1. Check if this user already exists in our system (The Unified Identity)
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('email', cleanEmail)
-      .single();
+      .maybeSingle();
 
     if (existingProfile) {
       // User exists! Grab their ID.
@@ -62,34 +62,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: roleError.message }, { status: 400 });
     }
 
-    // 3. The BULLETPROOF Roster Auto-Merge
-    const namePart = cleanEmail.split('@')[0];
-    const firstNameFallback = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-
-    // Look for an existing player matching the exact email OR the first name fallback
+    // 3. The True Atlassian-Style Roster Merge
+    // Look for an existing player matching the exact email OR their User ID
     const { data: existingPlayer } = await supabaseAdmin.from('players')
-      .select('id')
+      .select('id, default_team_id')
       .eq('club_id', club_id)
-      .is('user_id', null) 
-      .or(`email.eq.${cleanEmail},first_name.ilike.%${firstNameFallback}%`)
+      .or(`email.eq.${cleanEmail},user_id.eq.${userId}`)
       .limit(1)
-      .single();
+      .maybeSingle(); // Use maybeSingle to prevent crash if not found
       
     if (existingPlayer) {
-      // MATCH FOUND: Link the auth user to this historical player profile
+      // MATCH FOUND: They are already in the club roster. 
+      // Ensure their user_id is linked. We only update their default team 
+      // if they don't already have one assigned.
+      const updatePayload: any = { user_id: userId };
+      
+      if (!existingPlayer.default_team_id && role === 'team_admin' && team_id) {
+        updatePayload.default_team_id = team_id;
+      }
+
       await supabaseAdmin.from('players')
-        .update({ 
-          user_id: userId,
-          default_team_id: role === 'team_admin' ? team_id : undefined 
-        })
+        .update(updatePayload)
         .eq('id', existingPlayer.id);
+
     } else if (role === 'team_admin' && team_id) {
-      // NO MATCH: They are brand new. Create a new player record for the captain.
+      // NO MATCH: They are brand new to this club. Create a placeholder roster record.
+      const namePart = cleanEmail.split('@')[0];
+      const firstNameFallback = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+
       await supabaseAdmin.from('players').insert({
         user_id: userId,
         email: cleanEmail,
         first_name: firstNameFallback,
-        last_name: "(Captain)",
+        last_name: "(Manager)",
         club_id: club_id,
         default_team_id: team_id,
         is_member: true
