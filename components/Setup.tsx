@@ -31,6 +31,7 @@ export default function Setup({ activeTab }: SetupProps) {
   // CONFIG STATE
   const [clubName, setClubName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [announcement, setAnnouncement] = useState(""); // <-- ADDED ANNOUNCEMENT STATE
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   
   // SPONSOR STATE
@@ -124,6 +125,7 @@ export default function Setup({ activeTab }: SetupProps) {
       setClubRecord(clubData);
       setClubName(clubData.name || "");
       setLogoUrl(clubData.logo_url || "");
+      setAnnouncement(clubData.announcement || ""); // <-- FETCH ANNOUNCEMENT
       setSeasonName(clubData.season_name || "");
       setSeasonStart(clubData.season_start || "");
       setSeasonEnd(clubData.season_end || "");
@@ -172,7 +174,7 @@ export default function Setup({ activeTab }: SetupProps) {
       loadClubData(); 
     } else if (clubId === 'new') {
       setIsLoading(false);
-      setClubName(""); setLogoUrl(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd("");
+      setClubName(""); setLogoUrl(""); setAnnouncement(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd("");
       setTeams([]); setPlayers([]); setFixtures([]); setClubUsers([]);
     }
   }, [clubId]);
@@ -246,7 +248,8 @@ export default function Setup({ activeTab }: SetupProps) {
     const generatedSlug = clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const payload = { 
       name: clubName, 
-      logo_url: logoUrl, 
+      logo_url: logoUrl,
+      announcement: announcement, // <-- SAVE ANNOUNCEMENT
       season_name: seasonName, 
       season_start: seasonStart || null, 
       season_end: seasonEnd || null, 
@@ -569,6 +572,24 @@ export default function Setup({ activeTab }: SetupProps) {
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding & Sponsors</h2>
             <div className="space-y-4">
+              
+              {/* ANNOUNCEMENT FIELD */}
+              <div>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">
+                  Active Club Announcement
+                </label>
+                <textarea 
+                  value={announcement} 
+                  onChange={(e) => setAnnouncement(e.target.value)} 
+                  placeholder="e.g. 📢 Ground closed today due to rain. All games cancelled." 
+                  rows={2}
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors resize-none"
+                />
+                <p className="text-[8px] text-zinc-400 mt-1 ml-1 font-bold uppercase tracking-widest">
+                  This appears at the very top of all team landing pages.
+                </p>
+              </div>
+
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Name</label>
                 <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
