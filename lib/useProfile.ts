@@ -18,22 +18,39 @@ export function useProfile() {
         
         if (!session) {
           console.log("📡 useProfile: No session found.");
+          if (isMounted) setLoading(false);
           return;
         }
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-        // Fetch data in parallel to save time
+        // Fetch data using the OR logic to catch unlinked invites by email
         const [profileRes, rolesRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-          supabase.from('user_roles').select('*, clubs(id, name, logo_url)').eq('user_id', user.id)
+          supabase.from('user_roles')
+            .select('*, clubs(id, name, logo_url)')
+            .or(`user_id.eq.${user.id},email.eq.${user.email}`) 
         ]);
 
         const profileData = profileRes.data;
-        const rolesData = rolesRes.data || [];
+        let rolesData = rolesRes.data || [];
 
-        // STRICT BOOLEAN CASTING TO SATISFY TYPESCRIPT
+        // --- 🚨 SELF-HEALING INVITE LOGIC 🚨 ---
+        // If they have an invited role but no UUID attached, bind it now!
+        const unlinkedRoles = rolesData.filter((r: any) => !r.user_id && r.email === user.email);
+        if (unlinkedRoles.length > 0) {
+          console.log("📡 useProfile: Claiming orphaned roles...");
+          for (const role of unlinkedRoles) {
+            await supabase.from('user_roles').update({ user_id: user.id }).eq('id', role.id);
+            // Update local state so it doesn't stay null
+            role.user_id = user.id; 
+          }
+        }
+
         const isSuper: boolean = Boolean(rolesData.some((r: any) => r.role === 'super_admin'));
         const adminRole = rolesData.find((r: any) => r.role === 'club_admin');
         const teamRole = rolesData.find((r: any) => r.role === 'team_admin');
@@ -59,28 +76,33 @@ export function useProfile() {
                 event: '*', 
                 schema: 'public',
                 table: 'user_roles',
-                filter: `user_id=eq.${user.id}`, 
-              }, () => fetchRolesSilently(user.id, profileData, isSuper))
+                filter: `user_id=eq.${user.id}`, // This works now because we self-healed above!
+              }, () => fetchRolesSilently(user.id, profileData, isSuper, user.email))
               .subscribe();
           }
         }
       } catch (err) {
         console.error("❌ Profile Sync Error:", err);
       } finally {
-        // THIS IS THE UNSTUCKER: It must run even if there's an error
         if (isMounted) setLoading(false);
       }
     }
 
-    async function fetchRolesSilently(userId: string, baseProfileData: any, isSuper: boolean) {
+    async function fetchRolesSilently(userId: string, baseProfileData: any, isSuper: boolean, email: string | undefined) {
       if (!isMounted) return;
-      const { data: rolesData } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url)').eq('user_id', userId);
+      
+      // Also updated to use the OR logic just in case
+      const query = email 
+        ? `user_id.eq.${userId},email.eq.${email}` 
+        : `user_id.eq.${userId}`;
+        
+      const { data: rolesData } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url)').or(query);
       const adminRole = rolesData?.find((r: any) => r.role === 'club_admin');
       const teamRole = rolesData?.find((r: any) => r.role === 'team_admin');
 
       setProfile({
         id: userId,
-        email: baseProfileData?.email, 
+        email: baseProfileData?.email || email, 
         ...(baseProfileData || {}), 
         role: isSuper ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
         club_id: adminRole?.club_id || teamRole?.club_id || null,
