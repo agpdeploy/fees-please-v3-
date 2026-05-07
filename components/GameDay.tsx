@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
@@ -533,7 +533,7 @@ export default function GameDay() {
     setIsProcessing(false);
   }
 
-  // --- REVERTED: Clean Insert for RLS ---
+  // --- Clean Insert for RLS ---
   async function toggleSquadMember(playerId: string) {
     if (!activeFixture) return;
     setIsProcessing(true);
@@ -568,7 +568,7 @@ export default function GameDay() {
     }
   }
 
-  // --- REVERTED: Clean Insert for RLS ---
+  // --- Clean Insert for RLS ---
   async function createAndAddPlayer(fullName: string) {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     if (!resolvedClubId || !activeFixture) return;
@@ -709,18 +709,18 @@ export default function GameDay() {
               </span>
             </div>
             
-            <div className="flex gap-2">
-              <button 
-                onClick={() => openAiReporter(activeFixture)} 
-                disabled={isProcessing}
-                className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
-              >
-                {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin text-xs"></i> : <i className="fa-solid fa-wand-magic-sparkles text-xs"></i>}
-              </button>
-              <button onClick={openManageSquad} className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center transition-colors">
-                <i className="fa-solid fa-user-plus text-xs"></i>
-              </button>
-            </div>
+            {/* UPDATED: Prominent Add Player button replacing magic wand */}
+            {canManage && (
+              <div className="flex gap-2">
+                <button 
+                  onClick={openManageSquad}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-black uppercase shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <i className="fa-solid fa-user-plus"></i>
+                  <span>Add Player</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="p-4 flex items-center justify-between gap-2">
@@ -813,11 +813,42 @@ export default function GameDay() {
       {/* --- PAYMENT & COLLECTION AREA --- */}
       {activeFixture && (
         <div className="mb-4 mt-8 border-t border-zinc-200 dark:border-zinc-800/50 pt-6 transition-colors">
+          
+          {/* --- ALWAYS-ON UMPIRE/EXPENSE TOGGLE --- */}
+          {activeFixture?.umpire_fee > 0 && (
+            <div className="mb-6">
+              <div 
+                className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 cursor-pointer active:scale-[0.98]'}`} 
+                onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isUmpirePaid ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : payUmpire ? 'bg-red-50 dark:bg-red-500/10 text-red-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
+                    <i className={`fa-solid ${isUmpirePaid ? 'fa-check' : 'fa-whistle'} text-sm`}></i>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Match Expense</span>
+                    <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                      {clubInfo.expense_label || 'Umpire'} (${activeFixture?.umpire_fee})
+                    </span>
+                  </div>
+                </div>
+                
+                {isUmpirePaid ? (
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">Paid</span>
+                ) : (
+                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-between items-center mb-4 px-1">
              <h2 className="text-[11px] font-black uppercase italic tracking-widest text-emerald-600 dark:text-emerald-500">To Pay ({squadToPay.length})</h2>
              <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400">Clear All</button>
           </div>
-          
+
           <div className="flex flex-wrap gap-2.5 mb-6">
             {isSquadLoading ? (
                <div className="w-full text-center py-6">
@@ -886,6 +917,7 @@ export default function GameDay() {
       {/* --- SELECTED PLAYERS PAYMENT PANEL --- */}
       {activeFixture && selectedPlayers.length > 0 && (
         <div className="space-y-4 animate-in slide-in-from-bottom-6">
+
           {selectedPlayers.map(player => {
             const data = paymentData[player.id];
             const currentBalance = playerDebts[player.id] || 0;
@@ -943,34 +975,7 @@ export default function GameDay() {
             );
           })}
           
-          <div className="pt-4 space-y-4">
-            {activeFixture?.umpire_fee > 0 && (
-              <div 
-                className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 cursor-pointer active:scale-[0.98]'}`} 
-                onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isUmpirePaid ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : payUmpire ? 'bg-red-50 dark:bg-red-500/10 text-red-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
-                    <i className={`fa-solid ${isUmpirePaid ? 'fa-check' : 'fa-whistle'} text-sm`}></i>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Match Expense</span>
-                    <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
-                      {clubInfo.expense_label || 'Umpire'} (${activeFixture?.umpire_fee})
-                    </span>
-                  </div>
-                </div>
-                
-                {isUmpirePaid ? (
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">Paid</span>
-                ) : (
-                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                  </div>
-                )}
-              </div>
-            )}
-            
+          <div className="pt-4 space-y-4">            
             <div className="flex justify-between items-end px-2">
               <span className="text-xs font-black italic text-zinc-500 uppercase tracking-widest">
                 {netTotal < 0 ? 'Net Outlay:' : 'Total Collected:'}
@@ -1095,7 +1100,7 @@ export default function GameDay() {
 
       {/* --- SELECT TEAM MODAL --- */}
       {isManageSquadOpen && (
-        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
               <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Select Team</h2>
@@ -1175,6 +1180,13 @@ export default function GameDay() {
                   );
                 })}
               </div>
+            </div>
+            
+            <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
+              <button onClick={() => setIsManageSquadOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+              <button onClick={() => setIsManageSquadOpen(false)} disabled={isProcessing} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">
+                Done
+              </button>
             </div>
           </div>
         </div>

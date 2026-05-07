@@ -339,6 +339,12 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
                             <input type="text" placeholder="Nickname" value={p.nickname || ""} onChange={(e) => updateDraftPlayer(i, 'nickname', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
                             <input type="tel" placeholder="Mobile" value={p.mobile_number || ""} onChange={(e) => updateDraftPlayer(i, 'mobile_number', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
                           </div>
+                          
+                          {/* NEW: ADDED EMAIL FIELD IN REVIEW MODE */}
+                          <div className="flex gap-2 pr-6 mt-1">
+                            <input type="email" placeholder="Email" value={p.email || ""} onChange={(e) => updateDraftPlayer(i, 'email', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                          </div>
+
                           <div className="flex items-center justify-between mt-1">
                              <button 
                                onClick={() => updateDraftPlayer(i, 'is_member', !p.is_member)}
@@ -516,6 +522,13 @@ function PlayerRow({
             </span>
           )}
         </div>
+        
+        {/* NEW: ADDED EMAIL DISPLAY FOR THE LIST VIEW */}
+        {player.email && (
+          <div className="text-[10px] text-zinc-500 mt-0.5 lowercase font-bold">
+            {player.email}
+          </div>
+        )}
         
         <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex items-center gap-2">
           <span className={!teamExists ? "text-amber-500 dark:text-amber-600" : ""}>{currentTeamName}</span>
