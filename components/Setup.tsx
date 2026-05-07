@@ -73,6 +73,8 @@ export default function Setup({ activeTab }: SetupProps) {
   // TEAM STATE
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
+  const [teamSlug, setTeamSlug] = useState(""); // <--- NEW SLUG STATE
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false); // <--- TRACKS IF WE SHOULD AUTO-GENERATE
   const [memberFee, setMemberFee] = useState<number | "">(10);
   const [casualFee, setCasualFee] = useState<number | "">(25);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
@@ -226,7 +228,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'sponsor1' | 'sponsor2' | 'sponsor3') {
     const file = e.target.files?.[0];
-    if (!file || !clubId || clubId === 'new') return showToast("Please save the club name first.", "error");
+    if (!file) return;
     if (file.size > 10 * 1024 * 1024) return showToast("File too large. Max 10MB.", "error");
     
     if (type === 'logo') setIsUploadingLogo(true);
@@ -403,6 +405,8 @@ export default function Setup({ activeTab }: SetupProps) {
 
   function resetTeamForm() { 
     setTeamName(""); 
+    setTeamSlug("");
+    setIsSlugManuallyEdited(false);
     setEditingTeamId(null); 
     setMemberFee(defaultMemberFee || 10); 
     setCasualFee(defaultCasualFee || 25); 
@@ -411,38 +415,64 @@ export default function Setup({ activeTab }: SetupProps) {
 
   function startEditingTeam(t: any) { 
     setTeamName(t.name); 
+    setTeamSlug(t.slug || "");
+    setIsSlugManuallyEdited(!!t.slug);
     setMemberFee(t.member_fee !== undefined ? t.member_fee : 10); 
     setCasualFee(t.casual_fee !== undefined ? t.casual_fee : 25); 
     setEditingTeamId(t.id); 
     setIsTeamModalOpen(true);
   }
+
+  function handleTeamNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newName = e.target.value;
+    setTeamName(newName);
+    
+    // Auto-generate slug only if the user hasn't manually edited it
+    if (!isSlugManuallyEdited) {
+      setTeamSlug(newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
+    }
+  }
+
+  function handleSlugChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setTeamSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+    setIsSlugManuallyEdited(true);
+  }
   
   async function saveTeam() {
     if (!teamName) return showToast("Team name is required.", "error");
+    
+    // Fallback if slug is empty
+    const finalSlug = teamSlug || teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
     const payload = { 
       name: teamName, 
+      slug: finalSlug,
       member_fee: memberFee === "" ? 0 : memberFee, 
       casual_fee: casualFee === "" ? 0 : casualFee, 
       club_id: clubId
     };
     
     setIsSaving(true);
-    let error;
+    let result;
     let savedTeamId = editingTeamId;
+
     if (editingTeamId) { 
-      const res = await supabase.from("teams").update(payload).eq("id", editingTeamId); 
-      error = res.error; 
+      result = await supabase.from("teams").update(payload).eq("id", editingTeamId).select().single(); 
     } else { 
-      const res = await supabase.from("teams").insert([payload]).select().single(); 
-      error = res.error; 
-      if (res.data) savedTeamId = res.data.id;
+      result = await supabase.from("teams").insert([payload]).select().single(); 
     }
     
     setIsSaving(false);
-    if (error) {
-      showToast(error.message, "error"); 
+
+    if (result.error) {
+      if (result.error.code === '23505') { // Postgres Unique Constraint Violation
+        showToast("That Custom Link is already taken. Please try a different one.", "error");
+      } else {
+        showToast(result.error.message, "error"); 
+      }
     } else { 
-      if (savedTeamId) {
+      if (result.data) {
+        savedTeamId = result.data.id;
         await supabase.from("public_team_profiles").upsert({
           team_id: savedTeamId,
           team_name: teamName,
@@ -634,49 +664,61 @@ export default function Setup({ activeTab }: SetupProps) {
                 <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
               
-              <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo</label>
-                <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 p-3 rounded-xl transition-colors">
-                  {logoUrl ? <img src={logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-cover bg-white" /> : <div className="w-12 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500"><i className="fa-solid fa-image"></i></div>}
-                  <div className="flex-1">
-                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logo')} className="hidden" id="logo-upload" disabled={isUploadingLogo || !clubId || clubId === 'new'} />
-                    <label htmlFor="logo-upload" className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-block ${isUploadingLogo || !clubId || clubId === 'new' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed' : 'bg-zinc-800 dark:bg-zinc-700 text-white hover:bg-zinc-700 dark:hover:bg-zinc-600 cursor-pointer shadow-sm'}`}>
-                      {(!clubId || clubId === 'new') ? "Save club name first" : (isUploadingLogo ? "Processing..." : "Upload Logo")}
-                    </label>
+              {(!clubId || clubId === 'new') ? (
+                <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Club First to Upload Logo</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo</label>
+                  <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 p-3 rounded-xl transition-colors">
+                    {logoUrl ? <img src={logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-cover bg-white" /> : <div className="w-12 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500"><i className="fa-solid fa-image"></i></div>}
+                    <div className="flex-1">
+                      <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logo')} className="hidden" id="logo-upload" disabled={isUploadingLogo} />
+                      <label htmlFor="logo-upload" className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-block ${isUploadingLogo ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed' : 'bg-zinc-800 dark:bg-zinc-700 text-white hover:bg-zinc-700 dark:hover:bg-zinc-600 cursor-pointer shadow-sm'}`}>
+                        {isUploadingLogo ? "Processing..." : "Upload Logo"}
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/50 space-y-4">
                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-2">Club Sponsors (Public Page)</label>
                  
-                 {[
-                   { id: 'sponsor1', num: 1, logo: sponsor1Logo, url: sponsor1Url, setUrl: setSponsor1Url, clear: () => {setSponsor1Logo(""); setSponsor1Url("")} },
-                   { id: 'sponsor2', num: 2, logo: sponsor2Logo, url: sponsor2Url, setUrl: setSponsor2Url, clear: () => {setSponsor2Logo(""); setSponsor2Url("")} },
-                   { id: 'sponsor3', num: 3, logo: sponsor3Logo, url: sponsor3Url, setUrl: setSponsor3Url, clear: () => {setSponsor3Logo(""); setSponsor3Url("")} }
-                 ].map((s) => (
-                   <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
-                      <div className="flex gap-3">
-                         <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative group">
-                            {s.logo ? (
-                               <>
-                                 <img src={s.logo} className="w-full h-full object-contain p-1" />
-                                 <button onClick={s.clear} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="fa-solid fa-trash text-xs"></i></button>
-                               </>
-                            ) : <i className="fa-solid fa-image text-zinc-400"></i>}
-                         </div>
-                         <div className="flex-1 space-y-2">
-                           <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor || !clubId || clubId === 'new'} />
-                           <div className="flex justify-between items-center">
-                              <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors ${!clubId || clubId === 'new' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30'}`}>
-                                 {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
-                              </label>
+                 {(!clubId || clubId === 'new') ? (
+                    <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Club First to Upload Sponsors</p>
+                    </div>
+                 ) : (
+                   [
+                     { id: 'sponsor1', num: 1, logo: sponsor1Logo, url: sponsor1Url, setUrl: setSponsor1Url, clear: () => {setSponsor1Logo(""); setSponsor1Url("")} },
+                     { id: 'sponsor2', num: 2, logo: sponsor2Logo, url: sponsor2Url, setUrl: setSponsor2Url, clear: () => {setSponsor2Logo(""); setSponsor2Url("")} },
+                     { id: 'sponsor3', num: 3, logo: sponsor3Logo, url: sponsor3Url, setUrl: setSponsor3Url, clear: () => {setSponsor3Logo(""); setSponsor3Url("")} }
+                   ].map((s) => (
+                     <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
+                        <div className="flex gap-3">
+                           <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative group">
+                              {s.logo ? (
+                                 <>
+                                   <img src={s.logo} className="w-full h-full object-contain p-1" />
+                                   <button onClick={s.clear} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="fa-solid fa-trash text-xs"></i></button>
+                                 </>
+                              ) : <i className="fa-solid fa-image text-zinc-400"></i>}
                            </div>
-                           <input type="url" placeholder="https://..." value={s.url} onChange={(e) => s.setUrl(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                         </div>
-                      </div>
-                   </div>
-                 ))}
+                           <div className="flex-1 space-y-2">
+                             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor} />
+                             <div className="flex justify-between items-center">
+                                <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30'}`}>
+                                   {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
+                                </label>
+                             </div>
+                             <input type="url" placeholder="https://..." value={s.url} onChange={(e) => s.setUrl(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                           </div>
+                        </div>
+                     </div>
+                   ))
+                 )}
               </div>
             </div>
           </div>
@@ -1004,7 +1046,7 @@ export default function Setup({ activeTab }: SetupProps) {
                       
                       <div className="flex gap-2 shrink-0 ml-4">
                         <button onClick={() => {
-                          const link = `${window.location.origin}/t/${t.id}`;
+                          const link = `${window.location.origin}/t/${t.slug || t.id}`;
                           navigator.clipboard.writeText(link);
                           showToast("Team Link Copied!");
                         }} className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-colors flex items-center justify-center" title="Copy Public Availability Link">
@@ -1050,9 +1092,23 @@ export default function Setup({ activeTab }: SetupProps) {
                   type="text" 
                   placeholder="e.g. Bin Chickens" 
                   value={teamName || ""} 
-                  onChange={(e) => setTeamName(e.target.value)} 
+                  onChange={handleTeamNameChange} 
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                 />
+              </div>
+
+              <div>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Custom Link (Slug)</label>
+                <div className="flex items-center bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 overflow-hidden focus-within:border-emerald-500 transition-colors">
+                  <span className="text-zinc-400 dark:text-zinc-500 text-xs font-bold mr-1">feesplease.app/t/</span>
+                  <input 
+                    type="text" 
+                    placeholder="bin-chickens" 
+                    value={teamSlug} 
+                    onChange={handleSlugChange} 
+                    className="w-full bg-transparent py-3 text-sm text-zinc-900 dark:text-white outline-none" 
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3">
