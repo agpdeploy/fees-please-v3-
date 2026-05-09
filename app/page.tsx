@@ -1,4 +1,4 @@
-// Deploy version 5.9.3 - Router Safe Hydration & Deadlock Fix
+// Deploy version 5.9.5 - UI Padding Fix
 "use client";
 
 import { useState, useEffect } from "react";
@@ -140,9 +140,15 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
+    // 1. Check if we have a saved club from a previous session or Square redirect
+    const savedClubId = typeof window !== 'undefined' ? localStorage.getItem('fp_active_club_id') : null;
+
     if (!activeClubId) {
-      if (profile?.role === 'super_admin') {
+      // Prioritize the saved club above the default sorting
+      if (savedClubId) {
+        setActiveClubId(savedClubId);
+      } else if (profile?.role === 'super_admin') {
         if (allClubs.length > 0) setActiveClubId(allClubs[0].id);
       } else if (profile?.club_id) {
         setActiveClubId(profile.club_id);
@@ -152,6 +158,11 @@ export default function Home() {
     }
 
     if (activeClubId) {
+      // 2. Continually save the active club whenever it changes
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('fp_active_club_id', activeClubId);
+      }
+
       const fetchClubMeta = async () => {
         const { data } = await supabase.from('clubs').select('name, logo_url').eq('id', activeClubId).single();
         if (data) {
@@ -273,19 +284,26 @@ export default function Home() {
                       currentClubRole === 'club_admin' ? 'Club Manager' : 
                       currentClubRole === 'team_admin' ? 'Team Manager' : 'Player';
 
-  const userMeta = session?.user?.user_metadata;
+  const userMeta = session?.user?.user_metadata || {};
   const avatarUrl = userMeta?.avatar_url;
-  const fullName = userMeta?.full_name || '';
-  const emailStr = profile?.email || '';
+  const fullName = userMeta?.full_name;
+  const emailStr = profile?.email || session?.user?.email;
   
   let userInitials = 'U';
-  if (fullName) {
-    const parts = fullName.split(' ');
-    userInitials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
-  } else if (emailStr) {
-    userInitials = emailStr.substring(0, 2).toUpperCase();
+  try {
+    if (fullName && typeof fullName === 'string') {
+      const parts = fullName.trim().split(' ');
+      userInitials = parts.length > 1 && parts[parts.length - 1]
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() 
+        : parts[0].substring(0, 2).toUpperCase();
+    } else if (emailStr && typeof emailStr === 'string') {
+      userInitials = emailStr.substring(0, 2).toUpperCase();
+    }
+  } catch (e) {
+    userInitials = 'U'; // Absolute fallback
   }
-  const displayFirstName = fullName ? fullName.split(' ')[0] : (emailStr.split('@')[0] || 'User');
+  
+  const displayFirstName = fullName?.split(' ')?.[0] || emailStr?.split('@')?.[0] || 'User';
 
   return (
     <div className="flex flex-col h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
@@ -347,8 +365,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* 🔥 FIX: Added pb-32 here to ensure the inner content scrolls past the absolute nav bar */}
-      <main className="flex-1 relative z-30 flex flex-col overflow-hidden pb-32">
+      {/* 🔥 FIX: Changed pb-32 to pb-8 to match your custom Tailwind spacing setup */}
+      <main className="flex-1 relative z-30 flex flex-col overflow-hidden pb-8">
         <div className="flex-1 overflow-y-auto">
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
@@ -364,8 +382,11 @@ export default function Home() {
         )}
       </main>
 
-      {/* 🔥 FIX: Changed position from relative to absolute to fix the navigation bar at the bottom */}
-      <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black pb-8 pt-4 z-40">
+      {/* 🔥 FIX: Raised navigation menu based on custom spacing overrides */}
+      <nav 
+        className="absolute bottom-8 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pb-4 pt-4"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+      >
         <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
           <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
             <i className="fa-solid fa-bolt-lightning text-2xl mb-1"></i><span>GameDay</span>
