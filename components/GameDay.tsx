@@ -1,4 +1,4 @@
-// app/dashboard/gameday/page.tsx (or wherever this lives)
+// app/dashboard/gameday/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -282,6 +282,7 @@ export default function GameDay() {
   
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
+  // --- 🔥 FIX: Added umpire logic directly to the finalise function ---
   async function executeMatchFinalization() {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     
@@ -294,31 +295,57 @@ export default function GameDay() {
 
     try {
       const shouldChargeFees = finaliseStatus === 'completed' || (finaliseStatus === 'abandoned' && chargeAbandonedFee);
+      const batchTxPayload: any[] = [];
 
+      // 1. Process Debts
       if (shouldChargeFees) {
         const unpaidPlayers = squad.filter(p => !paidPlayerIds.includes(p.id));
         
         if (unpaidPlayers.length > 0) {
-          const debtPayload = unpaidPlayers.map(player => ({
-            player_id: player.id,
-            team_id: selectedTeamId,
-            fixture_id: activeFixture.id,
-            club_id: resolvedClubId,
-            amount: player.is_member ? teamFees.member : teamFees.casual,
-            transaction_type: 'fee'
-          }));
-
-          const { error: debtError } = await supabase.from("transactions").insert(debtPayload);
-          if (debtError) throw debtError;
+          unpaidPlayers.forEach(player => {
+            batchTxPayload.push({
+              player_id: player.id,
+              team_id: selectedTeamId,
+              fixture_id: activeFixture.id,
+              club_id: resolvedClubId,
+              amount: player.is_member ? teamFees.member : teamFees.casual,
+              transaction_type: 'fee'
+            });
+          });
         }
       }
 
+      // 2. Process Umpire Fee (if toggled and unpaid)
+      if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
+        batchTxPayload.push({
+          team_id: selectedTeamId, 
+          fixture_id: activeFixture.id, 
+          club_id: resolvedClubId, 
+          amount: activeFixture.umpire_fee, 
+          transaction_type: 'expense', 
+          payment_method: 'cash', 
+          description: clubInfo.expense_label || 'Match Expense' 
+        });
+      }
+
+      // 3. Execute Inserts
+      if (batchTxPayload.length > 0) {
+        const { error: debtError } = await supabase.from("transactions").insert(batchTxPayload);
+        if (debtError) throw debtError;
+      }
+
+      // 4. Update Fixture Status
       const { error } = await supabase
         .from('fixtures')
         .update({ status: finaliseStatus })
         .eq('id', activeFixture.id);
 
       if (error) throw error;
+
+      if (payUmpire) {
+        setIsUmpirePaid(true);
+        setPayUmpire(false);
+      }
 
       const successMsg = finaliseStatus === 'completed' 
         ? "Match Finalised & Debts Logged!" 
@@ -470,7 +497,6 @@ export default function GameDay() {
       const amount = payloadData[player.id]?.amount || 0;
       const fee = player.is_member ? teamFees.member : teamFees.casual;
       
-      // FIX: Use canManage instead of strict club_admin check
       if (isSquareEnabled && method === 'card' && amount > 0) {
          if (canManage) {
             continue; 
@@ -710,7 +736,6 @@ export default function GameDay() {
               </span>
             </div>
             
-            {/* UPDATED: Prominent Add Player button replacing magic wand */}
             {canManage && (
               <div className="flex gap-2">
                 <button 
@@ -815,36 +840,6 @@ export default function GameDay() {
       {activeFixture && (
         <div className="mb-4 mt-8 border-t border-zinc-200 dark:border-zinc-800/50 pt-6 transition-colors">
           
-          {/* --- ALWAYS-ON UMPIRE/EXPENSE TOGGLE --- */}
-          {activeFixture?.umpire_fee > 0 && (
-            <div className="mb-6">
-              <div 
-                className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 cursor-pointer active:scale-[0.98]'}`} 
-                onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isUmpirePaid ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : payUmpire ? 'bg-red-50 dark:bg-red-500/10 text-red-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
-                    <i className={`fa-solid ${isUmpirePaid ? 'fa-check' : 'fa-whistle'} text-sm`}></i>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Match Expense</span>
-                    <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
-                      {clubInfo.expense_label || 'Umpire'} (${activeFixture?.umpire_fee})
-                    </span>
-                  </div>
-                </div>
-                
-                {isUmpirePaid ? (
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">Paid</span>
-                ) : (
-                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-red-500' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="flex justify-between items-center mb-4 px-1">
              <h2 className="text-[11px] font-black uppercase italic tracking-widest text-emerald-600 dark:text-emerald-500">To Pay ({squadToPay.length})</h2>
              <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400">Clear All</button>
@@ -952,7 +947,6 @@ export default function GameDay() {
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         
-                        // FIX: Use canManage to authorize Square Tap to Pay for Team Admins
                         if (isSquareEnabled && canManage) {
                           initiateTapToPay(player);
                         } else if (clubInfo.pay_id_value) {
@@ -994,16 +988,55 @@ export default function GameDay() {
 
       {/* --- MATCH COMPLETION ACTIONS --- */}
       {activeFixture && selectedPlayerIds.length === 0 && (
-        <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-          <button 
-            onClick={() => { setFinaliseStatus('completed'); setChargeAbandonedFee(false); setIsFinaliseModalOpen(true); }} 
-            className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-sm active:scale-95 transition-all"
-          >
-            Finalise Match
-          </button>
-          <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center italic">
-            Closes the match and finalises the ledger.
-          </p>
+        <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 space-y-6">
+          
+          {/* --- MOVED: UMPIRE / EXPENSE TOGGLE --- */}
+          {activeFixture?.umpire_fee > 0 && (
+            <div className="mb-2">
+              <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3 ml-1">Match Expenses</h3>
+              <div 
+                className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-[#1A1A1A] border-zinc-200 dark:border-zinc-800 cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700 active:scale-[0.98]'}`} 
+                onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isUmpirePaid ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : payUmpire ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
+                    <i className={`fa-solid ${isUmpirePaid ? 'fa-check' : 'fa-whistle'} text-sm`}></i>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Record Payment?</span>
+                    <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                      {clubInfo.expense_label || 'Umpire'} (${activeFixture?.umpire_fee})
+                    </span>
+                  </div>
+                </div>
+                
+                {isUmpirePaid ? (
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">Paid</span>
+                ) : (
+                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                  </div>
+                )}
+              </div>
+              {!isUmpirePaid && !payUmpire && (
+                 <p className="text-[10px] text-zinc-400 dark:text-zinc-500 italic mt-2 ml-1">
+                   Toggle this if you paid the {clubInfo.expense_label || 'Umpire'} today.
+                 </p>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button 
+              onClick={() => { setFinaliseStatus('completed'); setChargeAbandonedFee(false); setIsFinaliseModalOpen(true); }} 
+              className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-sm active:scale-95 transition-all"
+            >
+              Finalise Match
+            </button>
+            <p className="text-[9px] text-zinc-400 dark:text-zinc-600 text-center italic">
+              Closes the match and finalises the ledger.
+            </p>
+          </div>
         </div>
       )}
 
