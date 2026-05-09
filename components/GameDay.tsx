@@ -282,7 +282,6 @@ export default function GameDay() {
   
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
-  // --- 🔥 FIX: Added umpire logic directly to the finalise function ---
   async function executeMatchFinalization() {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     
@@ -692,7 +691,8 @@ export default function GameDay() {
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
   return (
-    <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative overflow-x-hidden">
+    // 🔥 FIX: Increased bottom padding (pb-32) to prevent mobile browser bar blocking buttons
+    <div className="animate-in fade-in duration-300 space-y-6 pb-32 relative overflow-x-hidden">
       {toast && (
         <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[300] animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i> {toast.msg}
@@ -1134,13 +1134,15 @@ export default function GameDay() {
       {/* --- SELECT TEAM MODAL --- */}
       {isManageSquadOpen && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
+          {/* 🔥 FIX: Changed max-h-[80vh] to max-h-[90dvh] for better mobile scaling */}
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[90dvh] shadow-2xl transition-colors">
             <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
               <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Select Team</h2>
               <button onClick={() => setIsManageSquadOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
             
-            <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-24">
+            {/* 🔥 FIX: Reduced bottom padding (pb-24 to pb-6) so it scrolls correctly */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-6">
               <input type="text" placeholder="Search across club..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
               
               <div className="space-y-4">
