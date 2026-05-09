@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import posthog from 'posthog-js' // <-- Add PostHog import
 
 export function useProfile() {
   const [profile, setProfile] = useState<any>(null)
@@ -19,12 +20,14 @@ export function useProfile() {
         if (!session) {
           console.log("📡 useProfile: No session found.");
           if (isMounted) setLoading(false);
+          posthog.reset(); // <-- Reset tracking if they are not logged in
           return;
         }
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           if (isMounted) setLoading(false);
+          posthog.reset(); // <-- Reset tracking if no user
           return;
         }
 
@@ -67,6 +70,19 @@ export function useProfile() {
         if (isMounted) {
           setProfile(finalProfile);
           setRoles(rolesData);
+
+          // --- 🔥 IDENTIFY THE USER IN POSTHOG 🔥 ---
+          if (typeof window !== 'undefined') {
+            posthog.identify(
+              user.id, // The unique Supabase Auth ID
+              { 
+                email: user.email,
+                first_name: profileData?.first_name || '',
+                last_name: profileData?.last_name || '',
+                role: finalProfile.role 
+              }
+            );
+          }
           
           // --- REALTIME SUBSCRIPTION ---
           if (!rolesSubscription) {
@@ -100,15 +116,22 @@ export function useProfile() {
       const adminRole = rolesData?.find((r: any) => r.role === 'club_admin');
       const teamRole = rolesData?.find((r: any) => r.role === 'team_admin');
 
-      setProfile({
+      const updatedProfile = {
         id: userId,
         email: baseProfileData?.email || email, 
         ...(baseProfileData || {}), 
         role: isSuper ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
         club_id: adminRole?.club_id || teamRole?.club_id || null,
         team_id: teamRole?.team_id || null
-      });
+      };
+
+      setProfile(updatedProfile);
       setRoles(rolesData || []);
+
+      // Re-identify in case their role changed during the session
+      if (typeof window !== 'undefined') {
+        posthog.identify(userId, { role: updatedProfile.role });
+      }
     }
 
     getProfile();

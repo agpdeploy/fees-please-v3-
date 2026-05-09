@@ -1,7 +1,9 @@
+// app/t/[slugid]/TeamAvailabilityClient.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import posthog from 'posthog-js'; // Ensure posthog is imported
 
 interface ClientProps {
   teamId: string;
@@ -153,6 +155,18 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
       return { ...prev, [fixtureId]: [...filteredResponses, { player_id: selectedPlayer.id, status }] };
     });
     await supabase.from("availability").upsert({ player_id: selectedPlayer.id, fixture_id: fixtureId, status: status }, { onConflict: 'player_id, fixture_id' });
+    
+    // --- POSTHOG TRACKING EVENT ---
+    try {
+        posthog.capture('player_availability_set', {
+          team_name: teamName,
+          status: status,
+          is_public_link: true
+        });
+    } catch (e) {
+        console.error('Posthog tracking failed', e)
+    }
+
     setIsUpdating(null);
   }
 

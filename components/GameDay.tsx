@@ -1,3 +1,4 @@
+// app/dashboard/gameday/page.tsx (or wherever this lives)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -469,9 +470,9 @@ export default function GameDay() {
       const amount = payloadData[player.id]?.amount || 0;
       const fee = player.is_member ? teamFees.member : teamFees.casual;
       
+      // FIX: Use canManage instead of strict club_admin check
       if (isSquareEnabled && method === 'card' && amount > 0) {
-         const userRole = roles?.find((r: any) => r.club_id === resolvedClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
-         if (userRole?.can_take_payments || profile?.role === 'super_admin' || profile?.role === 'club_admin') {
+         if (canManage) {
             continue; 
          }
       }
@@ -950,10 +951,9 @@ export default function GameDay() {
                     <button 
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
-                        const userRole = roles?.find((r: any) => r.club_id === activeClubId && (r.team_id === selectedTeamId || r.role === 'club_admin'));
-                        const hasSquarePerms = userRole?.can_take_payments || profile.role === 'super_admin' || profile.role === 'club_admin';
-
-                        if (isSquareEnabled && hasSquarePerms) {
+                        
+                        // FIX: Use canManage to authorize Square Tap to Pay for Team Admins
+                        if (isSquareEnabled && canManage) {
                           initiateTapToPay(player);
                         } else if (clubInfo.pay_id_value) {
                           setActivePayIdPlayer(player);

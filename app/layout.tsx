@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from 'next'
 import { Manrope } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import { PostHogProvider } from '@/components/PostHogProvider' // <-- Import it here
 import "@/app/globals.css"
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
-// --- SEO METADATA ---
 export const metadata: Metadata = {
   title: "Fees Please",
   description: "Less chasing. More playing.",
@@ -16,11 +16,11 @@ export const metadata: Metadata = {
   },
 };
 
-// --- VIEWPORT SETTINGS ---
 export const viewport: Viewport = {
   themeColor: "#10b981",
   width: "device-width",
   initialScale: 1,
+  userScalable: true, // Allow zooming for accessibility
 };
 
 export default function RootLayout({
@@ -31,7 +31,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* 🔥 FIX: Restored the correct CSS path for Font Awesome! */}
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
       </head>
       <body 
@@ -44,9 +43,12 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <ClubProvider>
-            {children}
-          </ClubProvider>
+          {/* Wrap ClubProvider with PostHogProvider */}
+          <PostHogProvider>
+            <ClubProvider>
+              {children}
+            </ClubProvider>
+          </PostHogProvider>
         </ThemeProvider>
       </body>
     </html>
