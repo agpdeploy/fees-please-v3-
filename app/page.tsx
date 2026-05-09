@@ -347,7 +347,8 @@ export default function Home() {
         </div>
       )}
 
-      <main className="flex-1 relative z-30 flex flex-col overflow-hidden">
+      {/* 🔥 FIX: Added pb-32 here to ensure the inner content scrolls past the absolute nav bar */}
+      <main className="flex-1 relative z-30 flex flex-col overflow-hidden pb-32">
         <div className="flex-1 overflow-y-auto">
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
@@ -363,7 +364,8 @@ export default function Home() {
         )}
       </main>
 
-      <nav className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black pb-8 pt-4 z-40 relative">
+      {/* 🔥 FIX: Changed position from relative to absolute to fix the navigation bar at the bottom */}
+      <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black pb-8 pt-4 z-40">
         <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
           <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
             <i className="fa-solid fa-bolt-lightning text-2xl mb-1"></i><span>GameDay</span>
