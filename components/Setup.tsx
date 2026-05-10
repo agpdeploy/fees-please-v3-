@@ -73,8 +73,8 @@ export default function Setup({ activeTab }: SetupProps) {
   // TEAM STATE
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
-  const [teamSlug, setTeamSlug] = useState(""); // <--- NEW SLUG STATE
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false); // <--- TRACKS IF WE SHOULD AUTO-GENERATE
+  const [teamSlug, setTeamSlug] = useState(""); 
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [memberFee, setMemberFee] = useState<number | "">(10);
   const [casualFee, setCasualFee] = useState<number | "">(25);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
@@ -1097,18 +1097,26 @@ export default function Setup({ activeTab }: SetupProps) {
                 />
               </div>
 
-              <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Custom Link (Slug)</label>
-                <div className="flex items-center bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 overflow-hidden focus-within:border-emerald-500 transition-colors">
-                  <span className="text-zinc-400 dark:text-zinc-500 text-xs font-bold mr-1">feesplease.app/t/</span>
+              {/* NEW SLUG LOGIC INJECTED HERE */}
+              <div className="mb-4">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2 ml-1">
+                  Friendly URL Slug (Optional)
+                </label>
+                <div className="flex items-center bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-1 focus-within:border-emerald-500 transition-colors">
+                  <span className="text-zinc-400 dark:text-zinc-600 mr-1 select-none font-bold text-sm">
+                    feesplease.app/t/
+                  </span>
                   <input 
                     type="text" 
-                    placeholder="bin-chickens" 
                     value={teamSlug} 
-                    onChange={handleSlugChange} 
-                    className="w-full bg-transparent py-3 text-sm text-zinc-900 dark:text-white outline-none" 
+                    onChange={handleSlugChange}
+                    placeholder="bin-chickens"
+                    className="bg-transparent py-2 text-sm text-zinc-900 dark:text-white outline-none w-full font-bold placeholder:font-normal"
                   />
                 </div>
+                <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-1.5 italic ml-1">
+                  Used for a direct shareable link so players can easily pay.
+                </p>
               </div>
 
               <div className="flex gap-3">

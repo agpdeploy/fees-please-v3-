@@ -1,4 +1,4 @@
-// Deploy version 6.0.0 - Side Menu Navigation Architecture
+// Deploy version 6.1.2 - Stripped Greeting & Enforced Custom Spacing
 "use client";
 
 import { useState, useEffect } from "react";
@@ -30,6 +30,7 @@ export default function Home() {
 
   const [session, setSession] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   
   const { profile, roles, loading: profileLoading } = useProfile();
   const { activeClubId, setActiveClubId } = useActiveClub();
@@ -38,7 +39,7 @@ export default function Home() {
   const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
   const isAdmin = profile?.role === 'super_admin' || currentClubRole === 'club_admin';
   const isTeamAdmin = roles?.some((r: any) => r.role === 'team_admin' && r.club_id === activeClubId);
-  const canManage = isAdmin || isTeamAdmin; // Anyone with Management rights
+  const canManage = isAdmin || isTeamAdmin;
   
   const [clubMeta, setClubMeta] = useState({ name: 'FP', logo: '' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -48,17 +49,49 @@ export default function Home() {
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
   const [allClubs, setAllClubs] = useState<any[]>([]);
 
-  // --- VERBOSE DIAGNOSTIC LOGGING ---
+  // --- PWA UPDATE LISTENER (Fix for aggressive caching) ---
   useEffect(() => {
-    console.log("🕵️ GATEKEEPER STATE UPDATE:", {
-      isCheckingAuth,
-      session: !!session,
-      profileLoading,
-      hasProfile: !!profile,
-      rolesCount: roles?.length || 0,
-      showOnboarding
-    });
-  }, [isCheckingAuth, session, profileLoading, profile, roles, showOnboarding]);
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg) {
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  setUpdateAvailable(true);
+                }
+              });
+            }
+          });
+        }
+      });
+
+      // Also check for updates when user switches back to the tab
+      const checkUpdate = async () => {
+        try {
+          const reg = await navigator.serviceWorker.getRegistration();
+          reg?.update();
+        } catch(e) {}
+      };
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkUpdate();
+      });
+    }
+  }, []);
+
+  const applyUpdate = () => {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg?.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        window.location.reload();
+      });
+    } else {
+      window.location.reload();
+    }
+  };
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
@@ -81,21 +114,14 @@ export default function Home() {
     setActiveTab(tab);
     sessionStorage.setItem('activeTab', tab);
     setIsDaiveOpen(false); 
-    setIsSidebarOpen(false); // Auto-close sidebar on navigation
+    setIsSidebarOpen(false); 
   };
 
-  // --- THE CIRCUIT BREAKER AUTH CHECK (ROUTER SAFE) ---
   useEffect(() => {
     let isMounted = true;
-
     async function initAuth() {
-      console.log("🚀 AUTH: Starting initialization...");
-      
       const timeoutId = setTimeout(() => {
-        if (isMounted) {
-          console.error("🚨 AUTH: Deadlock detected! Supabase took too long to respond. Forcing to Login.");
-          setIsCheckingAuth(false);
-        }
+        if (isMounted) setIsCheckingAuth(false);
       }, 5000);
 
       try {
@@ -105,29 +131,22 @@ export default function Home() {
         if (isMounted) {
           setSession(session);
           setIsCheckingAuth(false);
-          console.log("🔓 AUTH: Session Resolved:", !!session);
           
           if (session && typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
              setTimeout(() => {
-               if (isMounted) {
-                 window.history.replaceState(null, '', window.location.pathname);
-               }
+               if (isMounted) window.history.replaceState(null, '', window.location.pathname);
              }, 500);
           }
         }
       } catch (err) {
         clearTimeout(timeoutId);
-        console.error("❌ AUTH: Init Error:", err);
         if (isMounted) setIsCheckingAuth(false);
       }
     }
 
-    const startDelay = setTimeout(() => {
-      initAuth();
-    }, 100);
+    const startDelay = setTimeout(() => initAuth(), 100);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("⚡ AUTH: Event Fired:", event);
       if (isMounted) {
         setSession(session);
         setIsCheckingAuth(false);
@@ -141,12 +160,10 @@ export default function Home() {
     };
   }, []);
 
- useEffect(() => {
-    // 1. Check if we have a saved club from a previous session or Square redirect
+  useEffect(() => {
     const savedClubId = typeof window !== 'undefined' ? localStorage.getItem('fp_active_club_id') : null;
 
     if (!activeClubId) {
-      // Prioritize the saved club above the default sorting
       if (savedClubId) {
         setActiveClubId(savedClubId);
       } else if (profile?.role === 'super_admin') {
@@ -159,7 +176,6 @@ export default function Home() {
     }
 
     if (activeClubId) {
-      // 2. Continually save the active club whenever it changes
       if (typeof window !== 'undefined') {
         localStorage.setItem('fp_active_club_id', activeClubId);
       }
@@ -167,10 +183,7 @@ export default function Home() {
       const fetchClubMeta = async () => {
         const { data } = await supabase.from('clubs').select('name, logo_url').eq('id', activeClubId).single();
         if (data) {
-          setClubMeta({ 
-            name: data.name || 'FP',
-            logo: data.logo_url || ''
-          });
+          setClubMeta({ name: data.name || 'FP', logo: data.logo_url || '' });
         }
       };
       fetchClubMeta();
@@ -183,22 +196,13 @@ export default function Home() {
     }
   }, [profile, isAdmin, activeTab]);
 
-  // --- IRONCLAD GATEKEEPER LOGIC ---
   useEffect(() => {
     if (profileLoading) return;
-
-    if (profile?.role === 'super_admin') {
+    if (profile?.role === 'super_admin' || profile?.onboarding_completed === true) {
       setShowOnboarding(false);
       return;
     }
-
-    if (profile?.onboarding_completed === true) {
-      setShowOnboarding(false);
-      return;
-    }
-
     const hasAdminOrCaptainRole = roles?.some((r: any) => ['club_admin', 'team_admin'].includes(r.role));
-    
     if (hasAdminOrCaptainRole) {
       setShowOnboarding(false); 
       if (profile?.id) {
@@ -206,9 +210,7 @@ export default function Home() {
       }
       return;
     }
-
     setShowOnboarding(true);
-
   }, [profile, profileLoading, roles]);
 
   useEffect(() => {
@@ -225,7 +227,6 @@ export default function Home() {
         handleTabChange('setup'); 
       }
     };
-    
     window.addEventListener('navigate-setup', handleNavigateSetup);
     return () => window.removeEventListener('navigate-setup', handleNavigateSetup);
   }, []);
@@ -239,44 +240,28 @@ export default function Home() {
         sessionStorage.clear();
       }
       await supabase.auth.signOut();
-    } catch (error) {
-      console.error("Logout Error:", error);
-    } finally {
+    } catch (error) {} finally {
       window.location.replace('/'); 
     }
   };
 
-  if (isCheckingAuth) {
+  if (isCheckingAuth || profileLoading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
         <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
-        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Authenticating...</div>
+        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">
+          {isCheckingAuth ? 'Authenticating...' : 'Loading Organization...'}
+        </div>
       </div>
     );
   }
 
   if (!session) return <Login />;
 
-  if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
-        <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
-        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Loading Organization...</div>
-      </div>
-    );
-  }
-
-  // --- WIZARD RENDER BLOCK ---
   if (showOnboarding) {
     return (
       <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
-        <OnboardingFlow 
-          user={session.user} 
-          onComplete={() => {
-            console.log("Wizard officially requested closure.");
-            setShowOnboarding(false);
-          }} 
-        />
+        <OnboardingFlow user={session.user} onComplete={() => setShowOnboarding(false)} />
       </div>
     );
   }
@@ -301,7 +286,7 @@ export default function Home() {
       userInitials = emailStr.substring(0, 2).toUpperCase();
     }
   } catch (e) {
-    userInitials = 'U'; // Absolute fallback
+    userInitials = 'U'; 
   }
   
   const displayFirstName = fullName?.split(' ')?.[0] || emailStr?.split('@')?.[0] || 'User';
@@ -309,6 +294,17 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
       
+      {/* UPDATE TOASTER */}
+      {updateAvailable && (
+        <div 
+          onClick={applyUpdate}
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-[300] bg-emerald-600 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 cursor-pointer animate-in slide-in-from-top-4"
+        >
+           <i className="fa-solid fa-arrows-rotate animate-spin-slow"></i>
+           <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Update Available - Click to Refresh</span>
+        </div>
+      )}
+
       <header className="shrink-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-black z-40">
         <button 
           onClick={() => uniqueClubs.length > 1 && setShowClubMenu(true)} 
@@ -330,7 +326,8 @@ export default function Home() {
           </div>
         </button>
         
-        <button onClick={() => setIsSidebarOpen(true)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-colors">
+        <button onClick={() => setIsSidebarOpen(true)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-colors relative">
+          {updateAvailable && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-900"></span>}
           <i className="fa-solid fa-bars text-sm"></i>
         </button>
       </header>
@@ -366,7 +363,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 🔥 MAIN CONTENT (REMOVED BOTTOM PADDING SINCE NAV IS GONE) */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 relative z-30 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
@@ -383,7 +380,22 @@ export default function Home() {
         )}
       </main>
 
-      {/* SIDEBAR NAVIGATION */}
+      {/* RESTORED BOTTOM NAVIGATION FOR PWA */}
+      <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pt-3 pb-2">
+        <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
+          <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            <i className="fa-solid fa-bolt-lightning text-xl mb-1"></i><span>GameDay</span>
+          </button>
+          <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            <i className="fa-solid fa-wallet text-xl mb-1"></i><span>Ledger</span>
+          </button>
+          <button onClick={() => handleTabChange("analytics")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "analytics" ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            <i className="fa-solid fa-chart-simple text-xl mb-1"></i><span>Insights</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* SIDEBAR FOR MANAGEMENT */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
           <div className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm transition-colors" onClick={() => setIsSidebarOpen(false)}></div>
@@ -417,21 +429,6 @@ export default function Home() {
             </div>
 
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
-              
-              {/* PRIMARY NAVIGATION MOVED HERE */}
-              <div>
-                <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest"></div>
-                <button onClick={() => handleTabChange("gameday")} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'gameday' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                  <i className="fa-solid fa-bolt-lightning w-5 text-center"></i> GameDay
-                </button>
-                <button onClick={() => handleTabChange("ledger")} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'ledger' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                  <i className="fa-solid fa-wallet w-5 text-center"></i> Ledger
-                </button>
-                <button onClick={() => handleTabChange("analytics")} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'analytics' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                  <i className="fa-solid fa-chart-simple w-5 text-center"></i> Insights
-                </button>
-              </div>
-
               {canManage && (
                 <div>
                   <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Management</div>
@@ -463,6 +460,13 @@ export default function Home() {
                       </button>
                     </>
                   )}
+                  
+                  {/* MANUAL FORCE REFRESH FOR ADMINS (Bypass Cache) */}
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                    <button onClick={applyUpdate} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
+                      <i className="fa-solid fa-arrows-rotate w-5 text-center"></i> Force Update App
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
