@@ -40,10 +40,12 @@ export default function GameDay() {
   // Square State
   const [isSquareEnabled, setIsSquareEnabled] = useState(false);
   
-  // Manage Squad States
-  const [isManageSquadOpen, setIsManageSquadOpen] = useState(false);
+  // Manage Squad States (Inline Expanding UI)
+  const [isManageSquadExpanded, setIsManageSquadExpanded] = useState(false);
+  const [expandedPoolSections, setExpandedPoolSections] = useState<Record<string, boolean>>({ yes: true, maybe: true, no_reply: false, no: false });
   const [clubPlayers, setClubPlayers] = useState<any[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
+  const manageTeamRef = useRef<HTMLDivElement>(null);
 
   // Digital Transfer / PayID Modal States
   const [isPayIdModalOpen, setIsPayIdModalOpen] = useState(false);
@@ -53,6 +55,7 @@ export default function GameDay() {
   const [isFinaliseModalOpen, setIsFinaliseModalOpen] = useState(false);
   const [finaliseStatus, setFinaliseStatus] = useState<'completed' | 'abandoned'>('completed');
   const [chargeAbandonedFee, setChargeAbandonedFee] = useState(false);
+  const [unpaidPlayerActions, setUnpaidPlayerActions] = useState<Record<string, 'charge' | 'remove'>>({});
   
   // AI Modal States (Decoupled to handle past matches)
   const [aiModalFixture, setAiModalFixture] = useState<any>(null);
@@ -295,21 +298,28 @@ export default function GameDay() {
     try {
       const shouldChargeFees = finaliseStatus === 'completed' || (finaliseStatus === 'abandoned' && chargeAbandonedFee);
       const batchTxPayload: any[] = [];
+      const playersToRemove: string[] = [];
 
-      // 1. Process Debts
+      // 1. Process Debts & Removals
       if (shouldChargeFees) {
         const unpaidPlayers = squad.filter(p => !paidPlayerIds.includes(p.id));
         
         if (unpaidPlayers.length > 0) {
           unpaidPlayers.forEach(player => {
-            batchTxPayload.push({
-              player_id: player.id,
-              team_id: selectedTeamId,
-              fixture_id: activeFixture.id,
-              club_id: resolvedClubId,
-              amount: player.is_member ? teamFees.member : teamFees.casual,
-              transaction_type: 'fee'
-            });
+            const action = unpaidPlayerActions[player.id] || 'charge';
+            
+            if (action === 'charge') {
+              batchTxPayload.push({
+                player_id: player.id,
+                team_id: selectedTeamId,
+                fixture_id: activeFixture.id,
+                club_id: resolvedClubId,
+                amount: player.is_member ? teamFees.member : teamFees.casual,
+                transaction_type: 'fee'
+              });
+            } else if (action === 'remove') {
+              playersToRemove.push(player.id);
+            }
           });
         }
       }
@@ -333,7 +343,18 @@ export default function GameDay() {
         if (debtError) throw debtError;
       }
 
-      // 4. Update Fixture Status
+      // 4. Execute Removals
+      if (playersToRemove.length > 0) {
+        const { error: removeError } = await supabase
+          .from("match_squads")
+          .delete()
+          .eq("fixture_id", activeFixture.id)
+          .in("player_id", playersToRemove);
+          
+        if (removeError) throw removeError;
+      }
+
+      // 5. Update Fixture Status
       const { error } = await supabase
         .from('fixtures')
         .update({ status: finaliseStatus })
@@ -541,7 +562,13 @@ export default function GameDay() {
     }
   }
 
-  async function openManageSquad() {
+  // --- Inline Managed Squad Toggle ---
+  async function toggleManageSquad(smoothScroll: boolean = false) {
+    if (isManageSquadExpanded) {
+      setIsManageSquadExpanded(false);
+      return;
+    }
+
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     if (!resolvedClubId || !activeFixture) return;
     
@@ -558,8 +585,14 @@ export default function GameDay() {
     setAvailabilityData(availData || []);
 
     setPlayerSearch(""); 
-    setIsManageSquadOpen(true);
+    setIsManageSquadExpanded(true);
     setIsProcessing(false);
+
+    if (smoothScroll && manageTeamRef.current) {
+      setTimeout(() => {
+        manageTeamRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   }
 
   // --- Clean Insert for RLS ---
@@ -728,27 +761,22 @@ export default function GameDay() {
       {selectedTeamId && activeFixture ? (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-colors">
           
-          <div className="flex justify-between items-center p-4 border-b border-zinc-100 dark:border-zinc-800">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded text-white tracking-widest bg-emerald-600 dark:bg-emerald-500">
+          <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800" ref={manageTeamRef}>
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="text-[10px] font-black uppercase px-2 py-1 rounded text-white tracking-widest bg-emerald-600 dark:bg-emerald-500 leading-none shadow-sm">
                 {new Date(activeFixture.match_date).toDateString() === new Date().toDateString() ? 'Active' : 'Upcoming'}
               </span>
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                 {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                {(activeFixture.start_time || activeFixture.location) && (
+                  <>
+                    <span className="mx-1.5">•</span>
+                    {activeFixture.start_time && `${activeFixture.start_time} `}
+                    {activeFixture.location && `@ ${activeFixture.location}`}
+                  </>
+                )}
               </span>
             </div>
-            
-            {canManage && (
-              <div className="flex gap-2">
-                <button 
-                  onClick={openManageSquad}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-black uppercase shadow-sm transition-all active:scale-95 disabled:opacity-50"
-                >
-                  <i className="fa-solid fa-user-plus"></i>
-                  <span>Add Player</span>
-                </button>
-              </div>
-            )}
           </div>
 
           <div className="p-4 flex items-center justify-between gap-2">
@@ -779,12 +807,110 @@ export default function GameDay() {
             </div>
           </div>
 
-          <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-3 border-t border-zinc-100 dark:border-zinc-800">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-              {activeFixture.start_time && `${activeFixture.start_time} • `}
-              {activeFixture.location || 'Location TBA'}
-            </p>
-          </div>
+          {/* INLINE PLAYER POOL EXPANSION COMPONENT */}
+          {canManage && (
+            <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
+              <button 
+                onClick={() => toggleManageSquad(false)} 
+                disabled={isProcessing}
+                className={`w-full py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all disabled:opacity-50 ${isManageSquadExpanded ? 'bg-emerald-50 dark:bg-emerald-500/10' : ''}`}
+              >
+                {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageSquadExpanded ? 'fa-chevron-up' : 'fa-user-plus'}`}></i>}
+                {isManageSquadExpanded ? 'Hide Team' : 'Manage Team'}
+              </button>
+            </div>
+          )}
+
+          {isManageSquadExpanded && canManage && (
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111] animate-in slide-in-from-top-2 overflow-hidden">
+              <input 
+                type="text" 
+                placeholder={teams.length > 1 ? "Search across club..." : "Search or add a player..."} 
+                value={playerSearch || ""} 
+                onChange={(e) => setPlayerSearch(e.target.value)} 
+                className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors mb-4 shadow-sm" 
+              />
+
+              <div className="space-y-3">
+                {/* CREATE ON THE FLY BUTTON */}
+                {playerSearch.trim().length > 0 && !clubPlayers.some(p => `${p.first_name} ${p.last_name}`.toLowerCase() === playerSearch.trim().toLowerCase()) && (
+                  <button 
+                    onClick={() => createAndAddPlayer(playerSearch)}
+                    disabled={isProcessing}
+                    className="w-full flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors text-left group disabled:opacity-50"
+                  >
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                      + Add "{playerSearch}"
+                    </span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-200 dark:bg-emerald-900 px-2 py-1 rounded-md">New Casual</span>
+                  </button>
+                )}
+
+                {/* Categorized Sections */}
+                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
+                  const sectionPlayers = clubPlayers.filter(p => {
+                    const avail = availabilityData.find(a => a.player_id === p.id);
+                    const status = avail ? avail.status : 'no_reply';
+                    const isRelevant = p.default_team_id === selectedTeamId || squad.some(s => s.id === p.id) || avail !== undefined;
+                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
+
+                    if (playerSearch) {
+                      return status === section && matchesSearch;
+                    } else {
+                      return status === section && isRelevant;
+                    }
+                  });
+
+                  if (sectionPlayers.length === 0) return null;
+
+                  const config = {
+                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
+                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
+                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
+                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
+
+                  // FIX: Auto-expand if the user is typing in the search box
+                  const isSecExpanded = expandedPoolSections[section] || playerSearch.trim().length > 0;
+                  const toggleSec = () => setExpandedPoolSections(prev => ({...prev, [section]: !prev[section]}));
+
+                  return (
+                    <div key={section} className="mb-2">
+                      <button onClick={toggleSec} className="w-full flex items-center justify-between py-2 text-left group">
+                        <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} flex items-center gap-2`}>
+                          <i className={`fa-solid ${config.icon}`}></i> {config.label} ({sectionPlayers.length})
+                        </h3>
+                        <i className={`fa-solid fa-chevron-${isSecExpanded ? 'up' : 'down'} text-[10px] text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors`}></i>
+                      </button>
+                      
+                      {isSecExpanded && (
+                        <div className="flex flex-wrap gap-2.5 pt-2 pb-1 animate-in fade-in">
+                          {sectionPlayers.map(p => {
+                            const isInSquad = squad.some(s => s.id === p.id);
+                            return (
+                              <button 
+                                key={p.id} 
+                                onClick={() => toggleSquadMember(p.id)} 
+                                disabled={isProcessing}
+                                className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isInSquad ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
+                              >
+                                {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                {isInSquad ? (
+                                  <i className="fa-solid fa-check text-[10px]"></i>
+                                ) : (
+                                  <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : selectedTeamId ? (
         <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-2 animate-in fade-in">
@@ -865,7 +991,7 @@ export default function GameDay() {
                        Select the players for this match so you can collect fees.
                      </p>
                      <button 
-                       onClick={openManageSquad}
+                       onClick={() => toggleManageSquad(true)}
                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
                      >
                        <i className="fa-solid fa-user-plus"></i> Select Team
@@ -1030,7 +1156,16 @@ export default function GameDay() {
 
           <div className="space-y-3">
             <button 
-              onClick={() => { setFinaliseStatus('completed'); setChargeAbandonedFee(false); setIsFinaliseModalOpen(true); }} 
+              onClick={() => { 
+                setFinaliseStatus('completed'); 
+                setChargeAbandonedFee(false); 
+                const newActions: Record<string, 'charge' | 'remove'> = {};
+                squad.filter(p => !paidPlayerIds.includes(p.id)).forEach(p => {
+                  newActions[p.id] = 'charge'; 
+                });
+                setUnpaidPlayerActions(newActions);
+                setIsFinaliseModalOpen(true); 
+              }} 
               className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-sm active:scale-95 transition-all"
             >
               Finalise Match
@@ -1110,10 +1245,41 @@ export default function GameDay() {
                   </div>
                 )}
 
+                {finaliseStatus === 'completed' && squad.filter(p => !paidPlayerIds.includes(p.id)).length > 0 && (
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 mb-3 block">Unpaid Players ({squad.filter(p => !paidPlayerIds.includes(p.id)).length})</span>
+                     <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
+                        {squad.filter(p => !paidPlayerIds.includes(p.id)).map(p => (
+                           <div key={p.id} className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-2.5 rounded-xl">
+                              <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase truncate pr-2">
+                                 {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                              </span>
+                              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
+                                 <button
+                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'charge'}))}
+                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'charge' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                    Owes Fees
+                                 </button>
+                                 <button
+                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'remove'}))}
+                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'remove' ? 'bg-zinc-300 dark:bg-zinc-600 text-zinc-800 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                    Did Not Play
+                                 </button>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+                )}
+
                 <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed mt-3">
                   {finaliseStatus === 'abandoned' && !chargeAbandonedFee
                     ? "No match fees will be collected or added to player balances for this match."
-                    : `Any unpaid fees from today's squad (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
+                    : finaliseStatus === 'abandoned' && chargeAbandonedFee
+                      ? `Any unpaid fees from today's squad (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
+                      : "Review unpaid players above. Marking as 'Owe Fees' rolls the fee to their account. 'Did Not Play' removes them from the match."
                   }
                 </p>
               </div>
@@ -1128,100 +1294,6 @@ export default function GameDay() {
                   {isProcessing ? 'Saving...' : 'Confirm'}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- SELECT TEAM MODAL --- */}
-      {isManageSquadOpen && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[90dvh] shadow-2xl transition-colors">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Select Team</h2>
-              <button onClick={() => setIsManageSquadOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto flex-1 space-y-4 pb-6">
-              <input type="text" placeholder="Search across club..." value={playerSearch || ""} onChange={(e) => setPlayerSearch(e.target.value)} className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" />
-              
-              <div className="space-y-4">
-                {/* CREATE ON THE FLY BUTTON */}
-                {playerSearch.trim().length > 0 && !clubPlayers.some(p => `${p.first_name} ${p.last_name}`.toLowerCase() === playerSearch.trim().toLowerCase()) && (
-                  <button 
-                    onClick={() => createAndAddPlayer(playerSearch)}
-                    disabled={isProcessing}
-                    className="w-full flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors text-left group disabled:opacity-50"
-                  >
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
-                      + Add "{playerSearch}"
-                    </span>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-200 dark:bg-emerald-900 px-2 py-1 rounded-md">New Casual</span>
-                  </button>
-                )}
-
-                {/* Categorized Sections */}
-                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
-                  const sectionPlayers = clubPlayers.filter(p => {
-                    const avail = availabilityData.find(a => a.player_id === p.id);
-                    const status = avail ? avail.status : 'no_reply';
-
-                    // Relevant if in team, already in squad, or explicitly replied
-                    const isRelevant = p.default_team_id === selectedTeamId || squad.some(s => s.id === p.id) || avail !== undefined;
-                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
-
-                    if (playerSearch) {
-                      return status === section && matchesSearch;
-                    } else {
-                      return status === section && isRelevant;
-                    }
-                  });
-
-                  if (sectionPlayers.length === 0) return null;
-
-                  const config = {
-                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
-                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
-                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
-                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
-
-                  return (
-                    <div key={section} className="mb-4">
-                      <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} mb-3 flex items-center gap-2`}>
-                        <i className={`fa-solid ${config.icon}`}></i> {config.label}
-                      </h3>
-                      <div className="flex flex-wrap gap-2.5">
-                        {sectionPlayers.map(p => {
-                          const isInSquad = squad.some(s => s.id === p.id);
-                          return (
-                            <button 
-                              key={p.id} 
-                              onClick={() => toggleSquadMember(p.id)} 
-                              disabled={isProcessing}
-                              className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isInSquad ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
-                            >
-                              {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
-                              {isInSquad ? (
-                                <i className="fa-solid fa-check text-[10px]"></i>
-                              ) : (
-                                <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
-              <button onClick={() => setIsManageSquadOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={() => setIsManageSquadOpen(false)} disabled={isProcessing} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">
-                Done
-              </button>
             </div>
           </div>
         </div>

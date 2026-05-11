@@ -1196,7 +1196,7 @@ export default function Setup({ activeTab }: SetupProps) {
             <div className="p-5 overflow-y-auto flex-1 space-y-6 pb-24">
               <input 
                 type="text" 
-                placeholder="Search players..." 
+                placeholder="Search or Add a Player..." 
                 value={playerSearch || ""} 
                 onChange={(e) => setPlayerSearch(e.target.value)} 
                 className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
@@ -1254,7 +1254,7 @@ export default function Setup({ activeTab }: SetupProps) {
             
             <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
               <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">
+              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-50 disabled:opacity-50 transition-colors shadow-md">
                 {isSaving ? 'Saving...' : 'Save Match Squad'}
               </button>
             </div>
@@ -1274,7 +1274,7 @@ export default function Setup({ activeTab }: SetupProps) {
             <div className="p-5 overflow-y-auto flex-1 space-y-6 pb-24">
               <input 
                 type="text" 
-                placeholder="Search across club..." 
+                placeholder="Search players..." 
                 value={playerSearch || ""} 
                 onChange={(e) => setPlayerSearch(e.target.value)} 
                 className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" 
