@@ -382,11 +382,11 @@ export default function Ledger() {
               <div className="px-5 pb-4 animate-in slide-in-from-top-2">
                 <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700/50 grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Cash in Tin</div>
+                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">CASH</div>
                     <div className={`text-xl font-black ${seasonWallet.cash < 0 ? 'text-red-500' : 'text-emerald-500'}`}>${seasonWallet.cash.toFixed(0)}</div>
                   </div>
                   <div>
-                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Square / Card</div>
+                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">CARD</div>
                     <div className={`text-xl font-black ${seasonWallet.card < 0 ? 'text-red-500' : 'text-blue-500'}`}>${seasonWallet.card.toFixed(0)}</div>
                   </div>
                 </div>
@@ -431,6 +431,22 @@ export default function Ledger() {
                             <td colSpan={5} className="p-0">
                               <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
                                 
+                                {/* FIXTURE WALLET MATH */}
+                                <div className="bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-4 rounded-xl shadow-sm mb-5">
+                                  <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 border-b border-zinc-100 dark:border-zinc-700/50 pb-2">Where&apos;s the Money?</h4>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <div className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">CASH</div>
+                                      <div className={`text-lg font-black ${(audit.cash - audit.fee) < 0 ? 'text-red-500' : 'text-emerald-500'}`}>${audit.cash - audit.fee}</div>
+                                      <div className="text-[9px] text-zinc-500 font-bold mt-0.5">(${audit.cash} Cash - ${audit.fee} Fee)</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">CARD</div>
+                                      <div className="text-lg font-black text-blue-500">${audit.card}</div>
+                                    </div>
+                                  </div>
+                                </div>
+
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 px-1">Player Breakdown</h4>
                                 <div className="space-y-2">
                                   {groupedFixturePlayers.map(p => {

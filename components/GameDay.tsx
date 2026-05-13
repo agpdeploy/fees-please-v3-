@@ -6,7 +6,6 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareGross } from '@/lib/fees';
-import AiReporterModal from "@/components/AiReporterModal";
 
 export default function GameDay() {
   const { profile, roles } = useProfile();
@@ -57,9 +56,15 @@ export default function GameDay() {
   const [chargeAbandonedFee, setChargeAbandonedFee] = useState(false);
   const [unpaidPlayerActions, setUnpaidPlayerActions] = useState<Record<string, 'charge' | 'remove'>>({});
   
-  // AI Modal States (Decoupled to handle past matches)
-  const [aiModalFixture, setAiModalFixture] = useState<any>(null);
-  const [aiModalSquad, setAiModalSquad] = useState<any[]>([]);
+  // --- INLINE AI REPORTER STATES ---
+  const [expandedPastFixtureId, setExpandedPastFixtureId] = useState<string | null>(null);
+  const [reporterSquad, setReporterSquad] = useState<any[]>([]);
+  const [reporterImages, setReporterImages] = useState<File[]>([]);
+  const [reporterNotes, setReporterNotes] = useState("");
+  const [reporterCharacter, setReporterCharacter] = useState("DAIVE");
+  const [reporterText, setReporterText] = useState("");
+  const [reporterLoading, setReporterLoading] = useState(false);
+  const [reporterLoadingText, setReporterLoadingText] = useState("");
   
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -74,7 +79,7 @@ export default function GameDay() {
   const isClubAdmin = currentClubRole === 'club_admin';
   const isTeamCaptain = roles?.some((r: any) => r.role === 'team_admin' && r.team_id === selectedTeamId);
   const canManage = isSuperAdmin || isClubAdmin || isTeamCaptain;
-  // -------------------------
+  const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
 
   // --- SQUARE POS RETURN HANDLER ---
   useEffect(() => {
@@ -284,6 +289,175 @@ export default function GameDay() {
   }
   
   useEffect(() => { loadSquadData(); }, [activeFixture]);
+
+  // --- AI REPORTER LOADING EFFECT ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (reporterLoading) {
+      let messages: string[] = [];
+      if (reporterCharacter === 'OUTBACK_EXPERT') {
+        messages = ["Looking for the snake bite kit...", "Checking the radiator levels...", "Wrestling a rogue bin chicken...", "Sparking up the camp oven...", "Decoding the scorebook..."];
+      } else if (reporterCharacter === 'CLUB_VETERAN') {
+        messages = ["Stretching the hammies...", "Complaining about the umpire...", "Checking the price of a meat pie...", "Reminiscing about the 1998 Grand Final...", "Squinting at the run rate..."];
+      } else if (reporterCharacter === 'SUBURBAN_MUM') {
+        messages = ["Pouring a generous glass of Cardonnay...", "Saying 'Look at moy' to the umpire...", "Adjusting her statement earrings...", "Admiring her new activewear...", "Gossiping with the scorers..."];
+      } else if (reporterCharacter === 'ALIEN_MASTER') {
+        messages = ["Communing with the force...", "Lifting the cricket bat with my mind...", "Sensing the run rate..."];
+      } else if (reporterCharacter === 'NEWS_ANCHOR') {
+        messages = ["Fixing my perfect hair...", "Smelling the rich mahogany...", "Pouring three fingers of scotch..."];
+      } else if (reporterCharacter === 'CLASSIC_COMMENTATOR') {
+        messages = ["Adjusting the bone-colored jacket...", "Clearing the throat...", "Admiring a marvellous shot..."];
+      } else {
+        messages = ["Crunching the numbers...", "Running the dAIve algorithms...", "Scanning the scorebook...", "Identifying the MVP..."];
+      }
+      
+      let i = 0;
+      setReporterLoadingText(messages[0]);
+      
+      interval = setInterval(() => {
+        i++;
+        if (i < messages.length) {
+          setReporterLoadingText(messages[i]);
+        } else {
+          setReporterLoadingText("Still analyzing... the handwriting is terrible...");
+        }
+      }, 2500); 
+    }
+    
+    return () => clearInterval(interval);
+  }, [reporterLoading, reporterCharacter]);
+
+  // --- INLINE AI REPORTER LOGIC ---
+  async function togglePastFixtureForAi(fixture: any) {
+    if (expandedPastFixtureId === fixture.id) {
+      setExpandedPastFixtureId(null);
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const { data: squadRows } = await supabase.from('match_squads').select('player_id').eq('fixture_id', fixture.id);
+      let fixtureSquad: any[] = [];
+      if (squadRows && squadRows.length > 0) {
+        const playerIds = squadRows.map(row => row.player_id);
+        const { data: playerDetails } = await supabase.from("players").select("*").in("id", playerIds);
+        fixtureSquad = playerDetails || [];
+      }
+      setReporterSquad(fixtureSquad);
+      setReporterImages([]);
+      setReporterNotes("");
+      setReporterText("");
+      setExpandedPastFixtureId(fixture.id);
+    } catch (err) {
+      showToast("Error loading match data for AI", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800; 
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+          
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          }
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleGenerateReport = async (fixture: any) => {
+    if (reporterImages.length === 0) return showToast("Please upload at least one scorebook photo!", "error");
+    
+    setReporterLoading(true);
+    setReporterText("");
+
+    try {
+      // Compress all uploaded images
+      const base64Images = await Promise.all(reporterImages.map(img => compressImage(img)));
+
+      const context = {
+        competition: fixture?.notes || "Match",
+        teamName: currentTeamName, 
+        opponent: fixture?.opponent || "The Opposition",
+        roster: reporterSquad.length > 0 
+          ? reporterSquad.map(p => p.nickname || p.first_name).join(", ") 
+          : "Names currently being finalized."
+      };
+
+      const res = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imagesBase64: base64Images, character: reporterCharacter, context, customNotes: reporterNotes }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || "Server responded with an error");
+
+      if (data.report) {
+        setReporterText(data.report);
+        // Update local count visually
+        setPastFixtures(prev => prev.map(f => f.id === fixture.id ? { ...f, ai_reports_generated: (f.ai_reports_generated || 0) + 1 } : f));
+      } else {
+        throw new Error("No report returned");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setReporterText(`Blimey! The news wire is down. Error: ${err.message}`);
+    } finally {
+      setReporterLoading(false);
+    }
+  };
+
+  const handleShareReport = async () => {
+    const shareText = reporterText.replace(/\*\*/g, '*'); // Convert Markdown bold to WhatsApp bold
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Match Report',
+          text: shareText,
+        });
+      } catch (err) {
+        console.log("Share failed", err);
+      }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      showToast("Report copied to clipboard!");
+    }
+  };
+
+  const formatReportText = (text: string) => {
+    return text.split('\n').map((line, index) => {
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      return (
+        <span key={index} className="block mb-2">
+          {parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return <strong key={i} className="font-black text-zinc-900 dark:text-white">{part.slice(2, -2)}</strong>;
+            }
+            return part;
+          })}
+        </span>
+      );
+    });
+  };
 
   async function executeMatchFinalization() {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
@@ -685,31 +859,30 @@ export default function GameDay() {
     }
   }
 
-  async function openAiReporter(fixture: any) {
-    setIsProcessing(true);
-    try {
-      const { data: squadRows } = await supabase.from('match_squads').select('player_id').eq('fixture_id', fixture.id);
-      let fixtureSquad: any[] = [];
-      if (squadRows && squadRows.length > 0) {
-        const playerIds = squadRows.map(row => row.player_id);
-        const { data: playerDetails } = await supabase.from("players").select("*").in("id", playerIds);
-        fixtureSquad = playerDetails || [];
-      }
-      setAiModalSquad(fixtureSquad);
-      setAiModalFixture(fixture);
-    } catch (err) {
-      showToast("Error loading match data for AI", "error");
-    } finally {
-      setIsProcessing(false);
-    }
-  }
+  const handleShareMatch = async () => {
+    if (!activeFixture) return;
+    
+    const teamSlug = teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId;
+    const shareUrl = `${window.location.origin}/t/${teamSlug}`; // Eventually fixtures/[id]
+    const matchDate = new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    
+    const shareText = `🏏 Game On! vs ${activeFixture.opponent}\n📅 ${matchDate} @ ${activeFixture.start_time || 'TBA'}\n📍 ${activeFixture.location || 'TBA'}\n\nUpdate your availability here:\n${shareUrl}`;
 
-  const handleReportGenerated = () => {
-    if (activeFixture && aiModalFixture?.id === activeFixture.id) {
-      setActiveFixture({ ...activeFixture, ai_reports_generated: (activeFixture.ai_reports_generated || 0) + 1 });
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Match Reminder: vs ${activeFixture.opponent}`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error("Share failed", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      await navigator.clipboard.writeText(shareText);
+      showToast("Reminder copied to clipboard!");
     }
-    setPastFixtures(prev => prev.map(f => f.id === aiModalFixture?.id ? { ...f, ai_reports_generated: (f.ai_reports_generated || 0) + 1 } : f));
-    setAiModalFixture((prev: any) => prev ? { ...prev, ai_reports_generated: (prev.ai_reports_generated || 0) + 1 } : null);
   };
 
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
@@ -721,8 +894,6 @@ export default function GameDay() {
     const method = paymentData[p.id]?.method || 'cash';
     return !(isSquareEnabled && method === 'card');
   }).length;
-
-  const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
 
   if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
@@ -762,20 +933,25 @@ export default function GameDay() {
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-colors">
           
           <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800" ref={manageTeamRef}>
-            <div className="flex items-center flex-wrap gap-2">
-              <span className="text-[10px] font-black uppercase px-2 py-1 rounded text-white tracking-widest bg-emerald-600 dark:bg-emerald-500 leading-none shadow-sm">
-                {new Date(activeFixture.match_date).toDateString() === new Date().toDateString() ? 'Active' : 'Upcoming'}
-              </span>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                {(activeFixture.start_time || activeFixture.location) && (
-                  <>
-                    <span className="mx-1.5">•</span>
-                    {activeFixture.start_time && `${activeFixture.start_time} `}
-                    {activeFixture.location && `@ ${activeFixture.location}`}
-                  </>
-                )}
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center flex-wrap gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-1 rounded text-white tracking-widest bg-emerald-600 dark:bg-emerald-500 leading-none shadow-sm">
+                  {new Date(activeFixture.match_date).toDateString() === new Date().toDateString() ? 'Active' : 'Upcoming'}
+                </span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                  {(activeFixture.start_time || activeFixture.location) && (
+                    <>
+                      <span className="mx-1.5">•</span>
+                      {activeFixture.start_time && `${activeFixture.start_time} `}
+                      {activeFixture.location && `@ ${activeFixture.location}`}
+                    </>
+                  )}
+                </span>
+              </div>
+              <button onClick={handleShareMatch} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-500 hover:text-emerald-500 transition-colors">
+                <i className="fa-solid fa-share-nodes text-xs"></i>
+              </button>
             </div>
           </div>
 
@@ -1177,7 +1353,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* --- PAST MATCHES TOGGLE --- */}
+      {/* --- PAST MATCHES TOGGLE (WITH INLINE REPORTER) --- */}
       {pastFixtures.length > 0 && (
         <div className="mt-6">
            <button 
@@ -1190,28 +1366,154 @@ export default function GameDay() {
 
            {showPastFixtures && (
               <div className="mt-3 space-y-2 animate-in slide-in-from-top-2 fade-in">
-                 {pastFixtures.map(pf => (
-                    <div key={pf.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex justify-between items-center shadow-sm transition-colors">
-                       <div className="flex-1 min-w-0 pr-4">
-                          <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-0.5">
-                             {new Date(pf.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                             <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
-                             <span className={pf.status === 'completed' ? 'text-emerald-500' : pf.status === 'forfeited' ? 'text-orange-500' : 'text-red-500'}>{pf.status}</span>
-                          </div>
-                          <div className="font-bold text-sm text-zinc-900 dark:text-white uppercase tracking-wide leading-tight break-words">
-                             VS {pf.opponent}
-                          </div>
-                       </div>
-                       <button 
-                          onClick={() => openAiReporter(pf)}
-                          disabled={isProcessing}
-                          className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm shrink-0 disabled:opacity-50"
-                          title="Generate Match Report"
-                       >
-                          {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
-                       </button>
-                    </div>
-                 ))}
+                 {pastFixtures.map(pf => {
+                    const isExpanded = expandedPastFixtureId === pf.id;
+
+                    return (
+                      <div key={pf.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm transition-colors overflow-hidden">
+                         
+                         {/* Match Header (Clickable) */}
+                         <div 
+                           onClick={() => togglePastFixtureForAi(pf)} 
+                           className={`flex justify-between items-center p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-zinc-50 dark:bg-zinc-800/50' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}
+                         >
+                           <div className="flex-1 min-w-0 pr-4">
+                              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-0.5">
+                                 {new Date(pf.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                                 <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
+                                 <span className={pf.status === 'completed' ? 'text-emerald-500' : pf.status === 'forfeited' ? 'text-orange-500' : 'text-red-500'}>{pf.status}</span>
+                              </div>
+                              <div className="font-bold text-sm text-zinc-900 dark:text-white uppercase tracking-wide leading-tight break-words">
+                                 VS {pf.opponent}
+                              </div>
+                           </div>
+                           
+                           {/* Magic Wand Action Button */}
+                           <button 
+                              disabled={isProcessing}
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm shrink-0 disabled:opacity-50 ${isExpanded ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'}`}
+                              title={isExpanded ? "Close Reporter" : "Generate Match Report"}
+                           >
+                              {isProcessing && expandedPastFixtureId === pf.id ? (
+                                <i className="fa-solid fa-circle-notch fa-spin text-emerald-600"></i>
+                              ) : (
+                                <i className={`fa-solid ${isExpanded ? 'fa-chevron-up text-xs' : 'fa-wand-magic-sparkles text-emerald-500'}`}></i>
+                              )}
+                           </button>
+                         </div>
+
+                         {/* Inline AI Reporter Area */}
+                         {isExpanded && (
+                           <div className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111] animate-in slide-in-from-top-2">
+                             <div className="p-5 flex flex-col space-y-6">
+                               
+                               {/* Reporter Header */}
+                               <div>
+                                 <h2 className="text-[14px] font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500 flex items-center gap-2">
+                                   Match Reporter
+                                 </h2>
+                                 <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                                    <i className="fa-solid fa-wand-magic-sparkles text-emerald-500 text-[8px]"></i> Add your results to get commentary on the match.
+                                 </p>
+                                 
+                               </div>
+
+                               {/* Setup: Character & Image Selection */}
+                               {!reporterLoading && !reporterText && (
+                                 <div className="space-y-4">
+                                   
+                                   {/* Persona Dropdown */}
+                                   <div className="space-y-1.5">
+                                     <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Commentary Style</label>
+                                     <select 
+                                       value={reporterCharacter}
+                                       onChange={(e) => setReporterCharacter(e.target.value)}
+                                       className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm"
+                                     >
+                                       <option value="DAIVE">dAIve (Friendly Analyst)</option>
+                                       <option value="OUTBACK_EXPERT">Rusty (Outback Expert)</option>
+                                       <option value="CLUB_VETERAN">Gaz (Club Veteran)</option>
+                                       <option value="SUBURBAN_MUM">Shazza (Suburban Mum)</option>
+                                       <option value="CLASSIC_COMMENTATOR">Legendary Aussie Commentator</option>
+                                       <option value="NEWS_ANCHOR">1970s Egotistical News Anchor</option>
+                                       <option value="ALIEN_MASTER">Mystical Green Alien</option>
+                                     </select>
+                                   </div>
+
+                                   {/* Custom Highlights Area */}
+                                   <div className="space-y-1.5">
+                                     <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Custom Highlights (Optional)</label>
+                                     <textarea 
+                                       value={reporterNotes}
+                                       onChange={(e) => setReporterNotes(e.target.value)}
+                                       placeholder="e.g., Ronan has an incredible debut! Edith scored her 100th point with the team."
+                                       rows={2}
+                                       className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm"
+                                     />
+                                   </div>
+
+                                   {/* File Upload Box (Multiple) */}
+                                   <div className="relative group mt-2">
+                                     <input 
+                                       type="file" 
+                                       accept="image/*" 
+                                       multiple
+                                       onChange={(e) => setReporterImages(Array.from(e.target.files || []).slice(0, 3))} // Cap at 3 images
+                                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                     />
+                                     <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${reporterImages.length > 0 ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 group-hover:border-zinc-400'}`}>
+                                       <i className={`fa-solid ${reporterImages.length > 0 ? 'fa-images text-emerald-600 dark:text-emerald-500' : 'fa-camera text-zinc-400 dark:text-zinc-500'} text-2xl mb-2 transition-colors`}></i>
+                                       <p className={`text-[10px] font-bold uppercase tracking-widest ${reporterImages.length > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                                         {reporterImages.length > 0 ? `${reporterImages.length} Image${reporterImages.length > 1 ? 's' : ''} Selected` : 'Upload Scorebook(s)'}
+                                       </p>
+                                     </div>
+                                   </div>
+                                   
+                                   <button 
+                                     onClick={() => handleGenerateReport(pf)}
+                                     disabled={reporterImages.length === 0}
+                                     className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white shadow-md active:scale-95 transition-all disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 mt-2"
+                                   >
+                                     Generate Report
+                                   </button>
+                                 </div>
+                               )}
+
+                               {/* Loading State */}
+                               {reporterLoading && (
+                                 <div className="flex flex-col items-center justify-center py-8 space-y-5 animate-in fade-in">
+                                   <i className="fa-solid fa-wand-magic-sparkles text-3xl animate-pulse text-emerald-500"></i>
+                                   <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center px-4 animate-pulse">
+                                     {reporterLoadingText}
+                                   </p>
+                                 </div>
+                               )}
+
+                               {/* Generated Result */}
+                               {reporterText && !reporterLoading && (
+                                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                                   <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-5 rounded-2xl shadow-sm">
+                                     <div className="text-sm font-medium leading-relaxed text-zinc-800 dark:text-zinc-300">
+                                       {formatReportText(reporterText)}
+                                     </div>
+                                   </div>
+                                   
+                                   <div className="flex gap-2">
+                                     <button onClick={() => { setReporterText(""); setReporterImages([]); setReporterNotes(""); }} className="flex-1 py-4 rounded-xl bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 transition-colors font-black uppercase tracking-widest text-[10px] text-zinc-600 dark:text-zinc-400 shadow-sm">
+                                       New
+                                     </button>
+                                     <button onClick={handleShareReport} className="flex-[2] py-4 rounded-xl text-white font-black uppercase tracking-widest text-[11px] shadow-md transition-transform active:scale-95 bg-emerald-600 hover:bg-emerald-500">
+                                       <i className="fa-solid fa-share-nodes mr-2"></i> Share Report
+                                     </button>
+                                   </div>
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+                         )}
+                      </div>
+                    );
+                 })}
               </div>
            )}
         </div>
@@ -1343,27 +1645,6 @@ export default function GameDay() {
           </div>
         </div>
       )}
-
-      {/* --- SMART AI MODAL DECOUPLED FROM ACTIVE MATCH --- */}
-      <AiReporterModal 
-        isOpen={!!aiModalFixture} 
-        onClose={() => {
-          setAiModalFixture(null);
-          setAiModalSquad([]);
-        }} 
-        fixture={aiModalFixture}
-        squad={aiModalSquad}
-        themeColor="#10b981" 
-        teamName={currentTeamName}
-        reportsGenerated={aiModalFixture?.ai_reports_generated || 0}
-        onReportIncrement={() => {
-          if (activeFixture && aiModalFixture?.id === activeFixture.id) {
-            setActiveFixture({ ...activeFixture, ai_reports_generated: (activeFixture.ai_reports_generated || 0) + 1 });
-          }
-          setPastFixtures(prev => prev.map(f => f.id === aiModalFixture?.id ? { ...f, ai_reports_generated: (f.ai_reports_generated || 0) + 1 } : f));
-          setAiModalFixture((prev: any) => prev ? { ...prev, ai_reports_generated: (prev.ai_reports_generated || 0) + 1 } : null);
-        }}
-      />
     </div>
   );
 }
