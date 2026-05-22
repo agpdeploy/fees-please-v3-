@@ -93,13 +93,14 @@ export default function Ledger() {
   }, [profile, roles, activeClubId]);
 
   async function fetchLedger() {
-    if (!activeTeamId) return;
+    if (!activeTeamId || !activeClubId) return;
     setIsLoading(true);
     
+    // 🔥 FIX: Fetch transactions and players at the CLUB level so balances track across multiple teams
     const [fixRes, txRes, playersRes] = await Promise.all([
       supabase.from("fixtures").select("*").eq("team_id", activeTeamId).order("match_date", { ascending: false }),
-      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname ), fixtures ( opponent )`).eq("team_id", activeTeamId).order("created_at", { ascending: false }),
-      supabase.from("players").select('id, first_name, last_name, nickname').eq("default_team_id", activeTeamId)
+      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname ), fixtures ( opponent )`).eq("club_id", activeClubId).order("created_at", { ascending: false }),
+      supabase.from("players").select('id, first_name, last_name, nickname').eq("club_id", activeClubId)
     ]);
 
     const fixData = fixRes.data || [];
@@ -107,7 +108,10 @@ export default function Ledger() {
     const teamPlayersData = playersRes.data || [];
 
     setFixtures(fixData);
-    setTransactions(txData);
+    
+    // Only display transactions in the feed if they belong to this team, OR if they are a club-wide player payment
+    const teamFeedTransactions = txData.filter(tx => tx.team_id === activeTeamId || (tx.player_id && !tx.fixture_id));
+    setTransactions(teamFeedTransactions);
 
     let totalCashIn = 0;
     let totalCardIn = 0;
@@ -130,15 +134,18 @@ export default function Ledger() {
     });
 
     txData.forEach(tx => {
-      // Global Tracking for Season Wallet Math
-      if (tx.transaction_type === 'payment') {
-        if (tx.payment_method === 'card') totalCardIn += Number(tx.amount);
-        else totalCashIn += Number(tx.amount);
-      }
-      if (tx.transaction_type === 'expense') {
-        totalExpenses += Number(tx.amount);
+      // Global Tracking for Season Wallet Math (Filtered strictly to current team)
+      if (tx.team_id === activeTeamId) {
+        if (tx.transaction_type === 'payment') {
+          if (tx.payment_method === 'card') totalCardIn += Number(tx.amount);
+          else totalCashIn += Number(tx.amount);
+        }
+        if (tx.transaction_type === 'expense') {
+          totalExpenses += Number(tx.amount);
+        }
       }
 
+      // Match Specific Math
       if (tx.fixture_id && auditMap[tx.fixture_id]) {
         if (tx.transaction_type === 'payment') {
           if (tx.payment_method === 'cash') auditMap[tx.fixture_id].cash += Number(tx.amount);
@@ -147,6 +154,7 @@ export default function Ledger() {
         if (tx.transaction_type === 'expense') auditMap[tx.fixture_id].fee += Number(tx.amount);
       }
 
+      // Player Math (Calculated across the entire club so credits carry over)
       if (tx.player_id && tx.players) {
         if (!balances[tx.player_id]) {
           balances[tx.player_id] = { 
@@ -176,11 +184,17 @@ export default function Ledger() {
 
     setSeasonAudit(auditArray);
     
-    // Set actual overall wallet position (captures global txs as well as fixture txs)
     setSeasonWallet({ cash: totalCashIn - totalExpenses, card: totalCardIn });
     setOverallNet((totalCashIn + totalCardIn) - totalExpenses);
     
-    setPlayerBalances(Object.values(balances).sort((a: any, b: any) => {
+    // Only show players in the list if they are in this default team, OR if they have played for this team and have a balance
+    const activeTeamPlayerIds = new Set(teamFeedTransactions.filter(tx => tx.player_id).map(tx => tx.player_id));
+    const filteredBalances = Object.values(balances).filter((b: any) => {
+        const isDefaultTeam = allPlayers.find(p => p.id === b.id)?.default_team_id === activeTeamId;
+        return isDefaultTeam || activeTeamPlayerIds.has(b.id);
+    });
+
+    setPlayerBalances(filteredBalances.sort((a: any, b: any) => {
       if (b.owed !== a.owed) return b.owed - a.owed;
       return a.name.localeCompare(b.name);
     }));
@@ -188,7 +202,7 @@ export default function Ledger() {
     setIsLoading(false);
   }
 
-  useEffect(() => { fetchLedger(); }, [activeTeamId]);
+  useEffect(() => { fetchLedger(); }, [activeTeamId, activeClubId]); // Re-fetch if either changes
 
   // --- DERIVED GROUPED FEED ---
   const groupedFeed = useMemo(() => {
@@ -364,7 +378,7 @@ export default function Ledger() {
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm relative overflow-hidden transition-colors">
             <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-emerald-500 z-10"></div>
             
-            <div className="flex justify-between items-center p-5 mb-2">
+            <div className="flex justify-between items-start p-5 mb-2">
               <h2 className="text-sm font-black uppercase italic tracking-widest text-emerald-600 dark:text-emerald-500">Season Audit</h2>
               <div className="flex flex-col items-end">
                 <button 
