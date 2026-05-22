@@ -908,7 +908,7 @@ export default function GameDay() {
       {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5 rounded-xl shadow-sm mb-6 flex flex-col items-center text-center animate-in slide-in-from-top-4">
           <i className="fa-solid fa-triangle-exclamation text-amber-500 text-2xl mb-2"></i>
-          <h3 className="font-black uppercase tracking-widest text-amber-900 dark:text-amber-400 text-sm mb-1">Setup Incomplete</h3>
+          <h3 className="font-black uppercase tracking-widest text-emerald-900 dark:text-emerald-400 text-sm mb-1">Let&apos;s Get Started!</h3>
           <p className="text-[11px] font-bold text-amber-700 dark:text-amber-500/70 mb-4">Your club configuration is missing critical data. Some features may be disabled.</p>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('trigger-onboarding'))}

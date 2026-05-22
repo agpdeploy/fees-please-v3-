@@ -21,12 +21,16 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
     setError("");
 
     try {
-      // 1. Update Profile
+      // 1. Update Auth Metadata for Name
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { full_name: `${firstName} ${lastName}` }
+      });
+      if (authError) throw authError;
+
+      // 2. Update Profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          first_name: firstName,
-          last_name: lastName,
           has_onboarded: true
         })
         .eq('id', user.id);
@@ -81,7 +85,7 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
           </div>
           <h2 className="text-2xl font-black italic uppercase text-zinc-900 dark:text-white tracking-tighter">Welcome Aboard</h2>
           <p className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-widest mt-2">
-            Let's get you set up.
+            Let&apos;s get you set up.
           </p>
         </div>
 

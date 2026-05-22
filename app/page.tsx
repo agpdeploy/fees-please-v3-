@@ -12,7 +12,7 @@ import Analytics from "../components/Analytics";
 import MyTeam from "../components/MyTeam"; 
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
-import OnboardingFlow from "../components/OnboardingFlow"; 
+import InitialSetup from "../components/InitialSetup"; 
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
 
@@ -261,7 +261,7 @@ export default function Home() {
   if (showOnboarding) {
     return (
       <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
-        <OnboardingFlow user={session.user} onComplete={() => setShowOnboarding(false)} />
+        <InitialSetup user={session.user} onComplete={() => setShowOnboarding(false)} />
       </div>
     );
   }
