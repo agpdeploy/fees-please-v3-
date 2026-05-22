@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareGross } from '@/lib/fees';
+import SetupChecklist from './SetupChecklist';
 
 export default function GameDay() {
   const { profile, roles } = useProfile();
@@ -912,17 +913,19 @@ export default function GameDay() {
       )}
 
       {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
-        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5 rounded-xl shadow-sm mb-6 flex flex-col items-center text-center animate-in slide-in-from-top-4">
-          <i className="fa-solid fa-triangle-exclamation text-amber-500 text-2xl mb-2"></i>
-          <h3 className="font-black uppercase tracking-widest text-emerald-900 dark:text-emerald-400 text-sm mb-1">Let&apos;s Get Started!</h3>
-          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-500/70 mb-4">Your club configuration is missing critical data. Some features may be disabled.</p>
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('trigger-onboarding'))}
-            className="bg-amber-500 hover:bg-amber-400 text-white dark:text-black font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-lg shadow-md active:scale-95 transition-all"
-          >
-            Resume Setup Now
-          </button>
-        </div>
+        <SetupChecklist 
+          activeClubId={activeClubId} 
+          clubInfo={clubInfo} 
+          teamFees={teamFees} 
+          teamsCount={teams.length}
+          onDismiss={() => {
+             if (profile?.id) {
+               supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then(() => {
+                 window.location.reload();
+               });
+             }
+          }}
+        />
       )}
 
       {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.length > 1 && (

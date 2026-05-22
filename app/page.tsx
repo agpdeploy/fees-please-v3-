@@ -205,9 +205,6 @@ export default function Home() {
     const hasAdminOrCaptainRole = roles?.some((r: any) => ['club_admin', 'team_admin'].includes(r.role));
     if (hasAdminOrCaptainRole) {
       setShowOnboarding(false); 
-      if (profile?.id) {
-        supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then();
-      }
       return;
     }
     setShowOnboarding(true);

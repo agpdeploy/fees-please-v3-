@@ -83,7 +83,7 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
 
       // 5. Complete Setup
       onComplete();
-
+      window.location.reload(); // Force a hard reload to sync activeClubId and context immediately
     } catch (err: any) {
       console.error(err);
       setError(err.message || "An error occurred during setup.");
