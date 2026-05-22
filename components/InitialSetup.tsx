@@ -38,9 +38,20 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
       if (profileError) throw profileError;
 
       // 2. Create Club
+      const baseSlug = teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const clubSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+      
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
-        .insert([{ name: teamName }])
+        .insert([{ 
+          name: teamName,
+          owner_id: user.id,
+          slug: clubSlug,
+          is_club: false,
+          club_cat: "Other",
+          entity_type: "Team",
+          sport_type: "other"
+        }])
         .select()
         .single();
 
@@ -49,7 +60,12 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
       // 3. Create Team
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
-        .insert([{ name: teamName, club_id: clubData.id }])
+        .insert([{ 
+          name: teamName, 
+          club_id: clubData.id,
+          owner_id: user.id,
+          slug: `${clubSlug}-team`
+        }])
         .select()
         .single();
 
@@ -57,10 +73,10 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
 
       // 4. Create Role (Club Admin & Team Admin)
       const { error: rolesError } = await supabase
-        .from('roles')
+        .from('user_roles') // <-- Wait, is the table 'roles' or 'user_roles'? In useProfile it's 'user_roles'
         .insert([
-          { user_id: user.id, club_id: clubData.id, role: 'club_admin' },
-          { user_id: user.id, club_id: clubData.id, team_id: teamData.id, role: 'team_admin' }
+          { user_id: user.id, email: user.email, club_id: clubData.id, role: 'club_admin' },
+          { user_id: user.id, email: user.email, club_id: clubData.id, team_id: teamData.id, role: 'team_admin' }
         ]);
 
       if (rolesError) throw rolesError;
