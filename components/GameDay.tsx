@@ -171,7 +171,13 @@ export default function GameDay() {
       let query = supabase.from("teams").select("*");
       
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
-        if (activeClubId) query = query.eq('club_id', activeClubId);
+        if (activeClubId) {
+          query = query.eq('club_id', activeClubId);
+        } else if (profile.role !== 'super_admin') {
+          setTeams([]);
+          setLoading(false);
+          return;
+        }
       } else {
         const teamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id).filter(Boolean) || [];
         if (teamIds.length > 0) query = query.in('id', teamIds);
