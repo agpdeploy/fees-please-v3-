@@ -53,7 +53,13 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
   const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
+  const [defaultUmpireFee, setDefaultUmpireFee] = useState(clubInfo?.default_umpire_fee || 0);
   const [isSquareEnabled, setIsSquareEnabled] = useState(clubInfo?.is_square_enabled || false);
+  const [squareToken, setSquareToken] = useState(clubInfo?.square_access_token || "");
+  const [squareLocationId, setSquareLocationId] = useState(clubInfo?.square_location_id || "");
+  const [seasonName, setSeasonName] = useState(clubInfo?.season_name || "");
+  const [seasonStart, setSeasonStart] = useState(clubInfo?.season_start || "");
+  const [seasonEnd, setSeasonEnd] = useState(clubInfo?.season_end || "");
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
 
   const teamId = teams && teams.length > 0 ? teams[0].id : null;
@@ -111,7 +117,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     },
     {
       id: 'financials',
-      title: 'Set payment details',
+      title: 'Season & Payment details',
       completed: hasFinancials,
     }
   ];
@@ -430,7 +436,13 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
       pay_id_type: payIdType,
       pay_id_value: payId || null,
       expense_label: expenseLabel || null,
-      is_square_enabled: isSquareEnabled
+      default_umpire_fee: defaultUmpireFee || 0,
+      is_square_enabled: isSquareEnabled,
+      square_access_token: squareToken || null,
+      square_location_id: squareLocationId || null,
+      season_name: seasonName || null,
+      season_start: seasonStart || null,
+      season_end: seasonEnd || null
     }).eq('id', activeClubId);
     
     // Mutate local object so it checks off
@@ -440,7 +452,13 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
         pay_id_value: payId || null, 
         is_square_enabled: isSquareEnabled,
         pay_id_type: payIdType,
-        expense_label: expenseLabel || null
+        expense_label: expenseLabel || null,
+        default_umpire_fee: defaultUmpireFee || 0,
+        square_access_token: squareToken || null,
+        square_location_id: squareLocationId || null,
+        season_name: seasonName || null,
+        season_start: seasonStart || null,
+        season_end: seasonEnd || null
       });
     } else {
       clubInfo.pay_id_value = payId || null;
@@ -528,17 +546,20 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
                     {playerMode === 'daive' ? (
                       draftPlayers.length === 0 ? (
-                        <div key="daive-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
-                          <input type="file" accept="image/*,.csv" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                          {isExtracting ? (
-                             <i className="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-500 mb-2"></i>
-                          ) : (
-                             <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
-                          )}
-                          <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                            {isExtracting ? loadingText : 'Upload Image or CSV'}
-                          </p>
-                        </div>
+                        isExtracting ? (
+                          <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                            <i className="fa-solid fa-microchip text-4xl text-emerald-500 animate-pulse mb-4"></i>
+                            <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-[10px] text-center">{loadingText}</p>
+                          </div>
+                        ) : (
+                          <div key="daive-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                            <input type="file" accept="image/*,.csv" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
+                            <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
+                              Upload Image or CSV
+                            </p>
+                          </div>
+                        )
                       ) : (
                         <div key="daive-results" className="space-y-3 animate-in fade-in zoom-in-95 duration-200">
                           <button 
@@ -562,6 +583,13 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                                   <div className="flex gap-2 pr-6">
                                     <input type="text" placeholder="First Name" value={p.first_name || p.firstName || ""} onChange={(e) => updateDraftPlayer(i, 'first_name', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
                                     <input type="text" placeholder="Last Name" value={p.last_name || p.lastName || ""} onChange={(e) => updateDraftPlayer(i, 'last_name', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                  </div>
+                                  <div className="flex gap-2 pr-6 mt-1">
+                                    <input type="text" placeholder="Nickname" value={p.nickname || ""} onChange={(e) => updateDraftPlayer(i, 'nickname', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    <input type="tel" placeholder="Mobile" value={p.mobile_number || ""} onChange={(e) => updateDraftPlayer(i, 'mobile_number', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                  </div>
+                                  <div className="flex gap-2 pr-6 mt-1">
+                                    <input type="email" placeholder="Email" value={p.email || ""} onChange={(e) => updateDraftPlayer(i, 'email', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
                                   </div>
                                   <div className="flex items-center justify-between mt-1 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 bg-zinc-50 dark:bg-zinc-800">
                                      <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
@@ -628,17 +656,20 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                     {fixtureMode === 'daive' ? (
                       draftFixtures.length === 0 ? (
                         !fixtureNeedsAlias ? (
-                          <div key="daive-fixture-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
-                            <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveFixtureUpload} disabled={isExtractingFixture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                            {isExtractingFixture ? (
-                               <i className="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-500 mb-2"></i>
-                            ) : (
-                               <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
-                            )}
-                            <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                              {isExtractingFixture ? loadingText : 'Upload Master Draw (PDF/IMG/CSV)'}
-                            </p>
-                          </div>
+                          isExtractingFixture ? (
+                            <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                              <i className="fa-solid fa-microchip text-4xl text-emerald-500 animate-pulse mb-4"></i>
+                              <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-[10px] text-center">{loadingText}</p>
+                            </div>
+                          ) : (
+                            <div key="daive-fixture-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                              <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveFixtureUpload} disabled={isExtractingFixture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                              <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
+                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
+                                Upload Master Draw (PDF/IMG/CSV)
+                              </p>
+                            </div>
+                          )
                         ) : (
                           <div key="daive-fixture-alias" className="border border-orange-200 bg-orange-50 dark:bg-orange-900/10 p-5 rounded-xl">
                             <h3 className="font-black uppercase tracking-widest text-xs text-orange-800 dark:text-orange-400 mb-2">Team Not Found</h3>
@@ -717,6 +748,26 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                       <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
                     </div>
 
+                    {isSquareEnabled && (
+                      <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-emerald-500 rounded-xl transition-colors space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="aspect-video bg-zinc-200 dark:bg-zinc-900 rounded-lg flex items-center justify-center mb-2 overflow-hidden border border-zinc-300 dark:border-zinc-700">
+                          <div className="text-center p-6">
+                            <i className="fa-brands fa-youtube text-4xl text-red-500 mb-2"></i>
+                            <h4 className="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400">How to integrate Square</h4>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Access Token</label>
+                          <input type="password" value={squareToken} onChange={(e) => setSquareToken(e.target.value)} placeholder="sq0atp-..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Location ID</label>
+                          <input type="text" value={squareLocationId} onChange={(e) => setSquareLocationId(e.target.value)} placeholder="L..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                        <p className="text-[9px] font-bold text-zinc-400 text-center uppercase tracking-widest">You can skip this for now</p>
+                      </div>
+                    )}
+
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
                       <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Manual Payment Fallback</h4>
                       
@@ -760,9 +811,35 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                         </div>
                       </div>
 
+                      <div className="flex gap-2">
+                        <div className="flex-[2]">
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Label</label>
+                          <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Default Amount ($)</label>
+                          <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Season Details</h4>
+                      
                       <div>
-                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Global Expense Label</label>
-                        <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Season Name</label>
+                        <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Start Date</label>
+                          <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">End Date</label>
+                          <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                        </div>
                       </div>
                     </div>
                     
