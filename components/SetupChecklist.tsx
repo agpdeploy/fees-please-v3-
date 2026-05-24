@@ -58,6 +58,19 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
   const teamId = teams && teams.length > 0 ? teams[0].id : null;
 
+  const [loadingText, setLoadingText] = useState("");
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isExtracting || isExtractingFixture) {
+      const messages = ["Reading terrible handwriting...", "Crunching the data...", "Formatting names...", "Almost ready..."];
+      let i = 0;
+      setLoadingText(messages[0]);
+      interval = setInterval(() => { i++; if (i < messages.length) setLoadingText(messages[i]); }, 2500); 
+    }
+    return () => clearInterval(interval);
+  }, [isExtracting, isExtractingFixture]);
+
   useEffect(() => {
     async function checkStatus() {
       if (!activeClubId) return;
@@ -230,6 +243,16 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     }
   };
 
+  const updateDraftPlayer = (index: number, field: string, value: any) => {
+    const updated = [...draftPlayers];
+    updated[index] = { ...updated[index], [field]: value };
+    setDraftPlayers(updated);
+  };
+
+  const removeDraftPlayer = (index: number) => {
+    setDraftPlayers(draftPlayers.filter((_, i) => i !== index));
+  };
+
   const saveBulkPlayers = async () => {
     if (draftPlayers.length === 0 || !teamId) return;
     setIsSavingPlayer(true);
@@ -334,6 +357,16 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     } finally {
       e.target.value = ''; 
     }
+  };
+
+  const updateDraftFixture = (index: number, field: string, value: any) => {
+    const updated = [...draftFixtures];
+    updated[index] = { ...updated[index], [field]: value };
+    setDraftFixtures(updated);
+  };
+
+  const removeDraftFixture = (index: number) => {
+    setDraftFixtures(draftFixtures.filter((_, i) => i !== index));
   };
 
   const saveBulkFixtures = async () => {
@@ -503,16 +536,50 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                              <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
                           )}
                           <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                            {isExtracting ? 'dAIve is extracting...' : 'Upload Image or CSV'}
+                            {isExtracting ? loadingText : 'Upload Image or CSV'}
                           </p>
                         </div>
                       ) : (
-                        <div key="daive-results" className="space-y-3">
-                          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-center">
-                            <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-500 uppercase tracking-widest mb-1">Found {draftPlayers.length} Players</h4>
+                        <div key="daive-results" className="space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                          <button 
+                            onClick={() => setDraftPlayers([])} 
+                            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400 uppercase tracking-widest transition-colors flex items-center mb-2"
+                          >
+                            <i className="fa-solid fa-arrow-left mr-2"></i> Upload Different File
+                          </button>
+                          
+                          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col mb-4">
+                            <div className="bg-zinc-900 dark:bg-black px-4 py-3 flex justify-between items-center text-white shrink-0">
+                              <span className="font-black text-[10px] uppercase tracking-widest">Review Players</span>
+                              <span className="font-bold text-[10px] uppercase tracking-widest text-emerald-400">{draftPlayers.length} Found</span>
+                            </div>
+                            
+                            <div className="overflow-y-auto p-3 space-y-3 max-h-[40vh] bg-zinc-50 dark:bg-zinc-800/50">
+                              {draftPlayers.map((p, i) => (
+                                <div key={i} className="flex flex-col gap-2 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm relative">
+                                  <button onClick={() => removeDraftPlayer(i)} className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"><i className="fa-solid fa-xmark"></i></button>
+                                  
+                                  <div className="flex gap-2 pr-6">
+                                    <input type="text" placeholder="First Name" value={p.first_name || p.firstName || ""} onChange={(e) => updateDraftPlayer(i, 'first_name', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                    <input type="text" placeholder="Last Name" value={p.last_name || p.lastName || ""} onChange={(e) => updateDraftPlayer(i, 'last_name', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                  </div>
+                                  <div className="flex items-center justify-between mt-1 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 bg-zinc-50 dark:bg-zinc-800">
+                                     <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
+                                     <button 
+                                       onClick={() => updateDraftPlayer(i, 'is_member', p.is_member === undefined ? false : !p.is_member)}
+                                       className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors shadow-sm ${(p.is_member !== false) ? 'bg-emerald-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}
+                                     >
+                                       {(p.is_member !== false) ? 'MEMBER' : 'CASUAL'}
+                                     </button>
+                                  </div>
+                                </div>
+                              ))}
+                              {draftPlayers.length === 0 && <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs font-bold uppercase tracking-widest">No players extracted</div>}
+                            </div>
                           </div>
-                          <button onClick={saveBulkPlayers} disabled={isSavingPlayer} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
-                            {isSavingPlayer ? 'Saving...' : 'Import to Team'}
+
+                          <button onClick={saveBulkPlayers} disabled={isSavingPlayer || draftPlayers.length === 0} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                            {isSavingPlayer ? 'Saving...' : `Import ${draftPlayers.length} Players`}
                           </button>
                         </div>
                       )
@@ -569,7 +636,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                                <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
                             )}
                             <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                              {isExtractingFixture ? 'dAIve is extracting...' : 'Upload Master Draw (PDF/IMG/CSV)'}
+                              {isExtractingFixture ? loadingText : 'Upload Master Draw (PDF/IMG/CSV)'}
                             </p>
                           </div>
                         ) : (
@@ -587,12 +654,41 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                           </div>
                         )
                       ) : (
-                        <div className="space-y-3">
-                          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-center">
-                            <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-500 uppercase tracking-widest mb-1">Found {draftFixtures.length} Matches</h4>
+                        <div key="daive-fixture-results" className="space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                          <button 
+                            onClick={() => setDraftFixtures([])} 
+                            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400 uppercase tracking-widest transition-colors flex items-center mb-2"
+                          >
+                            <i className="fa-solid fa-arrow-left mr-2"></i> Upload Different File
+                          </button>
+
+                          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col mb-4">
+                            <div className="bg-zinc-900 dark:bg-black px-4 py-3 flex justify-between items-center text-white shrink-0">
+                              <span className="font-black text-[10px] uppercase tracking-widest">Review Fixtures</span>
+                              <span className="font-bold text-[10px] uppercase tracking-widest text-emerald-400">{draftFixtures.length} Found</span>
+                            </div>
+                            
+                            <div className="overflow-y-auto p-3 space-y-3 max-h-[40vh] bg-zinc-50 dark:bg-zinc-800/50">
+                              {draftFixtures.map((f, i) => (
+                                <div key={i} className="flex flex-col gap-2 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm relative">
+                                  <button onClick={() => removeDraftFixture(i)} className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"><i className="fa-solid fa-xmark"></i></button>
+                                  
+                                  <div className="flex gap-2 pr-6">
+                                    <input type="text" placeholder="Opponent" value={f.opponent || ""} onChange={(e) => updateDraftFixture(i, 'opponent', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                    <input type="date" value={f.match_date || ""} onChange={(e) => updateDraftFixture(i, 'match_date', e.target.value)} className="flex-[0.8] min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors color-scheme-light dark:color-scheme-dark" />
+                                  </div>
+                                  <div className="flex gap-2 pr-6">
+                                    <input type="text" placeholder="Time" value={f.start_time || ""} onChange={(e) => updateDraftFixture(i, 'start_time', e.target.value)} className="flex-[0.6] min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    <input type="text" placeholder="Venue/Location" value={f.location || ""} onChange={(e) => updateDraftFixture(i, 'location', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                  </div>
+                                </div>
+                              ))}
+                              {draftFixtures.length === 0 && <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs font-bold uppercase tracking-widest">No matches found for this team</div>}
+                            </div>
                           </div>
-                          <button onClick={saveBulkFixtures} disabled={isSavingFixture} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
-                            {isSavingFixture ? 'Saving...' : 'Import Matches'}
+
+                          <button onClick={saveBulkFixtures} disabled={isSavingFixture || draftFixtures.length === 0} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                            {isSavingFixture ? 'Saving...' : `Import ${draftFixtures.length} Matches`}
                           </button>
                         </div>
                       )
