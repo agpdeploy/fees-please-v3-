@@ -916,6 +916,7 @@ export default function GameDay() {
         <SetupChecklist 
           activeClubId={activeClubId} 
           clubInfo={clubInfo} 
+          onUpdateClubInfo={setClubInfo}
           teamFees={teamFees} 
           teamsCount={teams.length}
           teams={teams}

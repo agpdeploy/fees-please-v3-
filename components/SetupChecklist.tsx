@@ -6,13 +6,14 @@ import { supabase } from "@/lib/supabase";
 interface SetupChecklistProps {
   activeClubId: string;
   clubInfo: any;
+  onUpdateClubInfo?: (info: any) => void;
   teamFees: any;
   teamsCount: number;
   teams: any[];
   onDismiss: () => void;
 }
 
-export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teamsCount, teams, onDismiss }: SetupChecklistProps) {
+export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInfo, teamFees, teamsCount, teams, onDismiss }: SetupChecklistProps) {
   const [hasPlayers, setHasPlayers] = useState(false);
   const [hasFixtures, setHasFixtures] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,11 +35,17 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
   const [isExtracting, setIsExtracting] = useState(false);
 
   // Fixture state
+  const [fixtureMode, setFixtureMode] = useState<'daive'|'manual'>('daive');
   const [opponent, setOpponent] = useState("");
   const [matchDate, setMatchDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [location, setLocation] = useState("");
   const [isSavingFixture, setIsSavingFixture] = useState(false);
+  const [draftFixtures, setDraftFixtures] = useState<any[]>([]);
+  const [isExtractingFixture, setIsExtractingFixture] = useState(false);
+  const [fixtureNeedsAlias, setFixtureNeedsAlias] = useState(false);
+  const [fixtureDrawAlias, setFixtureDrawAlias] = useState("");
+  const [fixtureCachedUpload, setFixtureCachedUpload] = useState<any>(null);
 
   // Financials state
   const [memberFee, setMemberFee] = useState(teamFees?.member || 10);
@@ -81,7 +88,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     },
     {
       id: 'players',
-      title: 'Add players to your squad',
+      title: 'Add players to your team',
       completed: hasPlayers,
     },
     {
@@ -135,37 +142,23 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
       const { error: uploadError } = await supabase.storage.from('logos').upload(fileName, processedFile);
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('logos').getPublicUrl(fileName);
-      await supabase.from('clubs').update({ logo: data.publicUrl }).eq('id', activeClubId);
-      // Mutate local object so it instantly checks off
-      clubInfo.logo = data.publicUrl;
+      
+      const { error } = await supabase.from('clubs').update({ logo_url: data.publicUrl }).eq('id', activeClubId);
+      if (error) throw error;
+      
+      // Update local state instantly so GameDay header updates and the checkmark appears
+      if (onUpdateClubInfo) {
+        onUpdateClubInfo({ ...clubInfo, logo: data.publicUrl });
+      } else {
+        clubInfo.logo = data.publicUrl;
+      }
+
       setExpandedStep('players');
     } catch (err) {
       console.error(err);
       alert("Error uploading logo");
     } finally {
       setIsUploadingLogo(false);
-    }
-  };
-
-  const handleSavePlayerManual = async () => {
-    if (!firstName || !teamId) return;
-    setIsSavingPlayer(true);
-    const { error } = await supabase.from('players').insert([{
-      club_id: activeClubId,
-      default_team_id: teamId,
-      first_name: firstName,
-      last_name: lastName,
-      nickname: nickname || null,
-      mobile_number: mobileNumber || null,
-      email: emailAddress || null,
-      is_member: isMember
-    }]);
-    setIsSavingPlayer(false);
-    if (!error) {
-      setHasPlayers(true);
-      setExpandedStep('fixtures');
-    } else {
-      alert("Error saving player: " + error.message);
     }
   };
 
@@ -178,6 +171,30 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     });
   };
 
+  const compressFixtureImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000; 
+          const scaleSize = Math.min(1, MAX_WIDTH / img.width);
+          canvas.width = img.width * scaleSize;
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext('2d');
+          if (ctx) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  // --- PLAYERS ---
   const handleDaiveUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !teamId) return;
@@ -234,7 +251,119 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     }
   };
 
-  const handleSaveFixture = async () => {
+  const handleSavePlayerManual = async () => {
+    if (!firstName || !teamId) return;
+    setIsSavingPlayer(true);
+    const { error } = await supabase.from('players').insert([{
+      club_id: activeClubId,
+      default_team_id: teamId,
+      first_name: firstName,
+      last_name: lastName,
+      nickname: nickname || null,
+      mobile_number: mobileNumber || null,
+      email: emailAddress || null,
+      is_member: isMember
+    }]);
+    setIsSavingPlayer(false);
+    if (!error) {
+      setHasPlayers(true);
+      setExpandedStep('fixtures');
+    } else {
+      alert("Error saving player: " + error.message);
+    }
+  };
+
+  // --- FIXTURES ---
+  const runFixtureExtraction = async (payload: any, searchName: string) => {
+    setIsExtractingFixture(true);
+    setFixtureNeedsAlias(false);
+    try {
+      const res = await fetch("/api/extract-fixtures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, teamName: searchName }),
+      });
+
+      const data = await res.json();
+
+      if (data.fixtures && Array.isArray(data.fixtures)) {
+        if (data.fixtures.length === 0) {
+          setFixtureNeedsAlias(true);
+        } else {
+          setDraftFixtures(data.fixtures);
+        }
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      console.error("Extraction error:", error);
+      alert(error.message || "Couldn't parse the draw. Switch to manual.");
+    } finally {
+      setIsExtractingFixture(false);
+    }
+  };
+
+  const handleDaiveFixtureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !teamId) return;
+
+    const teamName = teams.find(t => t.id === teamId)?.name || "";
+
+    try {
+      let payload: any = {};
+
+      if (file.type.startsWith('image/')) {
+        payload.fileBase64 = await compressFixtureImage(file);
+        payload.mimeType = 'image/jpeg';
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        if (file.size > 5 * 1024 * 1024) throw new Error("PDF must be smaller than 5MB.");
+        payload.fileBase64 = await fileToBase64(file);
+        payload.mimeType = 'application/pdf';
+      } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        payload.csvText = await file.text();
+      } else {
+        throw new Error("Unsupported file format.");
+      }
+      
+      setFixtureCachedUpload(payload);
+      await runFixtureExtraction(payload, teamName);
+
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Couldn't process the file.");
+    } finally {
+      e.target.value = ''; 
+    }
+  };
+
+  const saveBulkFixtures = async () => {
+    const validFixtures = draftFixtures.filter(f => f.opponent.trim() !== "" && f.match_date);
+    if (validFixtures.length === 0) return alert("No valid fixtures to save.");
+    
+    setIsSavingFixture(true);
+    const payload = validFixtures.map(f => ({ 
+      ...f, 
+      team_id: teamId, 
+      club_id: activeClubId,
+      umpire_fee: clubInfo?.default_umpire_fee || 0 
+    }));
+
+    const { error } = await supabase.from("fixtures").insert(payload);
+    
+    setIsSavingFixture(false);
+    if (error) {
+      alert(error.message);
+    } else { 
+      setHasFixtures(true);
+      setDraftFixtures([]); 
+      setFixtureNeedsAlias(false);
+      setFixtureCachedUpload(null);
+      setFixtureDrawAlias("");
+      setExpandedStep('financials');
+    }
+  };
+
+  const handleSaveFixtureManual = async () => {
     if (!opponent || !matchDate || !teamId) return;
     setIsSavingFixture(true);
     const { error } = await supabase.from('fixtures').insert([{
@@ -255,6 +384,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     }
   };
 
+  // --- FINANCIALS ---
   const handleSaveFinancials = async () => {
     if (!teamId) return;
     setIsSavingFinancials(true);
@@ -271,8 +401,19 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     }).eq('id', activeClubId);
     
     // Mutate local object so it checks off
-    clubInfo.pay_id_value = payId || null;
-    clubInfo.is_square_enabled = isSquareEnabled;
+    if (onUpdateClubInfo) {
+      onUpdateClubInfo({ 
+        ...clubInfo, 
+        pay_id_value: payId || null, 
+        is_square_enabled: isSquareEnabled,
+        pay_id_type: payIdType,
+        expense_label: expenseLabel || null
+      });
+    } else {
+      clubInfo.pay_id_value = payId || null;
+      clubInfo.is_square_enabled = isSquareEnabled;
+    }
+    
     setIsSavingFinancials(false);
     setExpandedStep(null);
   };
@@ -371,7 +512,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
                             <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-500 uppercase tracking-widest mb-1">Found {draftPlayers.length} Players</h4>
                           </div>
                           <button onClick={saveBulkPlayers} disabled={isSavingPlayer} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
-                            {isSavingPlayer ? 'Saving...' : 'Import to Squad'}
+                            {isSavingPlayer ? 'Saving...' : 'Import to Team'}
                           </button>
                         </div>
                       )
@@ -407,18 +548,68 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
 
                 {/* Fixtures Inline */}
                 {step.id === 'fixtures' && (
-                  <div className="space-y-3">
-                    <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Add your first match</p>
-                    <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                    <div className="flex gap-2">
-                      <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="flex-[0.8] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
-                      <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="flex-[0.6] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                  <div>
+                    <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-4 transition-colors">
+                      <button onClick={() => setFixtureMode('daive')} className={`flex-1 py-2 text-[9px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${fixtureMode === 'daive' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> dAIve
+                      </button>
+                      <button onClick={() => setFixtureMode('manual')} className={`flex-1 py-2 text-[9px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${fixtureMode === 'manual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                        <i className="fa-solid fa-keyboard"></i> MANUAL
+                      </button>
                     </div>
-                    <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                    
-                    <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixture} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
-                      {isSavingFixture ? 'Saving...' : 'Save Fixture'}
-                    </button>
+
+                    {fixtureMode === 'daive' ? (
+                      draftFixtures.length === 0 ? (
+                        !fixtureNeedsAlias ? (
+                          <div className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                            <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveFixtureUpload} disabled={isExtractingFixture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            {isExtractingFixture ? (
+                               <i className="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-500 mb-2"></i>
+                            ) : (
+                               <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
+                            )}
+                            <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
+                              {isExtractingFixture ? 'dAIve is extracting...' : 'Upload Master Draw (PDF/IMG/CSV)'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="border border-orange-200 bg-orange-50 dark:bg-orange-900/10 p-5 rounded-xl">
+                            <h3 className="font-black uppercase tracking-widest text-xs text-orange-800 dark:text-orange-400 mb-2">Team Not Found</h3>
+                            <p className="text-[10px] font-bold text-orange-600/70 dark:text-orange-500 uppercase tracking-widest mb-3">Did they use an abbreviation on the draw?</p>
+                            
+                            <div className="flex gap-2">
+                              <input type="text" placeholder="e.g. Ferny Dist 1" value={fixtureDrawAlias} onChange={(e) => setFixtureDrawAlias(e.target.value)} className="flex-1 bg-white dark:bg-zinc-900 border border-orange-200 dark:border-orange-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-orange-500 transition-colors" />
+                              <button onClick={() => runFixtureExtraction(fixtureCachedUpload, fixtureDrawAlias)} disabled={!fixtureDrawAlias} className="px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-black uppercase transition-colors disabled:opacity-50">Try Again</button>
+                            </div>
+                            <button onClick={() => setFixtureNeedsAlias(false)} className="w-full mt-3 text-[9px] font-bold text-orange-600/70 hover:text-orange-800 dark:text-orange-500 uppercase tracking-widest underline">
+                              Cancel and upload different file
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-center">
+                            <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-500 uppercase tracking-widest mb-1">Found {draftFixtures.length} Matches</h4>
+                          </div>
+                          <button onClick={saveBulkFixtures} disabled={isSavingFixture} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                            {isSavingFixture ? 'Saving...' : 'Import Matches'}
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <div className="space-y-3">
+                        <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        <div className="flex gap-2">
+                          <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="flex-[0.8] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                          <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="flex-[0.6] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                        <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        
+                        <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixtureManual} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                          {isSavingFixture ? 'Saving...' : 'Save Fixture'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
