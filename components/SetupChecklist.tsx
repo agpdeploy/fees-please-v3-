@@ -103,7 +103,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     },
     {
       id: 'logo',
-      title: 'Add a club logo',
+      title: 'Add a logo for your team/club',
       completed: hasLogo,
     },
     {
@@ -514,7 +514,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
       <div className="flex justify-between items-start mb-5">
         <div>
           <h3 className="font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 text-sm mb-1">Let's Get Started</h3>
-          <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to set up your club.</p>
+          <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to set up your team and season details.</p>
         </div>
         <button 
           onClick={onDismiss}
@@ -616,16 +616,27 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                                 <div key={i} className="flex flex-col gap-2 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm relative">
                                   <button onClick={() => removeDraftPlayer(i)} className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"><i className="fa-solid fa-xmark"></i></button>
                                   
-                                  <div className="flex gap-2 pr-6">
-                                    <input type="text" placeholder="First Name" value={p.first_name || p.firstName || ""} onChange={(e) => updateDraftPlayer(i, 'first_name', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
-                                    <input type="text" placeholder="Last Name" value={p.last_name || p.lastName || ""} onChange={(e) => updateDraftPlayer(i, 'last_name', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
-                                  </div>
-                                  <div className="flex gap-2 pr-6 mt-1">
-                                    <input type="text" placeholder="Nickname" value={p.nickname || ""} onChange={(e) => updateDraftPlayer(i, 'nickname', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
-                                    <input type="tel" placeholder="Mobile" value={p.mobile_number || ""} onChange={(e) => updateDraftPlayer(i, 'mobile_number', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
-                                  </div>
-                                  <div className="flex gap-2 pr-6 mt-1">
-                                    <input type="email" placeholder="Email" value={p.email || ""} onChange={(e) => updateDraftPlayer(i, 'email', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                  <div className="flex flex-col gap-2 pr-6">
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">First Name</label>
+                                      <input type="text" placeholder="First Name" value={p.first_name || p.firstName || ""} onChange={(e) => updateDraftPlayer(i, 'first_name', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Last Name</label>
+                                      <input type="text" placeholder="Last Name" value={p.last_name || p.lastName || ""} onChange={(e) => updateDraftPlayer(i, 'last_name', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Nickname</label>
+                                      <input type="text" placeholder="Nickname" value={p.nickname || ""} onChange={(e) => updateDraftPlayer(i, 'nickname', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Mobile</label>
+                                      <input type="tel" placeholder="Mobile" value={p.mobile_number || ""} onChange={(e) => updateDraftPlayer(i, 'mobile_number', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Email</label>
+                                      <input type="email" placeholder="Email" value={p.email || ""} onChange={(e) => updateDraftPlayer(i, 'email', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    </div>
                                   </div>
                                   <div className="flex items-center justify-between mt-1 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 bg-zinc-50 dark:bg-zinc-800">
                                      <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
@@ -649,15 +660,28 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                       )
                     ) : (
                       <div key="manual-entry" className="space-y-3">
-                        <div className="flex gap-2">
-                          <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                          <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        <div className="flex flex-col gap-2">
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">First Name</label>
+                            <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Last Name</label>
+                            <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Nickname</label>
+                            <input type="text" placeholder="Nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Mobile Number</label>
+                            <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Email Address</label>
+                            <input type="email" placeholder="Email Address" value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <input type="text" placeholder="Nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                          <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                        </div>
-                        <input type="email" placeholder="Email Address" value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         
                         <div className="flex items-center justify-between border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800 transition-colors">
                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
@@ -711,9 +735,9 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                             <h3 className="font-black uppercase tracking-widest text-xs text-orange-800 dark:text-orange-400 mb-2">Team Not Found</h3>
                             <p className="text-[10px] font-bold text-orange-600/70 dark:text-orange-500 uppercase tracking-widest mb-3">Did they use an abbreviation on the draw?</p>
                             
-                            <div className="flex gap-2">
-                              <input type="text" placeholder="e.g. Ferny Dist 1" value={fixtureDrawAlias} onChange={(e) => setFixtureDrawAlias(e.target.value)} className="flex-1 bg-white dark:bg-zinc-900 border border-orange-200 dark:border-orange-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-orange-500 transition-colors" />
-                              <button onClick={() => runFixtureExtraction(fixtureCachedUpload, fixtureDrawAlias)} disabled={!fixtureDrawAlias} className="px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-black uppercase transition-colors disabled:opacity-50">Try Again</button>
+                            <div className="flex flex-col gap-2">
+                              <input type="text" placeholder="e.g. Ferny Dist 1" value={fixtureDrawAlias} onChange={(e) => setFixtureDrawAlias(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-orange-200 dark:border-orange-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-orange-500 transition-colors" />
+                              <button onClick={() => runFixtureExtraction(fixtureCachedUpload, fixtureDrawAlias)} disabled={!fixtureDrawAlias} className="w-full py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-black uppercase transition-colors disabled:opacity-50">Try Again</button>
                             </div>
                             <button onClick={() => setFixtureNeedsAlias(false)} className="w-full mt-3 text-[9px] font-bold text-orange-600/70 hover:text-orange-800 dark:text-orange-500 uppercase tracking-widest underline">
                               Cancel and upload different file
@@ -740,13 +764,23 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                                 <div key={i} className="flex flex-col gap-2 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm relative">
                                   <button onClick={() => removeDraftFixture(i)} className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"><i className="fa-solid fa-xmark"></i></button>
                                   
-                                  <div className="flex gap-2 pr-6">
-                                    <input type="text" placeholder="Opponent" value={f.opponent || ""} onChange={(e) => updateDraftFixture(i, 'opponent', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
-                                    <input type="date" value={f.match_date || ""} onChange={(e) => updateDraftFixture(i, 'match_date', e.target.value)} className="flex-[0.8] min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors color-scheme-light dark:color-scheme-dark" />
-                                  </div>
-                                  <div className="flex gap-2 pr-6">
-                                    <input type="text" placeholder="Time" value={f.start_time || ""} onChange={(e) => updateDraftFixture(i, 'start_time', e.target.value)} className="flex-[0.6] min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
-                                    <input type="text" placeholder="Venue/Location" value={f.location || ""} onChange={(e) => updateDraftFixture(i, 'location', e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                  <div className="flex flex-col gap-2 pr-6">
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Opponent</label>
+                                      <input type="text" placeholder="Opponent" value={f.opponent || ""} onChange={(e) => updateDraftFixture(i, 'opponent', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors font-bold" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Date</label>
+                                      <input type="date" value={f.match_date || ""} onChange={(e) => updateDraftFixture(i, 'match_date', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors color-scheme-light dark:color-scheme-dark" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Time</label>
+                                      <input type="text" placeholder="Time" value={f.start_time || ""} onChange={(e) => updateDraftFixture(i, 'start_time', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Venue/Location</label>
+                                      <input type="text" placeholder="Venue/Location" value={f.location || ""} onChange={(e) => updateDraftFixture(i, 'location', e.target.value)} className="w-full min-w-0 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 text-zinc-900 dark:text-white transition-colors" />
+                                    </div>
                                   </div>
                                 </div>
                               ))}
@@ -761,12 +795,24 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                       )
                     ) : (
                       <div key="manual-fixture-entry" className="space-y-3">
-                        <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                        <div className="flex gap-2">
-                          <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="flex-[0.8] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
-                          <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="flex-[0.6] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        <div className="flex flex-col gap-2">
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Opponent Name</label>
+                            <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Date</label>
+                            <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Time</label>
+                            <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Location</label>
+                            <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          </div>
                         </div>
-                        <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         
                         <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixtureManual} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
                           {isSavingFixture ? 'Saving...' : 'Save Fixture'}
@@ -785,12 +831,12 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                         <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                       </div>
                       
-                      <div className="flex gap-2">
-                        <div className="flex-1">
+                      <div className="flex flex-col gap-2">
+                        <div>
                           <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Start Date</label>
                           <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
                         </div>
-                        <div className="flex-1">
+                        <div>
                           <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">End Date</label>
                           <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
                         </div>
@@ -805,12 +851,12 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                         <input type="number" value={memberFee} onChange={(e) => setMemberFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                       </div>
 
-                      <div className="flex gap-2">
-                        <div className="flex-[2]">
+                      <div className="flex flex-col gap-2">
+                        <div>
                           <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Label</label>
-                          <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <input type="text" placeholder="e.g. match expense fees, game fees, umpire fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         </div>
-                        <div className="flex-1">
+                        <div>
                           <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Default Amount ($)</label>
                           <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                           <p className="text-[8px] text-zinc-400 mt-1 uppercase tracking-widest font-black leading-tight">E.G. GROUND FEES, COURT HIRE, UMPIRE FEES</p>
@@ -829,7 +875,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                   <div className="space-y-4">
                     <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 transition-colors">
                       <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-300 uppercase tracking-widest">Enable Square</span>
-                      <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
+                      <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Enabled' : 'Disabled'}</button>
                     </div>
 
                     {isSquareEnabled && (
@@ -855,8 +901,8 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
                       <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Manual Payment Fallback</h4>
                       
-                      <div className="flex gap-2">
-                        <div className="w-1/3">
+                      <div className="flex flex-col gap-2">
+                        <div className="w-full">
                           <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Type</label>
                           <select 
                             value={payIdType || ""} 
@@ -868,7 +914,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                             <option value="bank_account">Bank Account</option>
                           </select>
                         </div>
-                        <div className="flex-1">
+                        <div className="w-full">
                           <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Details</label>
                           <input 
                             type="text" 
