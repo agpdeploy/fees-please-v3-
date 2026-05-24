@@ -495,7 +495,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
                     {playerMode === 'daive' ? (
                       draftPlayers.length === 0 ? (
-                        <div className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                        <div key="daive-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
                           <input type="file" accept="image/*,.csv" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                           {isExtracting ? (
                              <i className="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-500 mb-2"></i>
@@ -507,7 +507,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-3">
+                        <div key="daive-results" className="space-y-3">
                           <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-center">
                             <h4 className="text-xs font-black text-emerald-700 dark:text-emerald-500 uppercase tracking-widest mb-1">Found {draftPlayers.length} Players</h4>
                           </div>
@@ -517,7 +517,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                         </div>
                       )
                     ) : (
-                      <div className="space-y-3">
+                      <div key="manual-entry" className="space-y-3">
                         <div className="flex gap-2">
                           <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                           <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
@@ -561,7 +561,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                     {fixtureMode === 'daive' ? (
                       draftFixtures.length === 0 ? (
                         !fixtureNeedsAlias ? (
-                          <div className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                          <div key="daive-fixture-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
                             <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveFixtureUpload} disabled={isExtractingFixture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             {isExtractingFixture ? (
                                <i className="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-500 mb-2"></i>
@@ -573,7 +573,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                             </p>
                           </div>
                         ) : (
-                          <div className="border border-orange-200 bg-orange-50 dark:bg-orange-900/10 p-5 rounded-xl">
+                          <div key="daive-fixture-alias" className="border border-orange-200 bg-orange-50 dark:bg-orange-900/10 p-5 rounded-xl">
                             <h3 className="font-black uppercase tracking-widest text-xs text-orange-800 dark:text-orange-400 mb-2">Team Not Found</h3>
                             <p className="text-[10px] font-bold text-orange-600/70 dark:text-orange-500 uppercase tracking-widest mb-3">Did they use an abbreviation on the draw?</p>
                             
@@ -597,7 +597,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                         </div>
                       )
                     ) : (
-                      <div className="space-y-3">
+                      <div key="manual-fixture-entry" className="space-y-3">
                         <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         <div className="flex gap-2">
                           <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="flex-[0.8] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
