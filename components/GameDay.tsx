@@ -1148,7 +1148,8 @@ export default function GameDay() {
             </p>
           )}
         </div>
-      )}
+      ) : null}
+
 
       {/* --- PAYMENT & COLLECTION AREA --- */}
       {activeFixture && (

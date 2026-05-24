@@ -25,6 +25,10 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
   const [playerMode, setPlayerMode] = useState<'daive'|'manual'>('daive');
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [emailAddress, setEmailAddress] = useState("");
+  const [isMember, setIsMember] = useState(true);
   const [isSavingPlayer, setIsSavingPlayer] = useState(false);
   const [draftPlayers, setDraftPlayers] = useState<any[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -32,13 +36,17 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
   // Fixture state
   const [opponent, setOpponent] = useState("");
   const [matchDate, setMatchDate] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [location, setLocation] = useState("");
   const [isSavingFixture, setIsSavingFixture] = useState(false);
 
   // Financials state
   const [memberFee, setMemberFee] = useState(teamFees?.member || 10);
   const [casualFee, setCasualFee] = useState(teamFees?.casual || 25);
+  const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
+  const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
+  const [isSquareEnabled, setIsSquareEnabled] = useState(clubInfo?.is_square_enabled || false);
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
 
   const teamId = teams && teams.length > 0 ? teams[0].id : null;
@@ -90,19 +98,47 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
 
   const allCompleted = steps.every(s => s.completed);
 
-  // --- Handlers ---
+  const cropAndCompressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          canvas.width = 300; canvas.height = 300;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject("Canvas error");
+          const startX = (img.width - size) / 2; const startY = (img.height - size) / 2;
+          ctx.drawImage(img, startX, startY, size, size, 0, 0, 300, 300);
+          
+          canvas.toBlob((blob) => {
+            if (!blob) return reject("Blob error");
+            resolve(new File([blob], "image.webp", { type: "image/webp" }));
+          }, "image/webp", 0.8);
+        };
+        img.onerror = () => reject("Image format invalid");
+      };
+      reader.onerror = () => reject("File read error");
+    });
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploadingLogo(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${activeClubId}-${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('logos').upload(fileName, file);
+      const processedFile = await cropAndCompressImage(file);
+      const fileName = `${activeClubId}-logo-${Math.random()}.webp`;
+      const { error: uploadError } = await supabase.storage.from('logos').upload(fileName, processedFile);
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('logos').getPublicUrl(fileName);
       await supabase.from('clubs').update({ logo: data.publicUrl }).eq('id', activeClubId);
-      window.location.reload();
+      // Mutate local object so it instantly checks off
+      clubInfo.logo = data.publicUrl;
+      setExpandedStep('players');
     } catch (err) {
       console.error(err);
       alert("Error uploading logo");
@@ -119,12 +155,15 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
       default_team_id: teamId,
       first_name: firstName,
       last_name: lastName,
-      is_member: true
+      nickname: nickname || null,
+      mobile_number: mobileNumber || null,
+      email: emailAddress || null,
+      is_member: isMember
     }]);
     setIsSavingPlayer(false);
     if (!error) {
       setHasPlayers(true);
-      setExpandedStep(null);
+      setExpandedStep('fixtures');
     } else {
       alert("Error saving player: " + error.message);
     }
@@ -147,7 +186,6 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     try {
       let payload: any = {};
       if (file.type.startsWith('image/')) {
-        // Just use raw base64 for simplicity in checklist (in production we compress)
         payload.fileBase64 = await fileToBase64(file);
         payload.mimeType = 'image/jpeg';
       } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
@@ -189,7 +227,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
     setIsSavingPlayer(false);
     if (!error) {
       setHasPlayers(true);
-      setExpandedStep(null);
+      setExpandedStep('fixtures');
       setDraftPlayers([]);
     } else {
       alert("Error saving players");
@@ -204,13 +242,14 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
       team_id: teamId,
       opponent,
       match_date: matchDate,
+      start_time: startTime,
       location: location,
       status: 'scheduled'
     }]);
     setIsSavingFixture(false);
     if (!error) {
       setHasFixtures(true);
-      setExpandedStep(null);
+      setExpandedStep('financials');
     } else {
       alert("Error saving fixture: " + error.message);
     }
@@ -219,12 +258,23 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
   const handleSaveFinancials = async () => {
     if (!teamId) return;
     setIsSavingFinancials(true);
-    await supabase.from('teams').update({ default_match_fee: memberFee, default_casual_fee: casualFee }).eq('id', teamId);
-    if (payId) {
-      await supabase.from('clubs').update({ pay_id_value: payId }).eq('id', activeClubId);
-    }
+    await supabase.from('teams').update({ 
+      member_fee: memberFee, 
+      casual_fee: casualFee 
+    }).eq('id', teamId);
+    
+    await supabase.from('clubs').update({ 
+      pay_id_type: payIdType,
+      pay_id_value: payId || null,
+      expense_label: expenseLabel || null,
+      is_square_enabled: isSquareEnabled
+    }).eq('id', activeClubId);
+    
+    // Mutate local object so it checks off
+    clubInfo.pay_id_value = payId || null;
+    clubInfo.is_square_enabled = isSquareEnabled;
     setIsSavingFinancials(false);
-    window.location.reload();
+    setExpandedStep(null);
   };
 
   if (loading) return null;
@@ -328,9 +378,25 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
                     ) : (
                       <div className="space-y-3">
                         <div className="flex gap-2">
-                          <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
-                          <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
+                          <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         </div>
+                        <div className="flex gap-2">
+                          <input type="text" placeholder="Nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                        <input type="email" placeholder="Email Address" value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        
+                        <div className="flex items-center justify-between border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800 transition-colors">
+                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
+                           <button 
+                             onClick={() => setIsMember(!isMember)}
+                             className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'}`}
+                           >
+                             {isMember ? 'MEMBER' : 'CASUAL'}
+                           </button>
+                        </div>
+
                         <button disabled={isSavingPlayer || !firstName} onClick={handleSavePlayerManual} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
                           {isSavingPlayer ? 'Saving...' : 'Add Player'}
                         </button>
@@ -343,11 +409,13 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
                 {step.id === 'fixtures' && (
                   <div className="space-y-3">
                     <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Add your first match</p>
-                    <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
+                    <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                     <div className="flex gap-2">
-                      <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
-                      <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
+                      <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="flex-[0.8] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                      <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="flex-[0.6] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                     </div>
+                    <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                    
                     <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixture} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
                       {isSavingFixture ? 'Saving...' : 'Save Fixture'}
                     </button>
@@ -356,22 +424,62 @@ export default function SetupChecklist({ activeClubId, clubInfo, teamFees, teams
 
                 {/* Financials Inline */}
                 {step.id === 'financials' && (
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                         <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Member Fee ($)</label>
-                         <input type="number" value={memberFee} onChange={(e) => setMemberFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
-                      </div>
-                      <div className="flex-1">
-                         <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Casual Fee ($)</label>
-                         <input type="number" value={casualFee} onChange={(e) => setCasualFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 transition-colors">
+                      <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-300 uppercase tracking-widest">Enable Square</span>
+                      <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
+                    </div>
+
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Manual Payment Fallback</h4>
+                      
+                      <div className="flex gap-2">
+                        <div className="w-1/3">
+                          <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Type</label>
+                          <select 
+                            value={payIdType || ""} 
+                            onChange={(e) => setPayIdType(e.target.value as any)} 
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
+                          >
+                            <option value="mobile">PayID (Mobile)</option>
+                            <option value="email">PayID (Email)</option>
+                            <option value="bank_account">Bank Account</option>
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Details</label>
+                          <input 
+                            type="text" 
+                            value={payId || ""} 
+                            onChange={(e) => setPayId(e.target.value)} 
+                            placeholder={payIdType === 'mobile' ? 'e.g. 0400 000 000' : payIdType === 'email' ? 'e.g. admin@club.com' : 'e.g. BSB: 123-456 ACC: 12345678'}
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div>
-                       <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">PayID / Bank Details</label>
-                       <input type="text" placeholder="e.g. 0412 345 678" value={payId} onChange={(e) => setPayId(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500" />
+
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Defaults & Labels</h4>
+                      
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Member Fee ($)</label>
+                          <input type="number" value={memberFee} onChange={(e) => setMemberFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Casual Fee ($)</label>
+                          <input type="number" value={casualFee} onChange={(e) => setCasualFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Global Expense Label</label>
+                        <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                      </div>
                     </div>
-                    <button disabled={isSavingFinancials || !payId} onClick={handleSaveFinancials} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-2">
+                    
+                    <button disabled={isSavingFinancials} onClick={handleSaveFinancials} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-2">
                       {isSavingFinancials ? 'Saving...' : 'Save Financials'}
                     </button>
                   </div>
