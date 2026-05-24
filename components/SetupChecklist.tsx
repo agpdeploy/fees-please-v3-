@@ -48,18 +48,18 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
   const [fixtureCachedUpload, setFixtureCachedUpload] = useState<any>(null);
 
   // Financials state
-  const [memberFee, setMemberFee] = useState(teamFees?.member || 10);
-  const [casualFee, setCasualFee] = useState(teamFees?.casual || 25);
+  const [memberFee, setMemberFee] = useState<number | "">(teamFees?.member || 10);
   const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
-  const [defaultUmpireFee, setDefaultUmpireFee] = useState(clubInfo?.default_umpire_fee || 0);
+  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(clubInfo?.default_umpire_fee || "");
   const [isSquareEnabled, setIsSquareEnabled] = useState(clubInfo?.is_square_enabled || false);
   const [squareToken, setSquareToken] = useState(clubInfo?.square_access_token || "");
   const [squareLocationId, setSquareLocationId] = useState(clubInfo?.square_location_id || "");
   const [seasonName, setSeasonName] = useState(clubInfo?.season_name || "");
   const [seasonStart, setSeasonStart] = useState(clubInfo?.season_start || "");
   const [seasonEnd, setSeasonEnd] = useState(clubInfo?.season_end || "");
+  const [isSavingSeason, setIsSavingSeason] = useState(false);
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
 
   const teamId = teams && teams.length > 0 ? teams[0].id : null;
@@ -90,6 +90,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     checkStatus();
   }, [activeClubId]);
 
+  const hasSeason = !!clubInfo.season_name;
   const hasLogo = !!clubInfo.logo;
   const hasTeams = teamsCount > 0;
   const hasFinancials = !!clubInfo.pay_id_value || !!clubInfo.is_square_enabled;
@@ -111,13 +112,18 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
       completed: hasPlayers,
     },
     {
+      id: 'season',
+      title: 'Set season dates',
+      completed: hasSeason,
+    },
+    {
       id: 'fixtures',
       title: 'Add your season fixtures',
       completed: hasFixtures,
     },
     {
       id: 'financials',
-      title: 'Season & Payment details',
+      title: 'Set payment details',
       completed: hasFinancials,
     }
   ];
@@ -430,26 +436,46 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     }
   };
 
+  // --- SEASON DETAILS ---
+  const handleSaveSeason = async () => {
+    setIsSavingSeason(true);
+    await supabase.from('clubs').update({ 
+      season_name: seasonName || null,
+      season_start: seasonStart || null,
+      season_end: seasonEnd || null
+    }).eq('id', activeClubId);
+    
+    if (onUpdateClubInfo) {
+      onUpdateClubInfo({ 
+        ...clubInfo, 
+        season_name: seasonName || null,
+        season_start: seasonStart || null,
+        season_end: seasonEnd || null
+      });
+    } else {
+      clubInfo.season_name = seasonName || null;
+    }
+    
+    setIsSavingSeason(false);
+    setExpandedStep('fixtures');
+  };
+
   // --- FINANCIALS ---
   const handleSaveFinancials = async () => {
     if (!teamId) return;
     setIsSavingFinancials(true);
     await supabase.from('teams').update({ 
-      member_fee: memberFee, 
-      casual_fee: casualFee 
+      member_fee: memberFee !== "" ? memberFee : null
     }).eq('id', teamId);
     
     await supabase.from('clubs').update({ 
       pay_id_type: payIdType,
       pay_id_value: payId || null,
       expense_label: expenseLabel || null,
-      default_umpire_fee: defaultUmpireFee || 0,
+      default_umpire_fee: defaultUmpireFee !== "" ? defaultUmpireFee : null,
       is_square_enabled: isSquareEnabled,
       square_access_token: squareToken || null,
-      square_location_id: squareLocationId || null,
-      season_name: seasonName || null,
-      season_start: seasonStart || null,
-      season_end: seasonEnd || null
+      square_location_id: squareLocationId || null
     }).eq('id', activeClubId);
     
     // Mutate local object so it checks off
@@ -460,12 +486,9 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
         is_square_enabled: isSquareEnabled,
         pay_id_type: payIdType,
         expense_label: expenseLabel || null,
-        default_umpire_fee: defaultUmpireFee || 0,
+        default_umpire_fee: defaultUmpireFee !== "" ? defaultUmpireFee : null,
         square_access_token: squareToken || null,
-        square_location_id: squareLocationId || null,
-        season_name: seasonName || null,
-        season_start: seasonStart || null,
-        season_end: seasonEnd || null
+        square_location_id: squareLocationId || null
       });
     } else {
       clubInfo.pay_id_value = payId || null;
@@ -807,15 +830,9 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
                       <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Defaults & Labels</h4>
                       
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Member Fee ($)</label>
-                          <input type="number" value={memberFee} onChange={(e) => setMemberFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                        </div>
-                        <div className="flex-1">
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Casual Fee ($)</label>
-                          <input type="number" value={casualFee} onChange={(e) => setCasualFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                        </div>
+                      <div>
+                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Game Fee ($)</label>
+                        <input type="number" value={memberFee} onChange={(e) => setMemberFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                       </div>
 
                       <div className="flex gap-2">
@@ -825,33 +842,14 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                         </div>
                         <div className="flex-1">
                           <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Default Amount ($)</label>
-                          <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Season Details</h4>
-                      
-                      <div>
-                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Season Name</label>
-                        <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Start Date</label>
-                          <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
-                        </div>
-                        <div className="flex-1">
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">End Date</label>
-                          <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                          <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <p className="text-[8px] text-zinc-400 mt-1 uppercase tracking-widest font-black leading-tight">E.G. GROUND FEES, COURT HIRE, UMPIRE FEES</p>
                         </div>
                       </div>
                     </div>
                     
-                    <button disabled={isSavingFinancials} onClick={handleSaveFinancials} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-2">
-                      {isSavingFinancials ? 'Saving...' : 'Save Financials'}
+                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!isSquareEnabled && !payId)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-4">
+                      {isSavingFinancials ? 'Saving...' : 'Complete Setup'}
                     </button>
                   </div>
                 )}
