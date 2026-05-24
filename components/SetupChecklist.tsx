@@ -238,7 +238,14 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
       const data = await res.json();
       if (data.players && Array.isArray(data.players)) {
-        setDraftPlayers(data.players);
+        setDraftPlayers(data.players.map((p: any) => ({
+          first_name: p.firstName || p.first_name || "",
+          last_name: p.lastName || p.last_name || "",
+          nickname: p.nickname || "",
+          mobile_number: p.mobile || p.mobile_number || "",
+          email: p.email || "",
+          is_member: p.is_member ?? true 
+        })));
       }
     } catch (err) {
       console.error(err);
