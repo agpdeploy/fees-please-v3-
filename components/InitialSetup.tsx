@@ -7,13 +7,35 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [teamName, setTeamName] = useState("");
-  const [sportType, setSportType] = useState("other");
+  const [sportType, setSportType] = useState("");
+  const [showSportsDropdown, setShowSportsDropdown] = useState(false);
+
+  const predefinedSports = [
+    "AFL",
+    "Basketball",
+    "Cricket",
+    "Cricket (Last Man Standing)",
+    "Dodgeball",
+    "Football / Soccer",
+    "Futsal",
+    "Hockey",
+    "Indoor Cricket",
+    "Indoor Netball",
+    "Indoor Soccer",
+    "Indoor Volleyball",
+    "Netball",
+    "Rugby League",
+    "Rugby Union",
+    "Tennis",
+    "Touch Football",
+    "Volleyball"
+  ];
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName || !lastName || !teamName) {
+    if (!firstName || !lastName || !teamName || !sportType) {
       setError("Please fill in all fields");
       return;
     }
@@ -144,21 +166,41 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
             />
           </div>
 
-          <div>
+          <div className="relative z-50">
             <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Sport Type</label>
-            <select
+            <input
+              type="text"
               value={sportType}
-              onChange={(e) => setSportType(e.target.value)}
+              onChange={(e) => {
+                setSportType(e.target.value);
+                setShowSportsDropdown(true);
+              }}
+              onFocus={() => setShowSportsDropdown(true)}
+              onBlur={() => setTimeout(() => setShowSportsDropdown(false), 200)}
+              placeholder="e.g. Cricket"
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
-            >
-              <option value="cricket">Cricket</option>
-              <option value="netball">Netball</option>
-              <option value="basketball">Basketball</option>
-              <option value="football">Football / Soccer</option>
-              <option value="rugby">Rugby</option>
-              <option value="afl">AFL</option>
-              <option value="other">Other</option>
-            </select>
+            />
+            {showSportsDropdown && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {predefinedSports.filter(s => s.toLowerCase().includes(sportType.toLowerCase())).map(s => (
+                  <div
+                    key={s}
+                    className="px-4 py-2 text-sm text-zinc-900 dark:text-white hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer transition-colors"
+                    onClick={() => {
+                      setSportType(s);
+                      setShowSportsDropdown(false);
+                    }}
+                  >
+                    {s}
+                  </div>
+                ))}
+                {sportType && predefinedSports.filter(s => s.toLowerCase().includes(sportType.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 italic">
+                    Press continue to use "{sportType}"
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (
