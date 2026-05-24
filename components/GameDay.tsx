@@ -918,6 +918,7 @@ export default function GameDay() {
           clubInfo={clubInfo} 
           teamFees={teamFees} 
           teamsCount={teams.length}
+          teams={teams}
           onDismiss={() => {
              if (profile?.id) {
                supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then(() => {
@@ -1097,7 +1098,7 @@ export default function GameDay() {
             </div>
           )}
         </div>
-      ) : selectedTeamId ? (
+      ) : selectedTeamId && profile?.onboarding_completed ? (
         <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-2 animate-in fade-in">
           <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-500 shadow-inner">
             <i className="fa-solid fa-calendar-xmark text-3xl opacity-80"></i>
@@ -1122,7 +1123,7 @@ export default function GameDay() {
             </p>
           )}
         </div>
-      ) : (
+      ) : profile?.onboarding_completed ? (
         <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-6 animate-in fade-in">
           <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-500 shadow-inner">
             <i className="fa-solid fa-users-slash text-3xl opacity-80"></i>
