@@ -382,7 +382,11 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   const saveBulkPlayers = async () => {
     const targetTeamId = await getOrCreateTeam();
-    if (draftPlayers.length === 0 || !targetTeamId) return;
+    if (draftPlayers.length === 0) return;
+    if (!targetTeamId) {
+      alert("Error: Could not find or automatically create a team for this club. Please go to Setup and manually create a team.");
+      return;
+    }
     setIsSavingPlayer(true);
     const payload = draftPlayers.map(p => ({ 
       first_name: p.firstName || p.first_name,
@@ -406,7 +410,11 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const handleSavePlayerManual = async (e?: React.MouseEvent) => {
     if(e) e.preventDefault();
     const targetTeamId = await getOrCreateTeam();
-    if (!firstName || !targetTeamId) return;
+    if (!firstName) return;
+    if (!targetTeamId) {
+      alert("Error: Could not find or automatically create a team. Please go to Setup and manually create a team.");
+      return;
+    }
     setIsSavingPlayer(true);
     const { error } = await supabase.from('players').insert([{
       club_id: activeClubId,
@@ -513,7 +521,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const saveBulkFixtures = async () => {
     const targetTeamId = await getOrCreateTeam();
     const validFixtures = draftFixtures.filter(f => f.opponent.trim() !== "" && f.match_date);
-    if (validFixtures.length === 0 || !targetTeamId) return alert("No valid fixtures to save or team missing.");
+    if (validFixtures.length === 0) return alert("No valid fixtures to save.");
+    if (!targetTeamId) return alert("Error: Could not find or automatically create a team for this club.");
     
     setIsSavingFixture(true);
     const payload = validFixtures.map(f => ({ 
@@ -541,7 +550,11 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const handleSaveFixtureManual = async (e?: React.MouseEvent) => {
     if(e) e.preventDefault();
     const targetTeamId = await getOrCreateTeam();
-    if (!opponent || !matchDate || !targetTeamId) return;
+    if (!opponent || !matchDate) return;
+    if (!targetTeamId) {
+      alert("Error: Could not find or automatically create a team.");
+      return;
+    }
     setIsSavingFixture(true);
     const { error } = await supabase.from('fixtures').insert([{
       club_id: activeClubId,
@@ -575,13 +588,20 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
 
     // Save club-level season & defaults
-    await supabase.from('clubs').update({ 
+    const { error: clubError } = await supabase.from('clubs').update({ 
       season_name: seasonName || null,
       season_start: seasonStart || null,
       season_end: seasonEnd || null,
       expense_label: expenseLabel || null,
       default_umpire_fee: defaultUmpireFee !== "" ? defaultUmpireFee : null
     }).eq('id', activeClubId);
+    
+    setIsSavingSeason(false);
+    
+    if (clubError) {
+      alert("Failed to save club season settings: " + clubError.message);
+      return;
+    }
     
     if (onUpdateClubInfo) {
       onUpdateClubInfo({ 
@@ -699,7 +719,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             </div>
 
             {/* Inline expansion area */}
-            {expandedStep === step.id && !step.completed && (
+            {expandedStep === step.id && (
               <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 animate-in slide-in-from-top-2">
                 
                 {/* Club Setup Inline */}
