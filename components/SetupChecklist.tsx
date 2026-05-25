@@ -156,13 +156,15 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       
       const { data: clubData, error: clubError } = await supabase
         .from('clubs').insert([{ 
-          name: teamName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "Other", entity_type: "Team", sport_type: sportType
+          name: teamName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "Other", entity_type: "Team", sport_type: sportType,
+          season_name: null, default_casual_fee: null, default_member_fee: null, default_umpire_fee: null, expense_label: null, income_label: null
         }]).select().single();
       if (clubError) throw clubError;
 
       const { data: teamData, error: teamError } = await supabase
         .from('teams').insert([{ 
-          name: teamName, club_id: clubData.id, owner_id: user.id, slug: `${clubSlug}-team`
+          name: teamName, club_id: clubData.id, owner_id: user.id, slug: `${clubSlug}-team`,
+          member_fee: null, casual_fee: null
         }]).select().single();
       if (teamError) throw teamError;
 
@@ -1150,7 +1152,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         <div>
                           <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Label</label>
                           <input type="text" placeholder="e.g. Match Fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                          <p className="text-[8px] text-zinc-400 mt-1 uppercase tracking-widest font-black leading-tight">E.G. MATCH FEES, GAME FEES</p>
+                          <p className="text-[9px] text-zinc-400 mt-1 font-bold leading-snug">This is for your match expenses that are not player fees (e.g., ground/court hire, umpire fees).</p>
                         </div>
                         
                         <div>
