@@ -71,8 +71,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [payIdValue, setPayIdValue] = useState("");
 
   // TEAM STATE
-  const [isSquadModalOpen, setIsSquadModalOpen] = useState(false);
-  const [expandedRosterTeamId, setExpandedRosterTeamId] = useState<string | null>(null);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [teamSlug, setTeamSlug] = useState(""); 
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
@@ -85,7 +84,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
   const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   
-  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [expandedRosterTeamId, setExpandedRosterTeamId] = useState<string | null>(null);
   const [activeRosterTeam, setActiveRosterTeam] = useState<any>(null);
   const [rosterPlayerIds, setRosterPlayerIds] = useState<string[]>([]);
 
