@@ -172,7 +172,8 @@ export default function GameDay() {
   useEffect(() => {
     async function fetchTeams() {
       if (!profile) return;
-      setLoading(true);
+      if (teams.length === 0) setLoading(true);
+      
       let query = supabase.from("teams").select("*");
       
       if (profile.role === 'club_admin' || profile.role === 'super_admin') {
@@ -906,7 +907,7 @@ export default function GameDay() {
     return !(isSquareEnabled && method === 'card');
   }).length;
 
-  if (loading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
+  if (loading && !profile) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-32 relative overflow-x-hidden">
