@@ -184,7 +184,29 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
   };
 
-  const cropAndCompressImage = (file: File): Promise<File> => {
+  const cropAndCompressImage = async (file: File): Promise<File> => {
+    try {
+      if (typeof createImageBitmap !== 'undefined') {
+        const bitmap = await createImageBitmap(file);
+        const canvas = document.createElement("canvas");
+        const size = Math.min(bitmap.width, bitmap.height);
+        canvas.width = 300; canvas.height = 300;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const startX = (bitmap.width - size) / 2; const startY = (bitmap.height - size) / 2;
+          ctx.drawImage(bitmap, startX, startY, size, size, 0, 0, 300, 300);
+          return new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+              if (blob) resolve(new File([blob], file.name, { type: "image/jpeg" }));
+              else reject("Blob error");
+            }, "image/jpeg", 0.7);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("createImageBitmap failed, falling back to legacy", e);
+    }
+    
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
@@ -281,7 +303,23 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
   };
 
-  const compressImage = (file: File): Promise<string> => {
+  const compressImage = async (file: File): Promise<string> => {
+    try {
+      if (typeof createImageBitmap !== 'undefined') {
+        const bitmap = await createImageBitmap(file, { resizeWidth: 1000 });
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0);
+          return canvas.toDataURL('image/jpeg', 0.6);
+        }
+      }
+    } catch (e) {
+      console.warn("createImageBitmap failed, falling back to legacy", e);
+    }
+    
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();

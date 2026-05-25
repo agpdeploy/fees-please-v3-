@@ -89,7 +89,23 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
     }
   }
 
-  const compressImage = (file: File): Promise<string> => {
+  const compressImage = async (file: File): Promise<string> => {
+    try {
+      if (typeof createImageBitmap !== 'undefined') {
+        const bitmap = await createImageBitmap(file, { resizeWidth: 1000 });
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0);
+          return canvas.toDataURL('image/jpeg', 0.6);
+        }
+      }
+    } catch (e) {
+      console.warn("createImageBitmap failed, falling back to legacy", e);
+    }
+
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
