@@ -119,8 +119,8 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
   };
 
   return (
-    <div className="fixed inset-0 z-[500] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-sm animate-in fade-in duration-300">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <i className="fa-solid fa-user-astronaut text-2xl"></i>
