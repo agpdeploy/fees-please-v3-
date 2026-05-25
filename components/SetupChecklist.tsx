@@ -1243,8 +1243,11 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             onClick={onDismiss}
             className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
           >
-            <i className="fa-solid fa-flag-checkered"></i> Congratulations! Setup Complete. Enter GameDay
+            <i className="fa-solid fa-flag-checkered"></i> Setup Complete! Continue
           </button>
+          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-3 font-medium">
+            Continue to Game Day to assign players from your teams to your matches
+          </p>
         </div>
       )}
     </div>
