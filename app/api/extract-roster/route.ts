@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 function formatAussieMobile(phone: string): string {
   if (!phone) return "";
   let cleaned = phone.replace(/\D/g, '');

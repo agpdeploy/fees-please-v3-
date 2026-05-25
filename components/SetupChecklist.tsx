@@ -229,12 +229,16 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     try {
       let payload: any = {};
       if (file.type.startsWith('image/')) {
-        payload.fileBase64 = await fileToBase64(file);
+        payload.fileBase64 = await compressFixtureImage(file);
         payload.mimeType = 'image/jpeg';
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        if (file.size > 5 * 1024 * 1024) throw new Error("PDF must be smaller than 5MB.");
+        payload.fileBase64 = await fileToBase64(file);
+        payload.mimeType = 'application/pdf';
       } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
         payload.csvText = await file.text();
       } else {
-        throw new Error("Unsupported file format for inline dAIve. Try CSV or Image.");
+        throw new Error("Unsupported file format for inline dAIve. Try Image, PDF, or CSV.");
       }
       
       const res = await fetch("/api/extract-roster", {
