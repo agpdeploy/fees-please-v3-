@@ -252,8 +252,40 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       const reader = new FileReader();
       reader.readAsDataURL(f);
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
+      reader.onerror = error => reject(error);
     });
+  };
+
+  const getOrCreateTeam = async (): Promise<string | null> => {
+    if (teamId) return teamId;
+    
+    // First, fallback to query
+    const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
+    if (data && data.length > 0) {
+      return data[0].id;
+    }
+
+    if (!activeClubId || !user) return null;
+
+    // Still no team? Create one!
+    try {
+       const clubSlug = clubInfo?.slug || `club-${activeClubId.substring(0,6)}`;
+       const { data: teamData, error: teamError } = await supabase
+        .from('teams').insert([{ 
+          name: `${clubInfo?.name || 'Club'} First Team`, club_id: activeClubId, owner_id: user.id, slug: `${clubSlug}-team`
+        }]).select().single();
+       if (teamError) throw teamError;
+
+       // Also insert role for this team
+       await supabase.from('user_roles').insert([
+          { user_id: user.id, email: user.email, club_id: activeClubId, team_id: teamData.id, role: 'team_admin' }
+       ]);
+       
+       return teamData.id;
+    } catch (err) {
+       console.error("Failed to auto-create team", err);
+       return null;
+    }
   };
 
   const compressImage = (file: File): Promise<string> => {
@@ -285,17 +317,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     const file = e.target.files?.[0];
     if (!file) return;
 
-    let targetTeamId = teamId;
-    if (!targetTeamId) {
-      // Fallback: If teams array didn't load in time, fetch the first team for this club directly
-      const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
-      if (data && data.length > 0) {
-        targetTeamId = data[0].id;
-      }
-    }
+    let targetTeamId = await getOrCreateTeam();
 
     if (!targetTeamId) {
-      alert("Error: No team found to attach players to. Please save the club settings and refresh.");
+      setDaiveError("Error: No team found to attach players to. Please save the club settings and refresh.");
       return;
     }
 
@@ -356,15 +381,17 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   };
 
   const saveBulkPlayers = async () => {
-    if (draftPlayers.length === 0 || !teamId) return;
+    const targetTeamId = await getOrCreateTeam();
+    if (draftPlayers.length === 0 || !targetTeamId) return;
     setIsSavingPlayer(true);
     const payload = draftPlayers.map(p => ({ 
       first_name: p.firstName || p.first_name,
       last_name: p.lastName || p.last_name || "",
       is_member: true,
       club_id: activeClubId,
-      default_team_id: teamId, 
+      default_team_id: targetTeamId, 
     }));
+
     const { error } = await supabase.from("players").insert(payload);
     setIsSavingPlayer(false);
     if (!error) {
@@ -378,11 +405,12 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   const handleSavePlayerManual = async (e?: React.MouseEvent) => {
     if(e) e.preventDefault();
-    if (!firstName || !teamId) return;
+    const targetTeamId = await getOrCreateTeam();
+    if (!firstName || !targetTeamId) return;
     setIsSavingPlayer(true);
     const { error } = await supabase.from('players').insert([{
       club_id: activeClubId,
-      default_team_id: teamId,
+      default_team_id: targetTeamId,
       first_name: firstName,
       last_name: lastName,
       nickname: nickname || null,
@@ -436,16 +464,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     const file = e.target.files?.[0];
     if (!file) return;
 
-    let targetTeamId = teamId;
-    if (!targetTeamId) {
-      const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
-      if (data && data.length > 0) {
-        targetTeamId = data[0].id;
-      }
-    }
+    let targetTeamId = await getOrCreateTeam();
 
     if (!targetTeamId) {
-      alert("Error: No team found to attach fixtures to. Please refresh.");
+      setDaiveError("Error: No team found to attach fixtures to. Please refresh.");
       return;
     }
 
@@ -489,13 +511,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   };
 
   const saveBulkFixtures = async () => {
+    const targetTeamId = await getOrCreateTeam();
     const validFixtures = draftFixtures.filter(f => f.opponent.trim() !== "" && f.match_date);
-    if (validFixtures.length === 0) return alert("No valid fixtures to save.");
+    if (validFixtures.length === 0 || !targetTeamId) return alert("No valid fixtures to save or team missing.");
     
     setIsSavingFixture(true);
     const payload = validFixtures.map(f => ({ 
       ...f, 
-      team_id: teamId, 
+      team_id: targetTeamId, 
       club_id: activeClubId,
       umpire_fee: clubInfo?.default_umpire_fee || 0 
     }));
@@ -517,11 +540,12 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   const handleSaveFixtureManual = async (e?: React.MouseEvent) => {
     if(e) e.preventDefault();
-    if (!opponent || !matchDate || !teamId) return;
+    const targetTeamId = await getOrCreateTeam();
+    if (!opponent || !matchDate || !targetTeamId) return;
     setIsSavingFixture(true);
     const { error } = await supabase.from('fixtures').insert([{
       club_id: activeClubId,
-      team_id: teamId,
+      team_id: targetTeamId,
       opponent,
       match_date: matchDate,
       start_time: startTime,
@@ -540,13 +564,15 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   // --- SEASON DETAILS ---
   const handleSaveSeason = async (e?: React.MouseEvent) => {
     if(e) e.preventDefault();
-    if (!teamId) return;
+    const targetTeamId = await getOrCreateTeam();
     setIsSavingSeason(true);
     
-    // Save team-level defaults
-    await supabase.from('teams').update({ 
-      member_fee: memberFee !== "" ? memberFee : null
-    }).eq('id', teamId);
+    // Save team-level defaults if team exists
+    if (targetTeamId) {
+      await supabase.from('teams').update({ 
+        member_fee: memberFee !== "" ? memberFee : null
+      }).eq('id', targetTeamId);
+    }
 
     // Save club-level season & defaults
     await supabase.from('clubs').update({ 
