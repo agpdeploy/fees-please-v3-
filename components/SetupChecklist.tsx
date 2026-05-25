@@ -186,28 +186,27 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   const cropAndCompressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const size = Math.min(img.width, img.height);
-          canvas.width = 300; canvas.height = 300;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return reject("Canvas error");
-          const startX = (img.width - size) / 2; const startY = (img.height - size) / 2;
-          ctx.drawImage(img, startX, startY, size, size, 0, 0, 300, 300);
-          
-          canvas.toBlob((blob) => {
-            if (!blob) return reject("Blob error");
-            resolve(new File([blob], "image.webp", { type: "image/webp" }));
-          }, "image/webp", 0.8);
-        };
-        img.onerror = () => reject("Image format invalid");
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement("canvas");
+        const size = Math.min(img.width, img.height);
+        canvas.width = 300; canvas.height = 300;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject("Canvas error");
+        const startX = (img.width - size) / 2; const startY = (img.height - size) / 2;
+        ctx.drawImage(img, startX, startY, size, size, 0, 0, 300, 300);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(new File([blob], file.name, { type: "image/jpeg" }));
+          else reject("Blob error");
+        }, "image/jpeg", 0.7);
       };
-      reader.onerror = () => reject("File read error");
+      img.onerror = (err) => {
+        URL.revokeObjectURL(url);
+        reject(err);
+      };
     });
   };
 
@@ -284,24 +283,24 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1000; 
-          const scaleSize = MAX_WIDTH / img.width;
-          canvas.width = MAX_WIDTH;
-          canvas.height = img.height * scaleSize;
-          const ctx = canvas.getContext('2d');
-          if (ctx) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.6));
-        };
-        img.onerror = (err) => reject(err);
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1000; 
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
       };
-      reader.onerror = (err) => reject(err);
+      img.onerror = (err) => {
+        URL.revokeObjectURL(url);
+        reject(err);
+      };
     });
   };
 
