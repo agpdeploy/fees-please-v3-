@@ -12,7 +12,7 @@ export default function GameDay() {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
 
-  const [clubInfo, setClubInfo] = useState({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
+  const [clubInfo, setClubInfo] = useState<any>({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
