@@ -345,7 +345,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         throw new Error(data.error || `Server Error: ${res.status}`);
       }
       
-      if (data.players && Array.isArray(data.players)) {
+      if (data.players && Array.isArray(data.players) && data.players.length > 0) {
         setDraftPlayers(data.players.map((p: any) => ({
           first_name: p.firstName || p.first_name || "",
           last_name: p.lastName || p.last_name || "",
@@ -354,6 +354,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           email: p.email || "",
           is_member: p.is_member ?? true 
         })));
+      } else {
+        setDaiveError("We couldn't extract any players from that file. Please make sure the image is clear and contains a list of names.");
       }
     } catch (err: any) {
       console.error(err);
@@ -450,8 +452,15 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         if (data.fixtures.length === 0) {
           setFixtureNeedsAlias(true);
         } else {
-          setDraftFixtures(data.fixtures);
+          setDraftFixtures(data.fixtures.map((f: any) => ({
+            opponent: f.opponent || f.opponentName || "",
+            match_date: f.date || f.match_date || "",
+            start_time: f.time || f.start_time || "",
+            location: f.location || f.venue || ""
+          })));
         }
+      } else {
+        setDaiveFixtureError("We couldn't extract any matches from that file. Please make sure the image is clear and contains a fixture list.");
       }
     } catch (error: any) {
       console.error("Extraction error:", error);

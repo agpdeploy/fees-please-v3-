@@ -145,7 +145,7 @@ export default function GameDay() {
   useEffect(() => {
     if (activeClubId) {
       supabase.from('clubs')
-        .select('name, logo_url, is_square_enabled, expense_label, pay_id_type, pay_id_value')
+        .select('*')
         .eq('id', activeClubId)
         .single()
         .then(({data}) => {
@@ -155,7 +155,11 @@ export default function GameDay() {
               logo: data.logo_url || '', 
               expense_label: data.expense_label || '',
               pay_id_type: data.pay_id_type || '',
-              pay_id_value: data.pay_id_value || ''
+              pay_id_value: data.pay_id_value || '',
+              season_name: data.season_name,
+              season_start: data.season_start,
+              season_end: data.season_end,
+              default_umpire_fee: data.default_umpire_fee
             });
             setIsSquareEnabled(data.is_square_enabled || false);
           }
