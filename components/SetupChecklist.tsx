@@ -48,7 +48,8 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
   const [fixtureCachedUpload, setFixtureCachedUpload] = useState<any>(null);
 
   // Financials state
-  const [memberFee, setMemberFee] = useState<number | "">(teamFees?.member || "");
+  const initialMemberFee = (teams && teams.length > 0 && teams[0].member_fee != null) ? teams[0].member_fee : "";
+  const [memberFee, setMemberFee] = useState<number | "">(initialMemberFee);
   const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
@@ -846,18 +847,20 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
                       <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Defaults & Labels</h4>
                       
-                      <div>
-                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Player Game Fee ($)</label>
-                        <input type="number" value={memberFee} onChange={(e) => setMemberFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                      </div>
-
                       <div className="flex flex-col gap-2">
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Label</label>
-                          <input type="text" placeholder="e.g. match expense fees, game fees, umpire fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Player Match Fee ($)</label>
+                          <input type="number" value={memberFee} onChange={(e) => setMemberFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         </div>
+
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Default Amount ($)</label>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Label</label>
+                          <input type="text" placeholder="e.g. Match Fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <p className="text-[8px] text-zinc-400 mt-1 uppercase tracking-widest font-black leading-tight">E.G. MATCH FEES, GAME FEES</p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Amount ($)</label>
                           <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                           <p className="text-[8px] text-zinc-400 mt-1 uppercase tracking-widest font-black leading-tight">E.G. GROUND FEES, COURT HIRE, UMPIRE FEES</p>
                         </div>
@@ -865,7 +868,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                     </div>
 
                     <button onClick={handleSaveSeason} disabled={isSavingSeason || !seasonName || memberFee === ""} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-4">
-                      {isSavingSeason ? 'Saving...' : 'Save & Continue'}
+                      {isSavingSeason ? 'Saving...' : 'Save Settings'}
                     </button>
                   </div>
                 )}
