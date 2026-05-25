@@ -223,7 +223,21 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
   // --- PLAYERS ---
   const handleDaiveUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !teamId) return;
+    if (!file) return;
+
+    let targetTeamId = teamId;
+    if (!targetTeamId) {
+      // Fallback: If teams array didn't load in time, fetch the first team for this club directly
+      const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
+      if (data && data.length > 0) {
+        targetTeamId = data[0].id;
+      }
+    }
+
+    if (!targetTeamId) {
+      alert("Error: No team found to attach players to. Please save the club settings and refresh.");
+      return;
+    }
 
     setIsExtracting(true);
     try {
@@ -359,9 +373,22 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
   const handleDaiveFixtureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !teamId) return;
+    if (!file) return;
 
-    const teamName = teams.find(t => t.id === teamId)?.name || "";
+    let targetTeamId = teamId;
+    if (!targetTeamId) {
+      const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
+      if (data && data.length > 0) {
+        targetTeamId = data[0].id;
+      }
+    }
+
+    if (!targetTeamId) {
+      alert("Error: No team found to attach fixtures to. Please refresh.");
+      return;
+    }
+
+    const teamName = teams.find(t => t.id === targetTeamId)?.name || "";
 
     try {
       let payload: any = {};

@@ -106,7 +106,10 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
 
       // 5. Complete Setup
       onComplete(clubData.id);
-      window.location.reload(); // Force a hard reload to sync activeClubId and context immediately
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('fp_active_club_id', clubData.id);
+        window.location.reload(); // Force a hard reload to sync activeClubId and context immediately
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message || "An error occurred during setup.");
