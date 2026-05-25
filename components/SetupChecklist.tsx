@@ -377,10 +377,18 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || `Server Error: ${res.status}`);
+      if (!res.ok) {
+        let errStr = `Server Error: ${res.status}`;
+        try {
+          const errData = await res.json();
+          errStr = errData.error || errStr;
+        } catch(e) {
+          if (res.status === 504) errStr = "The request timed out. Please try a smaller or clearer image.";
+        }
+        throw new Error(errStr);
       }
+
+      const data = await res.json();
       
       if (data.players && Array.isArray(data.players) && data.players.length > 0) {
         setDraftPlayers(data.players.map((p: any) => ({
@@ -392,11 +400,17 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           is_member: p.is_member ?? true 
         })));
       } else {
-        setDaiveError("We couldn't extract any players from that file. Please make sure the image is clear and contains a list of names.");
+        setDaiveError(data.error || "We couldn't extract any players from that file. Please make sure the image is clear and contains a list of names.");
       }
     } catch (err: any) {
       console.error(err);
-      setDaiveError(err.message || "Failed to parse roster via dAIve.");
+      let errMsg = typeof err === 'string' ? err : (err.message || "Couldn't process the file.");
+      if (errMsg.includes("Unexpected token") || errMsg.includes("JSON")) {
+        errMsg = "Server returned an invalid response. The file might be too large or the server timed out.";
+      } else if (errMsg.includes("err") || errMsg.includes("Event")) {
+        errMsg = "Failed to load image. If you are using an iPhone HEIC photo or an unsupported screenshot format, please convert to JPEG or upload a PDF.";
+      }
+      setDaiveError(errMsg);
     } finally {
       setIsExtracting(false);
       e.target.value = '';
