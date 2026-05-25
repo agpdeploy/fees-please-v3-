@@ -460,7 +460,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           })));
         }
       } else {
-        setDaiveFixtureError("We couldn't extract any matches from that file. Please make sure the image is clear and contains a fixture list.");
+        setDaiveError("We couldn't extract any matches from that file. Please make sure the image is clear and contains a fixture list.");
       }
     } catch (error: any) {
       console.error("Extraction error:", error);
