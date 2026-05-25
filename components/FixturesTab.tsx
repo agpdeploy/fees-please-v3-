@@ -45,6 +45,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
   const [cachedUpload, setCachedUpload] = useState<any>(null);
   const [drawAlias, setDrawAlias] = useState("");
   const [needsAlias, setNeedsAlias] = useState(false);
+  const [daiveError, setDaiveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (teams && teams.length > 0 && !fixtureTeamId) {
@@ -123,12 +124,24 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
   const runExtraction = async (payload: any, searchName: string) => {
     setIsExtracting(true);
     setNeedsAlias(false);
+    setDaiveError(null);
     try {
       const res = await fetch("/api/extract-fixtures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, teamName: searchName }),
       });
+
+      if (!res.ok) {
+        let errStr = `Server Error: ${res.status}`;
+        try {
+          const errData = await res.json();
+          errStr = errData.error || errStr;
+        } catch(e) {
+          if (res.status === 504) errStr = "The request timed out. Please try a smaller or clearer image.";
+        }
+        throw new Error(errStr);
+      }
 
       const data = await res.json();
 
@@ -144,8 +157,13 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
       }
     } catch (error: any) {
       console.error("Extraction error:", error);
-      showToast(error.message || "Couldn't parse the draw. Switching to manual.", "error");
-      setIsBulkMode(false); 
+      let errMsg = typeof error === 'string' ? error : (error.message || "Couldn't process the file.");
+      if (errMsg.includes("Unexpected token") || errMsg.includes("JSON")) {
+        errMsg = "Server returned an invalid response. The file might be too large or the server timed out.";
+      } else if (errMsg.includes("err") || errMsg.includes("Event")) {
+        errMsg = "Failed to load image. If you are using an iPhone HEIC photo, please convert to JPEG or upload a PDF.";
+      }
+      setDaiveError(errMsg);
     } finally {
       setIsExtracting(false);
     }
@@ -306,6 +324,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
               <>
                 {!needsAlias ? (
                   <div className="relative group border-2 border-dashed border-emerald-500 dark:border-emerald-600 rounded-2xl p-10 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors bg-zinc-50 dark:bg-zinc-800 cursor-pointer w-full">
+                    {daiveError && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold z-20 relative shadow-sm">{daiveError}</div>}
                     <input type="file" accept="image/*,.csv,.pdf" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                     <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
                       <i className="fa-solid fa-wand-magic-sparkles text-3xl text-emerald-600 dark:text-emerald-500"></i>
