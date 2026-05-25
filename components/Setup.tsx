@@ -57,10 +57,10 @@ export default function Setup({ activeTab }: SetupProps) {
   const [seasonEnd, setSeasonEnd] = useState("");
   
   const [defaultMemberFee, setDefaultMemberFee] = useState<number | "">("");
-  const [defaultCasualFee, setDefaultCasualFee] = useState<number | "">(25);
-  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(70);
+  const [defaultCasualFee, setDefaultCasualFee] = useState<number | "">("");
+  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">("");
   
-  const [expenseLabel, setExpenseLabel] = useState("Umpire Fee");
+  const [expenseLabel, setExpenseLabel] = useState("");
   
   const [squareAccessToken, setSquareAccessToken] = useState("");
   const [squareLocationId, setSquareLocationId] = useState("");
@@ -140,10 +140,10 @@ export default function Setup({ activeTab }: SetupProps) {
       setSeasonName(clubData.season_name || "");
       setSeasonStart(clubData.season_start || "");
       setSeasonEnd(clubData.season_end || "");
-      setDefaultMemberFee(clubData.default_member_fee !== undefined ? clubData.default_member_fee : "");
-      setDefaultCasualFee(clubData.default_casual_fee !== undefined ? clubData.default_casual_fee : 25);
-      setExpenseLabel(clubData.expense_label || "Umpire Fee");
-      setDefaultUmpireFee(clubData.default_umpire_fee !== undefined ? clubData.default_umpire_fee : 70);
+      setDefaultMemberFee(clubData.default_member_fee != null ? clubData.default_member_fee : "");
+      setDefaultCasualFee(clubData.default_casual_fee != null ? clubData.default_casual_fee : "");
+      setExpenseLabel(clubData.expense_label || "");
+      setDefaultUmpireFee(clubData.default_umpire_fee != null ? clubData.default_umpire_fee : "");
       setSquareAccessToken(clubData.square_access_token || "");
       setSquareLocationId(clubData.square_location_id || "");
       setIsSquareEnabled(clubData.is_square_enabled || false);
@@ -765,7 +765,11 @@ export default function Setup({ activeTab }: SetupProps) {
                   <input 
                     type="number" 
                     value={defaultMemberFee ?? ""} 
-                    onChange={(e) => setDefaultMemberFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : Number(e.target.value);
+                      setDefaultMemberFee(val);
+                      setDefaultCasualFee(val);
+                    }} 
                     className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                   />
                 </div>

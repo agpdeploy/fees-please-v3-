@@ -229,7 +229,7 @@ export default function Home() {
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
         <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
         <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">
-          {isCheckingAuth ? 'Authenticating...' : 'Loading Organization...'}
+          {isCheckingAuth ? 'Authenticating...' : 'Loading...'}
         </div>
       </div>
     );

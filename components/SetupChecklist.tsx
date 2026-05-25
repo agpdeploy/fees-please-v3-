@@ -118,7 +118,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const hasFinancials = !!clubInfo.pay_id_value || !!clubInfo.is_square_enabled;
 
   const steps = [
-    { id: 'club', title: 'Create Club & Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
+    { id: 'club', title: 'Create Your Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
     { id: 'logo', title: 'Upload Club Logo', icon: 'fa-image', completed: !!clubInfo?.logo, required: false },
     { id: 'players', title: 'Add Players', icon: 'fa-users', completed: hasPlayers, required: true },
     { id: 'season', title: 'Season Setup', icon: 'fa-calendar', completed: hasSeason, required: true },
@@ -736,7 +736,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           <h3 className="font-black uppercase tracking-widest text-zinc-900 dark:text-white text-lg mb-1 flex items-center gap-2">
             <i className="fa-solid fa-rocket text-emerald-500"></i> Setup Checklist
           </h3>
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to finish setting up your season.</p>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to finish setting up.</p>
         </div>
         <button 
           onClick={onDismiss}
@@ -766,27 +766,25 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                   {step.title}
                 </span>
               </div>
-              {!step.completed && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => {
-                      setDismissedSteps(prev => ({ ...prev, [step.id]: true }));
-                      if (expandedStep === step.id) setExpandedStep(null);
-                    }}
-                    title="Dismiss step"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    <i className="fa-solid fa-xmark text-sm"></i>
-                  </button>
-                  <button 
-                    onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
-                    title={expandedStep === step.id ? "Collapse" : "Expand"}
-                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${expandedStep === step.id ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20'}`}
-                  >
-                    <i className={`fa-solid fa-chevron-${expandedStep === step.id ? 'up' : 'down'} text-xs`}></i>
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setDismissedSteps(prev => ({ ...prev, [step.id]: true }));
+                    if (expandedStep === step.id) setExpandedStep(null);
+                  }}
+                  title="Dismiss step"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <i className="fa-solid fa-xmark text-sm"></i>
+                </button>
+                <button 
+                  onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
+                  title={expandedStep === step.id ? "Collapse" : "Expand"}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${expandedStep === step.id ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20'}`}
+                >
+                  <i className={`fa-solid fa-chevron-${expandedStep === step.id ? 'up' : 'down'} text-xs`}></i>
+                </button>
+              </div>
             </div>
 
             {/* Inline expansion area */}
@@ -796,23 +794,29 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {/* Club Setup Inline */}
                 {step.id === 'club' && !activeClubId && (
                   <form onSubmit={handleCreateClub} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">First Name</label>
-                        <input type="text" value={ownerFirstName} onChange={(e) => setOwnerFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="First Name" required />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Last Name</label>
-                        <input type="text" value={ownerLastName} onChange={(e) => setOwnerLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="Last Name" required />
-                      </div>
-                    </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Team Name</label>
-                      <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. The Mighty Ducks" required />
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-3">Your Details</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">First Name</label>
+                          <input type="text" value={ownerFirstName} onChange={(e) => setOwnerFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="First Name" required />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Last Name</label>
+                          <input type="text" value={ownerLastName} onChange={(e) => setOwnerLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="Last Name" required />
+                        </div>
+                      </div>
                     </div>
-                    <div className="relative">
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Sport Type</label>
-                      <input type="text" value={sportType} onChange={(e) => { setSportType(e.target.value); setShowSportsDropdown(true); }} onFocus={() => setShowSportsDropdown(true)} onBlur={() => setTimeout(() => setShowSportsDropdown(false), 200)} placeholder="e.g. Football / Soccer" className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" required />
+                    <div className="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-3 mt-4">Team Details</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Team Name</label>
+                          <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. The Mighty Ducks" required />
+                        </div>
+                        <div className="relative">
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Sport Type</label>
+                          <input type="text" value={sportType} onChange={(e) => { setSportType(e.target.value); setShowSportsDropdown(true); }} onFocus={() => setShowSportsDropdown(true)} onBlur={() => setTimeout(() => setShowSportsDropdown(false), 200)} placeholder="e.g. Football / Soccer" className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" required />
                       {showSportsDropdown && (
                         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg max-h-48 overflow-y-auto py-2">
                           {predefinedSports.filter(s => s.toLowerCase().includes(sportType.toLowerCase())).map(s => (
@@ -874,9 +878,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                             {daiveError && <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">{daiveError}</div>}
                             <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
-                            <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                              Upload Image, PDF, or CSV
-                            </p>
+                            <div className="flex flex-col items-center">
+                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">
+                                Upload Image, PDF, or CSV
+                              </p>
+                              <p className="text-[9px] text-zinc-500 font-bold max-w-[200px] text-center leading-snug">
+                                Upload a screenshot, photo, or CSV file of your team roster. Include email addresses if you have them.
+                              </p>
+                            </div>
                           </div>
                         )
                       ) : (
@@ -1230,7 +1239,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             onClick={onDismiss}
             className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
           >
-            <i className="fa-solid fa-flag-checkered"></i> Finish Setup & Enter GameDay
+            <i className="fa-solid fa-flag-checkered"></i> Congratulations! Setup Complete. Enter GameDay
           </button>
         </div>
       )}
