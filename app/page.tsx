@@ -13,6 +13,7 @@ import MyTeam from "../components/MyTeam";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
 import InitialSetup from "../components/InitialSetup"; 
+import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
 
@@ -470,6 +471,9 @@ export default function Home() {
                     <button onClick={applyUpdate} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
                       <i className="fa-solid fa-arrows-rotate w-5 text-center"></i> Force Update App
                     </button>
+                    <div className="px-6 py-2 text-[8px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-600">
+                      Version: {APP_VERSION}
+                    </div>
                   </div>
                 </div>
               )}
