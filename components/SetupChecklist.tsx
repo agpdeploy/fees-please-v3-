@@ -197,7 +197,7 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     });
   };
 
-  const compressFixtureImage = (file: File): Promise<string> => {
+  const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -207,8 +207,8 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const MAX_WIDTH = 1000; 
-          const scaleSize = Math.min(1, MAX_WIDTH / img.width);
-          canvas.width = img.width * scaleSize;
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
           canvas.height = img.height * scaleSize;
           const ctx = canvas.getContext('2d');
           if (ctx) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -243,11 +243,10 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
     try {
       let payload: any = {};
       if (file.type.startsWith('image/')) {
-        // Bypass Canvas compression for small files to avoid Brave Browser Shields blocking canvas fingerprinting
-        payload.fileBase64 = file.size <= 3.2 * 1024 * 1024 ? await fileToBase64(file) : await compressFixtureImage(file);
+        payload.fileBase64 = await compressImage(file);
         payload.mimeType = 'image/jpeg';
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        if (file.size > 3.2 * 1024 * 1024) throw new Error("PDF must be smaller than 3.2MB to upload.");
+        if (file.size > 5 * 1024 * 1024) throw new Error("PDF must be smaller than 5MB.");
         payload.fileBase64 = await fileToBase64(file);
         payload.mimeType = 'application/pdf';
       } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
@@ -394,11 +393,10 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
       let payload: any = {};
 
       if (file.type.startsWith('image/')) {
-        // Bypass Canvas compression for small files to avoid Brave Browser Shields blocking canvas fingerprinting
-        payload.fileBase64 = file.size <= 3.2 * 1024 * 1024 ? await fileToBase64(file) : await compressFixtureImage(file);
+        payload.fileBase64 = await compressImage(file);
         payload.mimeType = 'image/jpeg';
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        if (file.size > 3.2 * 1024 * 1024) throw new Error("PDF must be smaller than 3.2MB to upload.");
+        if (file.size > 5 * 1024 * 1024) throw new Error("PDF must be smaller than 5MB.");
         payload.fileBase64 = await fileToBase64(file);
         payload.mimeType = 'application/pdf';
       } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
