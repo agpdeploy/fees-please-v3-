@@ -30,6 +30,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [showSportsDropdown, setShowSportsDropdown] = useState(false);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [clubCreateError, setClubCreateError] = useState("");
+  const [daiveError, setDaiveError] = useState<string | null>(null);
 
   const predefinedSports = [
     "AFL", "Basketball", "Cricket", "Dodgeball", "Football / Soccer", "Futsal",
@@ -120,9 +121,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     { id: 'club', title: 'Create Club & Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
     { id: 'logo', title: 'Upload Club Logo', icon: 'fa-image', completed: !!clubInfo?.logo, required: false },
     { id: 'players', title: 'Add Players', icon: 'fa-users', completed: hasPlayers, required: true },
-    { id: 'season', title: 'Season Setup', icon: 'fa-calendar', completed: !!seasonName && memberFee !== "", required: true },
+    { id: 'season', title: 'Season Setup', icon: 'fa-calendar', completed: hasSeason, required: true },
     { id: 'fixtures', title: 'Add Matches', icon: 'fa-list-ol', completed: hasFixtures, required: false },
-    { id: 'financials', title: 'Financials', icon: 'fa-sack-dollar', completed: isSquareEnabled || !!payId, required: true }
+    { id: 'financials', title: 'Financials', icon: 'fa-sack-dollar', completed: hasFinancials, required: true }
   ];
 
   const visibleSteps = steps.filter(s => {
@@ -280,6 +281,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   // --- PLAYERS ---
   const handleDaiveUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDaiveError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -336,7 +338,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       }
     } catch (err: any) {
       console.error(err);
-      alert(`AI Extraction Error: ${err.message || "Failed to parse roster via dAIve."}`);
+      setDaiveError(err.message || "Failed to parse roster via dAIve.");
     } finally {
       setIsExtracting(false);
       e.target.value = '';
@@ -423,13 +425,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       }
     } catch (error: any) {
       console.error("Extraction error:", error);
-      alert(error.message || "Couldn't parse the draw. Switch to manual.");
+      setDaiveError(error.message || "Couldn't parse the draw. Switch to manual.");
     } finally {
       setIsExtractingFixture(false);
     }
   };
 
   const handleDaiveFixtureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDaiveError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -469,7 +472,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Couldn't process the file.");
+      setDaiveError(error.message || "Couldn't process the file.");
     } finally {
       e.target.value = ''; 
     }
@@ -751,6 +754,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                           </div>
                         ) : (
                           <div key="daive-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                            {daiveError && <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">{daiveError}</div>}
                             <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
                             <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
@@ -885,6 +889,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                             </div>
                           ) : (
                             <div key="daive-fixture-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                              {daiveError && <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">{daiveError}</div>}
                               <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveFixtureUpload} disabled={isExtractingFixture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                               <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
                               <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
