@@ -56,7 +56,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [seasonStart, setSeasonStart] = useState("");
   const [seasonEnd, setSeasonEnd] = useState("");
   
-  const [defaultMemberFee, setDefaultMemberFee] = useState<number | "">(10);
+  const [defaultMemberFee, setDefaultMemberFee] = useState<number | "">("");
   const [defaultCasualFee, setDefaultCasualFee] = useState<number | "">(25);
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(70);
   
@@ -75,7 +75,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [teamName, setTeamName] = useState("");
   const [teamSlug, setTeamSlug] = useState(""); 
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
-  const [memberFee, setMemberFee] = useState<number | "">(10);
+  const [memberFee, setMemberFee] = useState<number | "">("");
   const [casualFee, setCasualFee] = useState<number | "">(25);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
@@ -140,7 +140,7 @@ export default function Setup({ activeTab }: SetupProps) {
       setSeasonName(clubData.season_name || "");
       setSeasonStart(clubData.season_start || "");
       setSeasonEnd(clubData.season_end || "");
-      setDefaultMemberFee(clubData.default_member_fee !== undefined ? clubData.default_member_fee : 10);
+      setDefaultMemberFee(clubData.default_member_fee !== undefined ? clubData.default_member_fee : "");
       setDefaultCasualFee(clubData.default_casual_fee !== undefined ? clubData.default_casual_fee : 25);
       setExpenseLabel(clubData.expense_label || "Umpire Fee");
       setDefaultUmpireFee(clubData.default_umpire_fee !== undefined ? clubData.default_umpire_fee : 70);
@@ -408,7 +408,7 @@ export default function Setup({ activeTab }: SetupProps) {
     setTeamSlug("");
     setIsSlugManuallyEdited(false);
     setEditingTeamId(null); 
-    setMemberFee(defaultMemberFee || 10); 
+    setMemberFee(defaultMemberFee || ""); 
     setCasualFee(defaultCasualFee || 25); 
     setIsTeamModalOpen(false);
   }
@@ -417,7 +417,7 @@ export default function Setup({ activeTab }: SetupProps) {
     setTeamName(t.name); 
     setTeamSlug(t.slug || "");
     setIsSlugManuallyEdited(!!t.slug);
-    setMemberFee(t.member_fee !== undefined ? t.member_fee : 10); 
+    setMemberFee(t.member_fee !== undefined ? t.member_fee : ""); 
     setCasualFee(t.casual_fee !== undefined ? t.casual_fee : 25); 
     setEditingTeamId(t.id); 
     setIsTeamModalOpen(true);

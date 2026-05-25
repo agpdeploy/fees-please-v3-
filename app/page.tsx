@@ -211,10 +211,17 @@ export default function Home() {
   }, [profile, profileLoading, roles]);
 
   useEffect(() => {
-    const triggerWizard = () => setShowOnboarding(true);
+    const triggerWizard = () => {
+      if (profile?.onboarding_completed !== true && roles && roles.length > 0) {
+        // Prevent triggering the wizard if they are already incomplete with setup
+        // and they already have a role (so they should be in the setup checklist)
+        return;
+      }
+      setShowOnboarding(true);
+    };
     window.addEventListener('trigger-onboarding', triggerWizard);
     return () => window.removeEventListener('trigger-onboarding', triggerWizard);
-  }, []);
+  }, [profile, roles]);
 
   useEffect(() => {
     const handleNavigateSetup = (e: Event) => {

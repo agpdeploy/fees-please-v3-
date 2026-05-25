@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function InitialSetup({ user, onComplete }: { user: any, onComplete: () => void }) {
+export default function InitialSetup({ user, onComplete }: { user: any, onComplete: (clubId?: string) => void }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [teamName, setTeamName] = useState("");
@@ -105,7 +105,7 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
       if (rolesError) throw rolesError;
 
       // 5. Complete Setup
-      onComplete();
+      onComplete(clubData.id);
       window.location.reload(); // Force a hard reload to sync activeClubId and context immediately
     } catch (err: any) {
       console.error(err);
