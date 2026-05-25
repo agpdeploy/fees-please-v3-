@@ -46,7 +46,6 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showClubMenu, setShowClubMenu] = useState(false);
   
-  const [showOnboarding, setShowOnboarding] = useState(true); 
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
   const [allClubs, setAllClubs] = useState<any[]>([]);
 
@@ -197,32 +196,7 @@ export default function Home() {
     }
   }, [profile, isAdmin, activeTab]);
 
-  useEffect(() => {
-    if (profileLoading) return;
-    if (profile?.role === 'super_admin' || profile?.onboarding_completed === true) {
-      setShowOnboarding(false);
-      return;
-    }
-    const hasAdminOrCaptainRole = roles?.some((r: any) => ['club_admin', 'team_admin'].includes(r.role));
-    if (hasAdminOrCaptainRole) {
-      setShowOnboarding(false); 
-      return;
-    }
-    setShowOnboarding(true);
-  }, [profile, profileLoading, roles]);
 
-  useEffect(() => {
-    const triggerWizard = () => {
-      if (profile?.onboarding_completed !== true && roles && roles.length > 0) {
-        // Prevent triggering the wizard if they are already incomplete with setup
-        // and they already have a role (so they should be in the setup checklist)
-        return;
-      }
-      setShowOnboarding(true);
-    };
-    window.addEventListener('trigger-onboarding', triggerWizard);
-    return () => window.removeEventListener('trigger-onboarding', triggerWizard);
-  }, [profile, roles]);
 
   useEffect(() => {
     const handleNavigateSetup = (e: Event) => {
@@ -263,13 +237,7 @@ export default function Home() {
 
   if (!session) return <Login />;
 
-  if (showOnboarding) {
-    return (
-      <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
-        <InitialSetup user={session.user} onComplete={() => setShowOnboarding(false)} />
-      </div>
-    );
-  }
+
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Club Manager' : 

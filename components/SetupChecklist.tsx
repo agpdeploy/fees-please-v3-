@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface SetupChecklistProps {
+  user?: any;
   activeClubId: string | null;
   clubInfo: any;
   onUpdateClubInfo?: (info: any) => void;
@@ -11,13 +12,29 @@ interface SetupChecklistProps {
   teamsCount: number;
   teams: any[];
   onDismiss: () => void;
+  onClubCreated?: (clubId: string) => void;
 }
 
-export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInfo, teamFees, teamsCount, teams, onDismiss }: SetupChecklistProps) {
+export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateClubInfo, teamFees, teamsCount, teams, onDismiss, onClubCreated }: SetupChecklistProps) {
   const [hasPlayers, setHasPlayers] = useState(false);
   const [hasFixtures, setHasFixtures] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [expandedStep, setExpandedStep] = useState<string | null>(null);
+  const [expandedStep, setExpandedStep] = useState<string | null>(activeClubId ? null : 'club');
+  const [dismissedSteps, setDismissedSteps] = useState<Record<string, boolean>>({});
+
+  // Club Creation State
+  const [ownerFirstName, setOwnerFirstName] = useState(user?.full_name?.split(' ')[0] || "");
+  const [ownerLastName, setOwnerLastName] = useState(user?.full_name?.split(' ').slice(1).join(' ') || "");
+  const [teamName, setTeamName] = useState("");
+  const [sportType, setSportType] = useState("");
+  const [showSportsDropdown, setShowSportsDropdown] = useState(false);
+  const [isCreatingClub, setIsCreatingClub] = useState(false);
+  const [clubCreateError, setClubCreateError] = useState("");
+
+  const predefinedSports = [
+    "AFL", "Basketball", "Cricket", "Dodgeball", "Football / Soccer", "Futsal",
+    "Hockey", "Netball", "Rugby League", "Rugby Union", "Tennis", "Touch Football", "Volleyball"
+  ];
 
   // Logo state
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -98,38 +115,95 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
   const steps = [
     {
-      id: 'teams',
-      title: 'Add a team',
-      completed: hasTeams,
+      id: 'club',
+      title: 'Create your Club',
+      completed: !!activeClubId,
     },
     {
       id: 'logo',
-      title: 'Add a logo for your team/club',
+      title: 'Add a logo',
       completed: hasLogo,
     },
     {
       id: 'players',
-      title: 'Add players to your team',
+      title: 'Add players',
       completed: hasPlayers,
     },
     {
       id: 'season',
-      title: 'Set season defaults',
+      title: 'Season defaults',
       completed: hasSeason,
     },
     {
       id: 'fixtures',
-      title: 'Add your season fixtures',
+      title: 'Add fixtures',
       completed: hasFixtures,
     },
     {
       id: 'financials',
-      title: 'Set payment details',
+      title: 'Payment details',
       completed: hasFinancials,
     }
   ];
 
-  const allCompleted = steps.every(s => s.completed);
+  const visibleSteps = steps.filter(s => (!activeClubId ? s.id === 'club' : s.id !== 'club') && !dismissedSteps[s.id]);
+  const allCompleted = visibleSteps.every(s => s.completed) && visibleSteps.length > 0;
+
+  useEffect(() => {
+    if (!loading && (visibleSteps.length === 0 || allCompleted)) {
+      if (activeClubId) {
+        onDismiss();
+      }
+    }
+  }, [visibleSteps.length, allCompleted, loading, activeClubId, onDismiss]);
+
+  const handleCreateClub = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ownerFirstName || !ownerLastName || !teamName || !sportType || !user) {
+      setClubCreateError("Please fill in all fields");
+      return;
+    }
+    setIsCreatingClub(true);
+    setClubCreateError("");
+
+    try {
+      if (user.full_name !== `${ownerFirstName} ${ownerLastName}`) {
+        await supabase.auth.updateUser({ data: { full_name: `${ownerFirstName} ${ownerLastName}` } });
+      }
+      await supabase.from('profiles').update({ has_onboarded: true }).eq('id', user.id);
+
+      const baseSlug = teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const clubSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+      
+      const { data: clubData, error: clubError } = await supabase
+        .from('clubs').insert([{ 
+          name: teamName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "Other", entity_type: "Team", sport_type: sportType
+        }]).select().single();
+      if (clubError) throw clubError;
+
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams').insert([{ 
+          name: teamName, club_id: clubData.id, owner_id: user.id, slug: `${clubSlug}-team`
+        }]).select().single();
+      if (teamError) throw teamError;
+
+      const { error: rolesError } = await supabase
+        .from('user_roles').insert([
+          { user_id: user.id, email: user.email, club_id: clubData.id, role: 'club_admin' },
+          { user_id: user.id, email: user.email, club_id: clubData.id, team_id: teamData.id, role: 'team_admin' }
+        ]);
+      if (rolesError) throw rolesError;
+
+      if (onClubCreated) {
+        onClubCreated(clubData.id);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setClubCreateError(err.message || "An error occurred.");
+    } finally {
+      setIsCreatingClub(false);
+    }
+  };
 
   const cropAndCompressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
@@ -545,31 +619,78 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
 
   if (loading) return null;
 
+  if (!activeClubId) {
+    return (
+      <div className="mb-8 animate-in slide-in-from-top-4 bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-sm border border-emerald-100 dark:border-emerald-900/30 text-center max-w-2xl mx-auto mt-10 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
+        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i className="fa-solid fa-flag text-2xl text-emerald-600 dark:text-emerald-400"></i>
+        </div>
+        <h2 className="text-2xl font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-2">Welcome to Fees Please</h2>
+        <p className="text-sm font-bold text-zinc-500 mb-8 max-w-md mx-auto">Let's get your first team set up. Fill out the details below to unlock your dashboard.</p>
+        
+        <form onSubmit={handleCreateClub} className="space-y-5 text-left max-w-sm mx-auto bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1.5 ml-1">First Name</label>
+              <input type="text" value={ownerFirstName} onChange={(e) => setOwnerFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors font-bold shadow-sm" placeholder="First" required />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1.5 ml-1">Last Name</label>
+              <input type="text" value={ownerLastName} onChange={(e) => setOwnerLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors font-bold shadow-sm" placeholder="Last" required />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1.5 ml-1">Team Name</label>
+            <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors font-bold shadow-sm" placeholder="e.g. The Mighty Ducks" required />
+          </div>
+          <div className="relative">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1.5 ml-1">Sport Type</label>
+            <input type="text" value={sportType} onChange={(e) => { setSportType(e.target.value); setShowSportsDropdown(true); }} onFocus={() => setShowSportsDropdown(true)} onBlur={() => setTimeout(() => setShowSportsDropdown(false), 200)} placeholder="e.g. Football / Soccer" className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors font-bold shadow-sm" required />
+            {showSportsDropdown && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg max-h-48 overflow-y-auto py-2">
+                {predefinedSports.filter(s => s.toLowerCase().includes(sportType.toLowerCase())).map(s => (
+                  <div key={s} className="px-4 py-2.5 text-sm font-bold text-zinc-900 dark:text-white hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer transition-colors" onClick={() => { setSportType(s); setShowSportsDropdown(false); }}>{s}</div>
+                ))}
+              </div>
+            )}
+          </div>
+          {clubCreateError && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest text-center mt-2">{clubCreateError}</div>}
+          <button type="submit" disabled={isCreatingClub} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-md hover:shadow-lg disabled:opacity-50 mt-4 group">
+            {isCreatingClub ? "Setting up..." : <span className="flex items-center justify-center gap-2">Let's Go <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i></span>}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/50 p-6 rounded-2xl shadow-sm mb-6 animate-in slide-in-from-top-4 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
-      
-      <div className="flex justify-between items-start mb-5">
+    <div className="mb-8 animate-in slide-in-from-top-4 relative">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 text-sm mb-1">Let's Get Started</h3>
-          <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to set up your team and season details.</p>
+          <h3 className="font-black uppercase tracking-widest text-zinc-900 dark:text-white text-lg mb-1 flex items-center gap-2">
+            <i className="fa-solid fa-rocket text-emerald-500"></i> Setup Checklist
+          </h3>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to finish setting up your season.</p>
         </div>
         <button 
           onClick={onDismiss}
-          className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+          className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-200 dark:hover:border-emerald-800 px-4 py-2 rounded-full shadow-sm"
         >
-          Dismiss
+          Dismiss All
         </button>
       </div>
 
       {/* Video Placeholder */}
-      <div className="mb-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex flex-col items-center justify-center py-10 px-4 text-zinc-400 dark:text-zinc-500 transition-colors shadow-inner">
-        <i className="fa-brands fa-youtube text-4xl mb-2 opacity-50"></i>
-        <span className="text-xs font-black uppercase tracking-widest opacity-80">Welcome Video Coming Soon</span>
+      <div className="mb-6 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 flex flex-col items-center justify-center py-12 px-4 text-zinc-400 dark:text-zinc-500 transition-colors cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 group">
+        <div className="w-16 h-16 bg-white dark:bg-zinc-800 rounded-full flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+          <i className="fa-brands fa-youtube text-2xl text-red-500"></i>
+        </div>
+        <span className="text-xs font-black uppercase tracking-widest">How to use Fees Please (1:30)</span>
       </div>
 
       <div className="space-y-3">
-        {steps.map(step => (
+        {visibleSteps.map(step => (
           <div key={step.id} className={`flex flex-col p-3.5 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -581,13 +702,25 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                 </span>
               </div>
               {!step.completed && (
-                <button 
-                  onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
-                  className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-100/50 dark:bg-emerald-500/10 hover:bg-emerald-200/50 dark:hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  {expandedStep === step.id ? "Close" : "Expand"}
-                  <i className={`fa-solid fa-chevron-${expandedStep === step.id ? 'up' : 'down'}`}></i>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      setDismissedSteps(prev => ({ ...prev, [step.id]: true }));
+                      if (expandedStep === step.id) setExpandedStep(null);
+                    }}
+                    title="Dismiss step"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <i className="fa-solid fa-xmark text-sm"></i>
+                  </button>
+                  <button 
+                    onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
+                    title={expandedStep === step.id ? "Collapse" : "Expand"}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${expandedStep === step.id ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20'}`}
+                  >
+                    <i className={`fa-solid fa-chevron-${expandedStep === step.id ? 'up' : 'down'} text-xs`}></i>
+                  </button>
+                </div>
               )}
             </div>
 

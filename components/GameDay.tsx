@@ -6,8 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareGross } from '@/lib/fees';
+import InitialSetup from './InitialSetup';
 import SetupChecklist from './SetupChecklist';
-
 export default function GameDay() {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
@@ -913,21 +913,23 @@ export default function GameDay() {
       )}
 
       {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
-        <SetupChecklist 
-          activeClubId={activeClubId} 
-          clubInfo={clubInfo} 
-          onUpdateClubInfo={setClubInfo}
-          teamFees={teamFees} 
-          teamsCount={teams.length}
-          teams={teams}
-          onDismiss={() => {
-             if (profile?.id) {
-               supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then(() => {
-                 window.location.reload();
-               });
-             }
-          }}
-        />
+          <SetupChecklist 
+            user={profile}
+            activeClubId={activeClubId} 
+            clubInfo={clubInfo} 
+            onUpdateClubInfo={setClubInfo}
+            teamFees={teamFees} 
+            teamsCount={teams.length}
+            teams={teams}
+            onDismiss={() => {
+               if (profile?.id) {
+                 supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then(() => {
+                   window.location.reload();
+                 });
+               }
+            }}
+            onClubCreated={(clubId) => window.location.reload()}
+          />
       )}
 
       {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.length > 1 && (
