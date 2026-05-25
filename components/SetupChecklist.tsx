@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface SetupChecklistProps {
-  activeClubId: string;
+  activeClubId: string | null;
   clubInfo: any;
   onUpdateClubInfo?: (info: any) => void;
   teamFees: any;
