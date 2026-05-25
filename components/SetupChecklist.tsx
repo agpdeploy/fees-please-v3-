@@ -134,13 +134,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   });
   const allCompleted = visibleSteps.every(s => s.completed) && visibleSteps.length > 0;
 
-  useEffect(() => {
-    if (!loading && (visibleSteps.length === 0 || allCompleted)) {
-      if (activeClubId) {
-        onDismiss();
-      }
-    }
-  }, [visibleSteps.length, allCompleted, loading, activeClubId, onDismiss]);
+  // Removed automatic onDismiss to prevent unexpected reloads
 
   const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -588,18 +582,23 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
 
     // Save club-level season & defaults
-    const { error: clubError } = await supabase.from('clubs').update({ 
+    const { data: clubData, error: clubError } = await supabase.from('clubs').update({ 
       season_name: seasonName || null,
       season_start: seasonStart || null,
       season_end: seasonEnd || null,
       expense_label: expenseLabel || null,
       default_umpire_fee: defaultUmpireFee !== "" ? defaultUmpireFee : null
-    }).eq('id', activeClubId);
+    }).eq('id', activeClubId).select();
     
     setIsSavingSeason(false);
     
     if (clubError) {
       alert("Failed to save club season settings: " + clubError.message);
+      return;
+    }
+    
+    if (!clubData || clubData.length === 0) {
+      alert("Error: Database rejected the season update. Permission denied or club not found.");
       return;
     }
     
@@ -627,13 +626,25 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     if(e) e.preventDefault();
     setIsSavingFinancials(true);
     
-    await supabase.from('clubs').update({ 
+    const { data: finData, error: finError } = await supabase.from('clubs').update({ 
       pay_id_type: payIdType,
       pay_id_value: payId || null,
       is_square_enabled: isSquareEnabled,
       square_access_token: squareToken || null,
       square_location_id: squareLocationId || null
-    }).eq('id', activeClubId);
+    }).eq('id', activeClubId).select();
+    
+    if (finError) {
+      alert("Failed to save financial settings: " + finError.message);
+      setIsSavingFinancials(false);
+      return;
+    }
+
+    if (!finData || finData.length === 0) {
+      alert("Error: Database rejected the financial update. Permission denied or club not found.");
+      setIsSavingFinancials(false);
+      return;
+    }
     
     // Mutate local object so it checks off
     if (onUpdateClubInfo) {
@@ -1153,13 +1164,15 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         ))}
       </div>
 
-      {allCompleted && (
-        <button 
-          onClick={onDismiss}
-          className="w-full mt-5 bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-md active:scale-95"
-        >
-          Complete Setup
-        </button>
+      {allCompleted && activeClubId && (
+        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-bottom-4">
+          <button 
+            onClick={onDismiss}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
+          >
+            <i className="fa-solid fa-flag-checkered"></i> Finish Setup & Enter GameDay
+          </button>
+        </div>
       )}
     </div>
   );
