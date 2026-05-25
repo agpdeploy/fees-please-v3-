@@ -825,8 +825,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         </div>
                       )}
                     </div>
-                    {clubCreateError && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest text-center mt-2">{clubCreateError}</div>}
-                    <button type="submit" disabled={isCreatingClub} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-[10px] transition-all shadow-md disabled:opacity-50 mt-4 group">
+                  </div>
+                </div>
+                {clubCreateError && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest text-center mt-2">{clubCreateError}</div>}
+                <button type="submit" disabled={isCreatingClub} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-[10px] transition-all shadow-md disabled:opacity-50 mt-4 group">
                       {isCreatingClub ? "Setting up..." : "Let's Go"}
                     </button>
                   </form>
