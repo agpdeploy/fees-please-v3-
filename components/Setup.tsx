@@ -71,7 +71,8 @@ export default function Setup({ activeTab }: SetupProps) {
   const [payIdValue, setPayIdValue] = useState("");
 
   // TEAM STATE
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isSquadModalOpen, setIsSquadModalOpen] = useState(false);
+  const [expandedRosterTeamId, setExpandedRosterTeamId] = useState<string | null>(null);
   const [teamName, setTeamName] = useState("");
   const [teamSlug, setTeamSlug] = useState(""); 
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
@@ -492,7 +493,7 @@ export default function Setup({ activeTab }: SetupProps) {
     setActiveRosterTeam(team); 
     setPlayerSearch(""); 
     setRosterPlayerIds(players.filter(p => p.default_team_id === team.id).map(p => p.id)); 
-    setIsRosterModalOpen(true); 
+    setExpandedRosterTeamId(team.id); 
   }
   
   function toggleRosterPlayer(playerId: string) { 
@@ -510,7 +511,7 @@ export default function Setup({ activeTab }: SetupProps) {
     
     await loadClubData(); 
     setIsSaving(false); 
-    setIsRosterModalOpen(false); 
+    setExpandedRosterTeamId(null); 
     showToast(`${activeRosterTeam.name} Roster Updated!`);
   }
   
@@ -1061,9 +1062,95 @@ export default function Setup({ activeTab }: SetupProps) {
                       </div>
                     </div>
                     
-                    <button onClick={() => openRosterModal(t)} className="w-full py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-                      <i className="fa-solid fa-clipboard-user"></i> Assign Team Players
+                    <button onClick={() => {
+                      if (expandedRosterTeamId === t.id) {
+                        setExpandedRosterTeamId(null);
+                      } else {
+                        openRosterModal(t);
+                      }
+                    }} className="w-full py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
+                      {expandedRosterTeamId === t.id ? (
+                        <><i className="fa-solid fa-chevron-up"></i> Close Roster</>
+                      ) : (
+                        <><i className="fa-solid fa-clipboard-user"></i> Assign Team Players</>
+                      )}
                     </button>
+
+                    {/* INLINE ROSTER ACCORDION */}
+                    {expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
+                      <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 animate-in slide-in-from-top-2">
+                        <input 
+                          type="text" 
+                          placeholder="Search players..." 
+                          value={playerSearch || ""} 
+                          onChange={(e) => setPlayerSearch(e.target.value)} 
+                          className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors mb-4" 
+                        />
+                        
+                        <div className="space-y-6">
+                          {/* CURRENT TEAM */}
+                          {currentTeamPlayers.length > 0 && (
+                            <div>
+                              <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Current Squad</h3>
+                              <div className="flex flex-wrap gap-2.5">
+                                {currentTeamPlayers.map(p => {
+                                  const isSelected = rosterPlayerIds.includes(p.id);
+                                  return (
+                                    <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
+                                      {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                      {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* UNASSIGNED PLAYERS */}
+                          {unassignedPlayers.length > 0 && (
+                            <div>
+                              <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-3">Unassigned Players</h3>
+                              <div className="flex flex-wrap gap-2.5">
+                                {unassignedPlayers.map(p => {
+                                  const isSelected = rosterPlayerIds.includes(p.id);
+                                  return (
+                                    <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
+                                      {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                      {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* OTHER TEAMS */}
+                          {otherTeamPlayers.length > 0 && (
+                            <div>
+                              <h3 className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-500 mb-3">Assigned to Other Teams</h3>
+                              <div className="flex flex-wrap gap-2.5">
+                                {otherTeamPlayers.map(p => {
+                                  const isSelected = rosterPlayerIds.includes(p.id);
+                                  const otherTeamName = teams.find((tt: any) => tt.id === p.default_team_id)?.name;
+                                  return (
+                                    <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
+                                      {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                      {!isSelected && <span className="text-[9px] text-orange-500 normal-case tracking-normal ml-1">({otherTeamName})</span>}
+                                      {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-6 flex gap-3">
+                          <button onClick={() => setExpandedRosterTeamId(null)} className="flex-1 py-3 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-800/50 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+                          <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-3 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-sm">{isSaving ? 'Saving...' : 'Save Players'}</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -1262,90 +1349,7 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
       )}
 
-      {/* --- NEW ROSTER MODAL (MATCHES SQUAD UX) --- */}
-      {isRosterModalOpen && activeRosterTeam && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[80vh] shadow-2xl transition-colors">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">{activeRosterTeam.name} Roster</h2>
-              <button onClick={() => setIsRosterModalOpen(false)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto flex-1 space-y-6 pb-24">
-              <input 
-                type="text" 
-                placeholder="Search players..." 
-                value={playerSearch || ""} 
-                onChange={(e) => setPlayerSearch(e.target.value)} 
-                className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500 transition-colors" 
-              />
-              
-              <div className="space-y-6">
-                {/* CURRENT TEAM */}
-                {currentTeamPlayers.length > 0 && (
-                  <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Current Squad</h3>
-                    <div className="flex flex-wrap gap-2.5">
-                      {currentTeamPlayers.map(p => {
-                        const isSelected = rosterPlayerIds.includes(p.id);
-                        return (
-                          <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
-                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
-                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* UNASSIGNED PLAYERS */}
-                {unassignedPlayers.length > 0 && (
-                  <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-3">Unassigned Players</h3>
-                    <div className="flex flex-wrap gap-2.5">
-                      {unassignedPlayers.map(p => {
-                        const isSelected = rosterPlayerIds.includes(p.id);
-                        return (
-                          <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
-                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
-                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* OTHER TEAMS */}
-                {otherTeamPlayers.length > 0 && (
-                  <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-500 mb-3">Assigned to Other Teams</h3>
-                    <div className="flex flex-wrap gap-2.5">
-                      {otherTeamPlayers.map(p => {
-                        const isSelected = rosterPlayerIds.includes(p.id);
-                        const otherTeamName = teams.find(t => t.id === p.default_team_id)?.name;
-                        return (
-                          <button key={p.id} onClick={() => toggleRosterPlayer(p.id)} disabled={isSaving} className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}>
-                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
-                            {!isSelected && <span className="text-[9px] text-orange-500 normal-case tracking-normal ml-1">({otherTeamName})</span>}
-                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
-              <button onClick={() => setIsRosterModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">{isSaving ? 'Saving...' : 'Save Players'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL REMOVED - CONVERTED TO INLINE ACCORDION */}
 
     </div>
   );
