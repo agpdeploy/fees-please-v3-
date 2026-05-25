@@ -249,6 +249,10 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
       });
 
       const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Server Error: ${res.status}`);
+      }
+      
       if (data.players && Array.isArray(data.players)) {
         setDraftPlayers(data.players.map((p: any) => ({
           first_name: p.firstName || p.first_name || "",
@@ -259,9 +263,9 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
           is_member: p.is_member ?? true 
         })));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to parse roster via dAIve.");
+      alert(`AI Extraction Error: ${err.message || "Failed to parse roster via dAIve."}`);
     } finally {
       setIsExtracting(false);
       e.target.value = '';
@@ -333,6 +337,10 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
       });
 
       const data = await res.json();
+      
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Server Error: ${res.status}`);
+      }
 
       if (data.fixtures && Array.isArray(data.fixtures)) {
         if (data.fixtures.length === 0) {
@@ -340,8 +348,6 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
         } else {
           setDraftFixtures(data.fixtures);
         }
-      } else if (data.error) {
-        throw new Error(data.error);
       }
     } catch (error: any) {
       console.error("Extraction error:", error);
