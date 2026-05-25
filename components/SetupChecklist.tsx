@@ -97,7 +97,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   useEffect(() => {
     async function checkStatus() {
-      if (!activeClubId) return;
+      if (!activeClubId) {
+        setLoading(false);
+        return;
+      }
       const { count: playerCount } = await supabase.from('players').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
       const { count: fixtureCount } = await supabase.from('fixtures').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
       
