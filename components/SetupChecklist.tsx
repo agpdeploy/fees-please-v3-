@@ -594,10 +594,10 @@ export default function SetupChecklist({ activeClubId, clubInfo, onUpdateClubInf
                           </div>
                         ) : (
                           <div key="daive-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
-                            <input type="file" accept="image/*,.csv" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
                             <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                              Upload Image or CSV
+                              Upload Image, PDF, or CSV
                             </p>
                           </div>
                         )
