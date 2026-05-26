@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import posthog from 'posthog-js'; // Ensure posthog is imported
 
@@ -12,8 +13,10 @@ interface ClientProps {
 }
 
 export default function TeamAvailabilityClient({ teamId, clubId, teamName }: ClientProps) {
-  // 🚨 FIX: We initialize with guaranteed fallback data so it NEVER thinks the team is missing
   const [teamInfo, setTeamInfo] = useState<any>({ team_id: teamId, team_name: teamName });
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   
   const [allClubPlayers, setAllClubPlayers] = useState<any[]>([]);
   const [upcomingFixtures, setUpcomingFixtures] = useState<any[]>([]);
@@ -120,6 +123,31 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
     loadPlayerAvailabilities();
   }, [selectedPlayer, upcomingFixtures]);
 
+  useEffect(() => {
+    // Auto-confirmation logic
+    const urlPlayerId = searchParams.get('player');
+    const urlFixtureId = searchParams.get('fixture');
+    const urlStatus = searchParams.get('status') as 'yes' | 'maybe' | 'no';
+
+    if (urlPlayerId && urlFixtureId && urlStatus && allClubPlayers.length > 0 && upcomingFixtures.length > 0) {
+      const player = allClubPlayers.find(p => p.id === urlPlayerId);
+      const fixture = upcomingFixtures.find(f => f.id === urlFixtureId);
+      
+      if (player && fixture) {
+        // Clear params from URL so refresh doesn't trigger again
+        const newUrl = window.location.pathname;
+        router.replace(newUrl);
+
+        (async () => {
+          await handleStatusClick(urlFixtureId, urlStatus, player.id);
+          setSelectedPlayer(player);
+          setToastMessage("Thanks for confirming!");
+          setTimeout(() => setToastMessage(null), 4000);
+        })();
+      }
+    }
+  }, [allClubPlayers, upcomingFixtures, searchParams, router]);
+
   const sponsors = teamInfo ? [
     { logo: teamInfo.sponsor_1_logo, url: teamInfo.sponsor_1_url, index: 1 },
     { logo: teamInfo.sponsor_2_logo, url: teamInfo.sponsor_2_url, index: 2 },
@@ -145,16 +173,18 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
     if (url) window.open(url, '_blank');
   };
 
-  async function handleStatusClick(fixtureId: string, status: 'yes' | 'maybe' | 'no') {
-    if (!selectedPlayer) return;
+  async function handleStatusClick(fixtureId: string, status: 'yes' | 'maybe' | 'no', overridePlayerId?: string) {
+    const activePlayerId = overridePlayerId || selectedPlayer?.id;
+    if (!activePlayerId) return;
+    
     setIsUpdating(fixtureId);
     setAvailabilities(prev => ({ ...prev, [fixtureId]: status }));
     setFixtureResponses(prev => {
       const currentResponses = prev[fixtureId] || [];
-      const filteredResponses = currentResponses.filter(r => r.player_id !== selectedPlayer.id);
-      return { ...prev, [fixtureId]: [...filteredResponses, { player_id: selectedPlayer.id, status }] };
+      const filteredResponses = currentResponses.filter(r => r.player_id !== activePlayerId);
+      return { ...prev, [fixtureId]: [...filteredResponses, { player_id: activePlayerId, status }] };
     });
-    await supabase.from("availability").upsert({ player_id: selectedPlayer.id, fixture_id: fixtureId, status: status }, { onConflict: 'player_id, fixture_id' });
+    await supabase.from("availability").upsert({ player_id: activePlayerId, fixture_id: fixtureId, status: status }, { onConflict: 'player_id, fixture_id' });
     
     // --- POSTHOG TRACKING EVENT ---
     try {
@@ -201,6 +231,12 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
           <i className="fa-solid fa-bullhorn"></i> {clubAnnouncement}
         </div>
       )}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg z-[100] flex items-center gap-3 animate-in fade-in slide-in-from-top-5 duration-300">
+          <i className="fa-solid fa-circle-check"></i>
+          <span className="font-bold text-sm uppercase tracking-wide">{toastMessage}</span>
+        </div>
+      )}
       <div className="max-w-md mx-auto space-y-6 mt-6 px-4">
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center overflow-hidden">
@@ -241,7 +277,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
             {upcomingFixtures.length === 0 ? (
               <div className="text-center p-8 bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl"><p className="text-zinc-500 text-xs font-bold uppercase">No upcoming fixtures.</p></div>
             ) : (
-              upcomingFixtures.map((fixture) => {
+              upcomingFixtures.map((fixture, index) => {
                 const currentStatus = availabilities[fixture.id];
                 const responses = fixtureResponses[fixture.id] || [];
                 const yesCount = responses.filter(r => r.status === 'yes').length;
@@ -260,8 +296,9 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
                 const unconfirmedPct = (unconfirmedCount / totalPlayers) * 100;
                 
                 return (
-                  <div key={fixture.id} className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-[1.5rem] shadow-lg overflow-hidden flex flex-col relative">
-                    {currentStatus === 'yes' && <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>}
+                  <div key={fixture.id} className="flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-[1.5rem] shadow-lg overflow-hidden flex flex-col relative">
+                      {currentStatus === 'yes' && <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>}
                     {currentStatus === 'no' && <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>}
                     {currentStatus === 'maybe' && <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>}
 
@@ -310,11 +347,19 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
                     </div>
 
                     <div className="p-4 flex gap-2.5 bg-zinc-50 dark:bg-zinc-950/50 ml-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/50">
-                      <button onClick={() => handleStatusClick(fixture.id, 'yes')} className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase ${currentStatus === 'yes' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white dark:bg-[#1A1A1A] border dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'}`}>IN</button>
+                      <button onClick={() => handleStatusClick(fixture.id, 'yes')} className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase ${currentStatus === 'yes' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white dark:bg-[#1A1A1A] border dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'}`}>AVAILABLE</button>
                       <button onClick={() => handleStatusClick(fixture.id, 'maybe')} className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase ${currentStatus === 'maybe' ? 'bg-amber-500 text-black shadow-md' : 'bg-white dark:bg-[#1A1A1A] border dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'}`}>MAYBE</button>
                       <button onClick={() => handleStatusClick(fixture.id, 'no')} className={`flex-1 py-4 rounded-xl text-[10px] font-black uppercase ${currentStatus === 'no' ? 'bg-red-500 text-white shadow-md' : 'bg-white dark:bg-[#1A1A1A] border dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'}`}>OUT</button>
                     </div>
                   </div>
+                  {index === 0 && upcomingFixtures.filter(f => !availabilities[f.id]).length > 0 && (
+                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl text-center shadow-sm">
+                      <i className="fa-solid fa-calendar-check text-emerald-500 text-2xl mb-2"></i>
+                      <h3 className="text-sm font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-tight mb-1">More Games Ahead!</h3>
+                      <p className="text-xs font-medium text-emerald-600/80 dark:text-emerald-400/80">You have {upcomingFixtures.filter(f => !availabilities[f.id]).length} unconfirmed match{upcomingFixtures.filter(f => !availabilities[f.id]).length > 1 ? 'es' : ''}. Please update your availability for the rest of the season below.</p>
+                    </div>
+                  )}
+                </div>
                 );
               })
             )}

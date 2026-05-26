@@ -490,6 +490,25 @@ function PlayerRow({
     else { showToast("Player deleted."); loadClubData(); }
   }
 
+  async function handleResubscribe() {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/resubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: player.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast("Player resubscribed successfully!");
+      loadClubData();
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   if (isEditing) {
     return (
       <div className="bg-white dark:bg-zinc-900 border-2 border-emerald-500 p-4 rounded-xl flex flex-col gap-3 shadow-md transition-colors animate-in fade-in">
@@ -558,6 +577,12 @@ function PlayerRow({
               Team Manager
             </span>
           )}
+          
+          {player.unsubscribed && (
+            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
+              Unsubscribed
+            </span>
+          )}
         </div>
         
         {/* NEW: ADDED EMAIL DISPLAY FOR THE LIST VIEW */}
@@ -575,7 +600,10 @@ function PlayerRow({
           </span>
         </div>
       </div>
-      <div className="flex gap-2 shrink-0 ml-4">
+      <div className="flex gap-2 shrink-0 ml-4 items-center">
+        {player.unsubscribed && (
+          <button onClick={handleResubscribe} disabled={isSaving} className="px-3 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors shadow-sm whitespace-nowrap">Resubscribe</button>
+        )}
         <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-pen text-xs"></i></button>
         <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-trash text-xs"></i></button>
       </div>

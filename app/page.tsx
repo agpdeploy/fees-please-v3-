@@ -27,7 +27,7 @@ export default function Home() {
     return 'gameday';
   });
 
-  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures'>('config');
+  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'automations'>('config');
 
   const [session, setSession] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -434,8 +434,11 @@ export default function Home() {
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
                       </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase ${activeTab === 'setup' && setupTab === 'fixtures' ? 'bg-zinc-100 dark:bg-zinc-800/50 text-emerald-600 dark:text-emerald-500' : 'text-zinc-500'}`}>
+                        <div className="w-6 flex justify-center"><i className="fa-solid fa-calendar-days"></i></div> Fixtures
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('reports'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase ${activeTab === 'setup' && setupTab === 'reports' ? 'bg-zinc-100 dark:bg-zinc-800/50 text-emerald-600 dark:text-emerald-500' : 'text-zinc-500'}`}>
+                        <div className="w-6 flex justify-center"><i className="fa-solid fa-chart-pie"></i></div> Reports
                       </button>
                     </>
                   )}

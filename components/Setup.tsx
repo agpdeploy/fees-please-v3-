@@ -6,9 +6,10 @@ import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 import PlayersTab from "@/components/PlayersTab";
 import FixturesTab from "@/components/FixturesTab"; 
+import AutomationsTab from "@/components/AutomationsTab";
 
 interface SetupProps {
-  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures';
+  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports';
 }
 
 interface UserRole {
@@ -1271,6 +1272,16 @@ export default function Setup({ activeTab }: SetupProps) {
           loadClubData={loadClubData} 
           showToast={showToast} 
           openSquadModal={openSquadModal}
+        />
+      )}
+
+      {/* --- REPORTS TAB --- */}
+      {clubId && clubId !== 'new' && activeTab === 'reports' && (
+        <AutomationsTab 
+          clubId={clubId} 
+          teams={teams} 
+          showToast={showToast} 
+          clubUsers={clubUsers}
         />
       )}
 

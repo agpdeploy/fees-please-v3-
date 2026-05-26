@@ -391,7 +391,7 @@ export default function Analytics() {
                         
                         <div className="flex justify-between items-center mt-2">
                            <div className="flex gap-2 sm:gap-3 text-[9px] font-black uppercase tracking-widest">
-                              <span className="text-emerald-600 dark:text-emerald-500">{f.lists.yes.length} IN</span>
+                              <span className="text-emerald-600 dark:text-emerald-500">{f.lists.yes.length} AVAIL</span>
                               <span className="text-amber-500">{f.lists.maybe.length} MAYBE</span>
                               <span className="text-red-500">{f.lists.no.length} OUT</span>
                               <span className="text-zinc-500">{f.lists.pending.length} PENDING</span>
@@ -408,7 +408,7 @@ export default function Analytics() {
                            <div className="grid grid-cols-2 gap-4 mb-5">
                               {f.lists.yes.length > 0 && (
                                  <div>
-                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-2 border-b border-emerald-500/20 pb-1">Playing</p>
+                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-2 border-b border-emerald-500/20 pb-1">Available</p>
                                     <ul className="text-xs font-bold text-zinc-700 dark:text-zinc-300 space-y-1">
                                        {f.lists.yes.map((name: string, i: number) => <li key={i}>{name}</li>)}
                                     </ul>

@@ -49,6 +49,9 @@ export default function GameDay() {
 
   // Digital Transfer / PayID Modal States
   const [isPayIdModalOpen, setIsPayIdModalOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [pendingReminderCount, setPendingReminderCount] = useState(0);
   const [activePayIdPlayer, setActivePayIdPlayer] = useState<any>(null);
 
   // Finalise Match Modal States
@@ -67,6 +70,13 @@ export default function GameDay() {
   const [reporterLoading, setReporterLoading] = useState(false);
   const [reporterLoadingText, setReporterLoadingText] = useState("");
   
+  // --- EMAIL ANALYTICS STATES ---
+  const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState(false);
+  const [emailStats, setEmailStats] = useState<Record<string, number>>({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 });
+  const [emailLogDetails, setEmailLogDetails] = useState<any[]>([]);
+  const [activeStatFilter, setActiveStatFilter] = useState<'sent' | 'delivered' | 'opened' | 'bounced' | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -871,6 +881,110 @@ export default function GameDay() {
     }
   }
 
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+
+  async function toggleEmailAnalytics() {
+    if (isAnalyticsExpanded) {
+      setIsAnalyticsExpanded(false);
+      return;
+    }
+    
+    if (!activeFixture) return;
+    setIsStatsLoading(true);
+    setIsAnalyticsExpanded(true);
+    
+    try {
+      const { data } = await supabase.from('email_logs').select('id, status, players(id, first_name, last_name, nickname, email)').eq('fixture_id', activeFixture.id);
+      
+      if (data) {
+         const stats: Record<string, number> = { sent: data.length, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 };
+         data.forEach(log => {
+           stats[log.status] = (stats[log.status] || 0) + 1;
+           if (['delivered', 'opened', 'clicked', 'complained'].includes(log.status)) {
+             stats.delivered++;
+           }
+         });
+         setEmailStats(stats);
+         setEmailLogDetails(data);
+         setActiveStatFilter(null);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error loading analytics", "error");
+    } finally {
+      setIsStatsLoading(false);
+    }
+  }
+
+  const handleSendRemindersCheck = async () => {
+    if (!activeFixture) return;
+    if (activeFixture.reminder_sent) {
+      showToast("A reminder has already been sent for this game.", "error");
+      return;
+    }
+    
+    setIsSendingReminders(true);
+    
+    try {
+      const res = await fetch("/api/send-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fixtureId: activeFixture.id, teamId: selectedTeamId, action: 'check' }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to check reminders");
+      
+      if (data.reminderSent) {
+         setActiveFixture((prev: any) => prev ? { ...prev, reminder_sent: true } : prev);
+         showToast("A reminder has already been sent for this game.", "error");
+         return;
+      }
+      
+      if (data.pendingCount === 0) {
+        showToast("Everyone has already responded.", "success");
+      } else {
+        setPendingReminderCount(data.pendingCount);
+        setIsReminderModalOpen(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to check reminders", "error");
+    } finally {
+      setIsSendingReminders(false);
+    }
+  };
+
+  const handleConfirmSendReminders = async () => {
+    if (!activeFixture) return;
+    setIsReminderModalOpen(false);
+    setIsSendingReminders(true);
+    
+    try {
+      const res = await fetch("/api/send-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          fixtureId: activeFixture.id, 
+          teamId: selectedTeamId, 
+          action: 'send',
+          senderName: profile?.first_name || "Your Captain" 
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reminders");
+      
+      showToast(`Sent ${data.sentCount} reminder${data.sentCount > 1 ? 's' : ''}!`);
+      setActiveFixture((prev: any) => prev ? { ...prev, reminder_sent: true } : prev);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Failed to send reminders", "error");
+    } finally {
+      setIsSendingReminders(false);
+    }
+  };
+
   const handleShareMatch = async () => {
     if (!activeFixture) return;
     
@@ -967,10 +1081,131 @@ export default function GameDay() {
                   )}
                 </span>
               </div>
-              <button onClick={handleShareMatch} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-500 hover:text-emerald-500 transition-colors">
-                <i className="fa-solid fa-share-nodes text-xs"></i>
-              </button>
+              <div className="flex gap-2">
+                {canManage && (
+                  <button 
+                    onClick={handleSendRemindersCheck} 
+                    disabled={isSendingReminders || activeFixture?.reminder_sent}
+                    className={`h-8 px-3 rounded-full border flex items-center justify-center transition-colors disabled:opacity-50 ${
+                      activeFixture?.reminder_sent 
+                        ? 'bg-zinc-100 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-zinc-400 dark:text-zinc-600'
+                        : 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                    }`}
+                    title={activeFixture?.reminder_sent ? "Reminder already sent for this game" : "Send Reminders"}
+                  >
+                    {isSendingReminders ? (
+                      <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
+                    ) : (
+                      <i className="fa-regular fa-paper-plane text-xs"></i>
+                    )}
+                  </button>
+                )}
+                {canManage && activeFixture?.reminder_sent && (
+                  <button 
+                    onClick={toggleEmailAnalytics} 
+                    className={`h-8 px-3 rounded-full border flex items-center justify-center transition-colors shadow-sm ${
+                      isAnalyticsExpanded 
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-800'
+                    }`}
+                    title="View Email Analytics"
+                  >
+                    <i className="fa-solid fa-chart-column text-xs"></i>
+                  </button>
+                )}
+                <button onClick={handleShareMatch} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-500 hover:text-emerald-500 transition-colors">
+                  <i className="fa-solid fa-share-nodes text-xs"></i>
+                </button>
+              </div>
             </div>
+
+            {/* INLINE EMAIL ANALYTICS EXPANSION COMPONENT */}
+            {isAnalyticsExpanded && (
+              <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2 fade-in duration-200">
+                 {isStatsLoading ? (
+                   <div className="text-center p-4">
+                     <i className="fa-solid fa-circle-notch fa-spin text-zinc-400"></i>
+                     <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-2">Loading Stats...</p>
+                   </div>
+                 ) : (
+                   <>
+                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'sent' ? null : 'sent')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'sent' ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Sent</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.sent}</span>
+                       </button>
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'delivered' ? null : 'delivered')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'delivered' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-emerald-200 dark:hover:border-emerald-800'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Delivered</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.delivered}</span>
+                       </button>
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'opened' ? null : 'opened')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'opened' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-800'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Opened</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.opened}</span>
+                       </button>
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'bounced' ? null : 'bounced')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'bounced' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-red-200 dark:hover:border-red-800'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Bounced</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.bounced}</span>
+                       </button>
+                     </div>
+                     
+                     {activeStatFilter && (
+                       <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2">
+                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 px-1">
+                           Players ({activeStatFilter})
+                         </h4>
+                         <div className="space-y-1">
+                           {emailLogDetails.filter(log => {
+                              if (activeStatFilter === 'sent') return true;
+                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
+                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
+                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
+                              return false;
+                           }).map((log, index) => {
+                              const p = log.players;
+                              return (
+                                <div key={log.id || index} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                                      <i className={`fa-solid ${p ? 'fa-user' : 'fa-user-slash'} text-[10px] text-zinc-400`}></i>
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden">
+                                      <span className={`text-xs font-bold truncate ${p ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 italic'}`}>
+                                        {p ? `${p.first_name} ${p.last_name || ''} ${p.nickname ? `"${p.nickname}"` : ''}` : 'Deleted Player'}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate max-w-[150px]">
+                                        {p ? (p.email || 'No email') : 'Record removed'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className={`shrink-0 ml-2 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 ${
+                                    log.status === 'opened' || log.status === 'clicked' ? 'text-blue-500' :
+                                    log.status === 'bounced' ? 'text-red-500' :
+                                    ['delivered', 'complained'].includes(log.status) ? 'text-emerald-500' :
+                                    'text-zinc-500'
+                                  }`}>
+                                    {log.status}
+                                  </span>
+                                </div>
+                              );
+                           })}
+                           {emailLogDetails.filter(log => {
+                              if (activeStatFilter === 'sent') return true;
+                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
+                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
+                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
+                              return false;
+                           }).length === 0 && (
+                             <div className="text-center py-4 text-xs font-bold text-zinc-400">
+                               No players in this category
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     )}
+                   </>
+                 )}
+              </div>
+            )}
           </div>
 
           <div className="p-4 flex items-center justify-between gap-2">
@@ -1178,7 +1413,7 @@ export default function GameDay() {
                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-3 text-emerald-600 dark:text-emerald-500">
                    <i className="fa-solid fa-clipboard-user text-xl"></i>
                  </div>
-                 <h3 className="font-black uppercase tracking-widest text-xs text-emerald-800 dark:text-emerald-400 mb-1">Who's Playing?</h3>
+                 <h3 className="font-black uppercase tracking-widest text-xs text-emerald-800 dark:text-emerald-400 mb-1">Who's Available?</h3>
                  
                  {canManage ? (
                    <>
@@ -1535,6 +1770,45 @@ export default function GameDay() {
                  })}
               </div>
            )}
+        </div>
+      )}
+
+      {/* --- SEND REMINDERS MODAL --- */}
+      {isReminderModalOpen && activeFixture && (
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 transition-colors">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[400px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Send Reminders</h2>
+              <button onClick={() => setIsReminderModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div className="p-6 space-y-6">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                You're about to send an availability invite to this game to <strong className="text-zinc-900 dark:text-white">{pendingReminderCount}</strong> {pendingReminderCount === 1 ? 'person' : 'people'}. Do you wish to send now?
+              </p>
+              
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl flex items-start gap-3">
+                <i className="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                  <strong>Please note:</strong> You can only send 1 reminder per game.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsReminderModalOpen(false)} 
+                  className="flex-1 py-3.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white text-xs font-black uppercase tracking-widest rounded-xl transition-colors"
+                >
+                  No - Don't send
+                </button>
+                <button 
+                  onClick={handleConfirmSendReminders} 
+                  className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-sm transition-colors"
+                >
+                  Yes - Send
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
