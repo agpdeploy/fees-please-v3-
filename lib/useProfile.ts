@@ -20,14 +20,18 @@ export function useProfile() {
         if (!session) {
           console.log("📡 useProfile: No session found.");
           if (isMounted) setLoading(false);
-          posthog.reset(); // <-- Reset tracking if they are not logged in
+          if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            posthog.reset(); // <-- Reset tracking if they are not logged in
+          }
           return;
         }
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           if (isMounted) setLoading(false);
-          posthog.reset(); // <-- Reset tracking if no user
+          if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            posthog.reset(); // <-- Reset tracking if no user
+          }
           return;
         }
 
@@ -72,7 +76,7 @@ export function useProfile() {
           setRoles(rolesData);
 
           // --- 🔥 IDENTIFY THE USER IN POSTHOG 🔥 ---
-          if (typeof window !== 'undefined') {
+          if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
             posthog.identify(
               user.id, // The unique Supabase Auth ID
               { 
@@ -129,7 +133,7 @@ export function useProfile() {
       setRoles(rolesData || []);
 
       // Re-identify in case their role changed during the session
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
         posthog.identify(userId, { role: updatedProfile.role });
       }
     }

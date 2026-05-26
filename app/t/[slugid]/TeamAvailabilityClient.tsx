@@ -158,11 +158,13 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
     
     // --- POSTHOG TRACKING EVENT ---
     try {
+      if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
         posthog.capture('player_availability_set', {
           team_name: teamName,
           status: status,
           is_public_link: true
         });
+      }
     } catch (e) {
         console.error('Posthog tracking failed', e)
     }
