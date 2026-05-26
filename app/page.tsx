@@ -406,6 +406,12 @@ export default function Home() {
                 <div>
                   <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Management</div>
                   
+                  {profile?.role === 'super_admin' && (
+                    <button onClick={() => window.location.assign('/admin')} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                      <i className="fa-solid fa-crown w-5 text-center text-amber-500"></i> Platform Admin
+                    </button>
+                  )}
+                  
                   <button onClick={() => handleTabChange('my-team')} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'my-team' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                     <i className="fa-solid fa-users w-5 text-center"></i> My Team
                   </button>
