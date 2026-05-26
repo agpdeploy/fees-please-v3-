@@ -98,7 +98,8 @@ export async function GET(req: Request) {
           }
           
           if (!teamId && tx.team_id) {
-            const tName = tx.teams?.name || 'Club';
+            const txTeams: any = tx.teams;
+            const tName = txTeams?.name || 'Club';
             if (!teamCollections[tx.team_id]) teamCollections[tx.team_id] = { name: tName, amount: 0 };
             teamCollections[tx.team_id].amount += amt;
           }
@@ -167,7 +168,8 @@ export async function GET(req: Request) {
           });
           
           const fixDate = new Date(fix.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-          const fixTeamLabel = !teamId ? ` - ${fix.teams?.name}` : '';
+          const fixTeams: any = fix.teams;
+          const fixTeamLabel = !teamId ? ` - ${fixTeams?.name}` : '';
           
           fixturesHtml += `
             <div style="background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; overflow: hidden; margin-bottom: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
