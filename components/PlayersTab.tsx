@@ -262,6 +262,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
   // If a team is selected, show that team's players.
   const teamPlayers = players.filter(p => {
     if (!addTeamId) return true; // Show everyone if filter is empty
+    if (teams.length === 1 && !p.default_team_id) return true; // Show unassigned if there's only 1 team
     return p.default_team_id === addTeamId;
   });
 
@@ -275,7 +276,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
         </div>
         
         <select value={addTeamId || ""} onChange={(e) => setAddTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
-          <option value="">-- View All Club Players --</option>
+          {teams.length > 1 && <option value="">-- View All Club Players --</option>}
           {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
 

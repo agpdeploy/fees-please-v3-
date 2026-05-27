@@ -10,10 +10,6 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 export const metadata: Metadata = {
   title: "Fees Please",
   description: "Less chasing. More playing.",
-  icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
-  },
 };
 
 export const viewport: Viewport = {

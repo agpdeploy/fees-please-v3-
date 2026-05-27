@@ -10,7 +10,7 @@ type Message = { id: string; role: 'user' | 'assistant'; content: string; logId?
 const INITIAL_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: "I'm **dAIve 1.0**. I can help you onboard, check the ledger, and pull fixture data.\n\nWhat do you need a hand with?"
+  content: "I'm **dAIve**. I can help you search the manual, check the ledger, and pull fixture data.\n\nWhat do you need a hand with?"
 };
 
 const QUICK_PROMPTS = ["How do I set up my club?", "How much money have we collected?", "When is our next game?"];
@@ -84,7 +84,7 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
           </div>
           <div className="flex flex-col">
             <div className="font-black italic uppercase tracking-tighter text-lg leading-none">
-              dAIve <span className="text-emerald-200 text-xs font-medium tracking-normal not-italic opacity-80">1.0</span>
+              dAIve
             </div>
             <div className="text-[10px] text-emerald-100 font-medium uppercase tracking-widest mt-0.5">Tactical Support</div>
           </div>
@@ -114,6 +114,21 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
         )}
       </div>
 
+      {/* QUICK PROMPTS */}
+      {messages.length === 1 && !isLoading && (
+        <div className="px-4 pb-3 bg-zinc-50 dark:bg-[#0a0a0a] flex flex-wrap gap-2">
+          {QUICK_PROMPTS.map((prompt) => (
+            <button 
+              key={prompt} 
+              onClick={() => sendMessage(prompt)}
+              className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold uppercase rounded-lg shadow-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* INPUT AREA */}
       <div className="p-3 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
         <form onSubmit={(e) => { e.preventDefault(); sendMessage(text); }} className="flex gap-2">
@@ -122,10 +137,10 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
             value={text} 
             onChange={(e) => setText(e.target.value)}
             placeholder="Ask dAIve..."
-            className="flex-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition-colors"
+            className="flex-1 min-w-0 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition-colors"
           />
-          <button type="submit" disabled={isLoading || !text.trim()} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-            <i className="fa-solid fa-paper-plane"></i>
+          <button type="submit" disabled={isLoading || !text.trim()} className="w-12 shrink-0 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+            <i className="fa-solid fa-paper-plane text-sm"></i>
           </button>
         </form>
       </div>

@@ -23,7 +23,7 @@ export default function MyTeam() {
       setIsLoading(true);
 
       // 1. Determine Teams
-      let teamQuery = supabase.from("teams").select("id, name").eq("club_id", activeClubId);
+      let teamQuery = supabase.from("teams").select("id, name, slug").eq("club_id", activeClubId);
       if (!isClubAdmin) {
         const allowedTeamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id) || [];
         if (allowedTeamIds.length === 0) { setIsLoading(false); return; }
@@ -66,7 +66,9 @@ export default function MyTeam() {
 
   const copyTeamLink = () => {
     if (!selectedTeamId) return;
-    const link = `${window.location.origin}/t/${selectedTeamId}`;
+    const team = teams.find(t => t.id === selectedTeamId);
+    const identifier = team?.slug || selectedTeamId;
+    const link = `${window.location.origin}/t/${identifier}`;
     navigator.clipboard.writeText(link);
     setToast("Public Link Copied!");
     setTimeout(() => setToast(null), 2000);
@@ -99,18 +101,17 @@ export default function MyTeam() {
       )}
 
       {/* HEADER & TEAM SELECT */}
-      <div className="flex justify-between items-center bg-white dark:bg-[#111] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <h1 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">My Team</h1>
-        {teams.length > 1 && (
+      {teams.length > 1 && (
+        <div className="flex justify-end items-center bg-white dark:bg-[#111] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <select 
             value={selectedTeamId} 
             onChange={handleTeamChange} 
-            className="bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-xs font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors cursor-pointer"
+            className="w-full sm:w-auto bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-xs font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors cursor-pointer"
           >
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* PUBLIC LINK CARD */}
       <div className="bg-emerald-600 dark:bg-emerald-500 rounded-3xl p-6 shadow-lg text-white relative overflow-hidden">
@@ -128,31 +129,15 @@ export default function MyTeam() {
         </button>
       </div>
 
-      {/* CURRENT ROSTER */}
-      <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col gap-4">
-        <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-2">
-          <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
-            <i className="fa-solid fa-users text-sm"></i>
-          </div>
-          <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Active Roster ({players.length})</h2>
+      {/* EMBEDDED HUB */}
+      <div className="bg-zinc-100 dark:bg-[#0a0a0a] rounded-[2rem] overflow-hidden border-4 border-zinc-800 shadow-2xl h-[800px] max-w-md mx-auto relative flex flex-col">
+        <div className="bg-zinc-800 py-2 flex items-center justify-center gap-2 relative">
+          <div className="w-16 h-4 bg-zinc-900 rounded-full"></div>
         </div>
-
-        {players.length === 0 ? (
-          <p className="text-xs font-bold text-zinc-500 text-center py-6">No players assigned to this team.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 mt-2">
-            {players.map(p => (
-              <div key={p.id} className="bg-zinc-50 dark:bg-[#1A1A1A] px-4 py-3 rounded-xl border border-zinc-100 dark:border-zinc-800/50 flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                   <i className="fa-solid fa-user text-[10px] text-zinc-400"></i>
-                </div>
-                <span className="text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wide truncate">
-                  {formatName(p)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        <iframe 
+          src={`/t/${teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId}`} 
+          className="w-full h-full border-none bg-zinc-50 dark:bg-[#0a0a0a]"
+        ></iframe>
       </div>
 
     </div>

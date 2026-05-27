@@ -68,6 +68,10 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
     if (!opponent || !matchDate || !fixtureTeamId) return showToast("Please fill all match fields.", "error");
     setIsSaving(true);
     
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isPast = new Date(matchDate) < today;
+
     const payload = { 
       team_id: fixtureTeamId, 
       opponent, 
@@ -75,7 +79,8 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
       start_time: fixtureTime, 
       location: fixtureLocation, 
       notes: fixtureNotes, 
-      umpire_fee: umpireFee === "" ? 0 : umpireFee 
+      umpire_fee: umpireFee === "" ? 0 : umpireFee,
+      status: isPast ? 'completed' : 'upcoming'
     };
 
     const { error } = await supabase.from("fixtures").insert([payload]);
@@ -250,11 +255,18 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
     if (validFixtures.length === 0) return showToast("No valid fixtures to save.", "error");
     
     setIsSaving(true);
-    const payload = validFixtures.map(f => ({ 
-      ...f, 
-      team_id: fixtureTeamId, 
-      umpire_fee: defaultUmpireFee || 0 
-    }));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const payload = validFixtures.map(f => {
+      const isPast = f.match_date ? new Date(f.match_date) < today : false;
+      return { 
+        ...f, 
+        team_id: fixtureTeamId, 
+        umpire_fee: defaultUmpireFee || 0,
+        status: isPast ? 'completed' : 'upcoming'
+      };
+    });
 
     const { error } = await supabase.from("fixtures").insert(payload);
     

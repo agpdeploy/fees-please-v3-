@@ -134,7 +134,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
     try {
       let targetId = report.id;
       if (targetId === 'virtual') {
-         targetId = await upsertReport({ ...report, is_active: true });
+         targetId = await upsertReport({ ...report, is_active: false });
       }
 
       const res = await fetch(`/api/cron/weekly-summary?report_id=${targetId}`, { method: 'GET' });

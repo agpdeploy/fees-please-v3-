@@ -16,9 +16,11 @@ export async function GET(req: Request) {
     );
 
     // 1. Fetch the report configuration
-    let query = supabaseAdmin.from('email_reports').select('*, clubs(name), teams(name)').eq('is_active', true);
+    let query = supabaseAdmin.from('email_reports').select('*, clubs(name), teams(name)');
     if (reportId) {
       query = query.eq('id', reportId);
+    } else {
+      query = query.eq('is_active', true);
     }
     
     const { data: allReports, error: reportsErr } = await query;
@@ -251,13 +253,20 @@ export async function GET(req: Request) {
       // --- RECIPIENTS ---
       let rolesQuery = supabaseAdmin.from('user_roles').select('email, role').eq('club_id', clubId);
       if (teamId) {
-        rolesQuery = rolesQuery.or(`and(role.eq.team_admin,team_id.eq.${teamId}),role.in.(club_admin,super_admin)`);
+        rolesQuery = rolesQuery.or(`and(role.eq.team_admin,team_id.eq.${teamId}),role.in.(club_admin)`);
       } else {
-        rolesQuery = rolesQuery.in('role', ['club_admin', 'super_admin']);
+        rolesQuery = rolesQuery.in('role', ['club_admin']);
       }
       const { data: recipientsData } = await rolesQuery;
-      
-      const recipientEmails = Array.from(new Set((recipientsData || []).map(r => r.email).filter(Boolean)));
+      let recipientEmails = (recipientsData || []).map(r => r.email).filter(Boolean);
+
+      // Also get super admins
+      const { data: superAdmins } = await supabaseAdmin.from('profiles').select('email').eq('role', 'super_admin');
+      if (superAdmins) {
+        recipientEmails.push(...superAdmins.map(p => p.email).filter(Boolean));
+      }
+
+      recipientEmails = Array.from(new Set(recipientEmails));
       if (recipientEmails.length === 0) continue;
 
       const entityName = report.report_type === 'club_summary' ? clubName : `${clubName} - ${teamName}`;

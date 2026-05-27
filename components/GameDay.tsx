@@ -869,17 +869,30 @@ export default function GameDay() {
     setIsProcessing(true);
     
     try {
-      const parts = fullName.trim().split(' ');
+      let email = null;
+      let nameStr = fullName.trim();
+      
+      // Extract email if provided
+      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/;
+      const emailMatch = nameStr.match(emailRegex);
+      if (emailMatch) {
+        email = emailMatch[0];
+        nameStr = nameStr.replace(emailMatch[0], '').trim();
+      }
+      
+      const parts = nameStr.split(' ');
       const firstName = parts[0];
-      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '(Casual)';
+      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '(New)';
 
       const { data: newPlayer, error: playerError } = await supabase
         .from('players')
         .insert([{
           first_name: firstName,
           last_name: lastName,
+          email: email,
           club_id: resolvedClubId,
-          is_member: false 
+          default_team_id: selectedTeamId,
+          is_member: true 
         }])
         .select()
         .single();
@@ -1414,7 +1427,7 @@ export default function GameDay() {
                     <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
                       + Add "{playerSearch}"
                     </span>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-200 dark:bg-emerald-900 px-2 py-1 rounded-md">New Casual</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-200 dark:bg-emerald-900 px-2 py-1 rounded-md">New Member</span>
                   </button>
                 )}
 
