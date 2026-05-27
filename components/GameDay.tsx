@@ -1156,11 +1156,11 @@ export default function GameDay() {
 
           {/* INLINE MANAGE AVAILABILITY EXPANSION COMPONENT */}
           {canManage && (
-            <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
+            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
               <button 
                 onClick={toggleManageAvailability} 
                 disabled={isProcessing}
-                className={`w-full py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all disabled:opacity-50 ${isManageAvailabilityExpanded ? 'bg-emerald-50 dark:bg-emerald-500/10' : ''}`}
+                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl transition-all shadow-sm disabled:opacity-50 ${isManageAvailabilityExpanded ? 'ring-2 ring-emerald-500/50' : ''}`}
               >
                 {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageAvailabilityExpanded ? 'fa-chevron-up' : 'fa-bullhorn'}`}></i>}
                 {isManageAvailabilityExpanded ? 'Hide Availability' : 'Manage Availability'}
@@ -1184,9 +1184,9 @@ export default function GameDay() {
                   
                   <button 
                     onClick={() => {
-                      // Pre-select players who haven't responded
+                      // Pre-select players who haven't responded (and belong to this team)
                       const respondedIds = new Set(availabilityData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
-                      const pending = clubPlayers.filter(p => !respondedIds.has(p.id) && p.email);
+                      const pending = clubPlayers.filter(p => p.default_team_id === selectedTeamId && !respondedIds.has(p.id) && p.email);
                       setEmailSelectedPlayerIds(pending.map(p => p.id));
                       setAvailabilityMode('email_players');
                     }}
@@ -1316,7 +1316,7 @@ export default function GameDay() {
                   </div>
                   
                   <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                    {clubPlayers.map(p => {
+                    {clubPlayers.filter(p => p.default_team_id === selectedTeamId).map(p => {
                       const avail = availabilityData.find(a => a.player_id === p.id);
                       const isSelected = emailSelectedPlayerIds.includes(p.id);
                       const hasEmail = !!p.email;
@@ -1381,11 +1381,11 @@ export default function GameDay() {
 
           {/* INLINE PLAYER POOL EXPANSION COMPONENT */}
           {canManage && (
-            <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
+            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
               <button 
                 onClick={() => toggleManageSquad(false)} 
                 disabled={isProcessing}
-                className={`w-full py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all disabled:opacity-50 ${isManageSquadExpanded ? 'bg-emerald-50 dark:bg-emerald-500/10' : ''}`}
+                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl transition-all shadow-sm disabled:opacity-50 ${isManageSquadExpanded ? 'ring-2 ring-emerald-500/50' : ''}`}
               >
                 {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageSquadExpanded ? 'fa-chevron-up' : 'fa-user-plus'}`}></i>}
                 {isManageSquadExpanded ? 'Hide Team' : 'Manage Team'}
