@@ -625,7 +625,7 @@ export default function Ledger() {
                               <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-4 text-center text-xl font-black text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" required />
                               <input type="text" placeholder="Method / Note (e.g. Fine, Cash, Refund)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                               
-                              <button type="submit" disabled={isSaving} className="w-full bg-emerald-600 dark:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50 mt-2">
+                              <button type="submit" disabled={isSaving} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-2">
                                 {isSaving ? 'Saving...' : 'Confirm Transaction'}
                               </button>
                               <button type="button" onClick={() => setIsInlineManualFormOpen(false)} className="w-full text-[10px] text-zinc-500 hover:text-zinc-900 dark:hover:text-white uppercase font-black py-2 tracking-widest transition-colors">Back to History</button>
@@ -724,7 +724,7 @@ export default function Ledger() {
                    <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-4 text-center text-xl font-black text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" required />
                    <input type="text" placeholder="Method / Note (e.g. Bunnings Sausage Sizzle, Cash)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                    
-                   <button type="submit" disabled={isSaving} className="w-full bg-emerald-600 dark:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md disabled:opacity-50 mt-2">
+                   <button type="submit" disabled={isSaving} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-2">
                      {isSaving ? 'Saving...' : 'Confirm Transaction'}
                    </button>
                 </form>

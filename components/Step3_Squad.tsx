@@ -287,7 +287,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
             <button 
               onClick={saveRoster}
               disabled={isSaving || players.length === 0}
-              className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-md disabled:opacity-50 active:scale-95"
+              className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               {isSaving ? "Saving Profiles..." : `Save ${players.filter(p => p.firstName.trim() !== "").length} Players`}
             </button>

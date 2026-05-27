@@ -209,7 +209,7 @@ export default function Step4_Season({ onNext, clubId }: { onNext: () => void, c
           <button 
             onClick={handleNextChat}
             disabled={loading || (chatStep === 1 && !seasonName)}
-            className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+            className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
           >
             {loading ? "Saving..." : (chatStep === 5 ? "Lock it in" : "Next")}
           </button>

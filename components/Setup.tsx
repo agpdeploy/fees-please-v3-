@@ -588,7 +588,7 @@ export default function Setup({ activeTab }: SetupProps) {
               <button 
                 onClick={saveConfig} 
                 disabled={isSaving || !clubName} 
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-sm disabled:opacity-50"
+                className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
               >
                 {isSaving ? "Creating..." : "Create Club"}
               </button>
@@ -839,7 +839,7 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
-          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md disabled:opacity-50">
+          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
             {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Club")}
           </button>
         </div>
@@ -894,7 +894,7 @@ export default function Setup({ activeTab }: SetupProps) {
               <button 
                 onClick={handleInviteUser} 
                 disabled={isSaving || !inviteEmail}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50 shadow-md"
+                className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
               >
                 {isSaving ? "Processing..." : "Invite Admin"}
               </button>
@@ -1151,7 +1151,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
                         <div className="mt-6 flex gap-3">
                           <button onClick={() => setExpandedRosterTeamId(null)} className="flex-1 py-3 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-800/50 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-                          <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-3 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-sm">{isSaving ? 'Saving...' : 'Save Players'}</button>
+                          <button onClick={saveTeamRoster} disabled={isSaving} className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">{isSaving ? 'Saving...' : 'Save Players'}</button>
                         </div>
                       </div>
                     )}
@@ -1240,7 +1240,7 @@ export default function Setup({ activeTab }: SetupProps) {
               <button 
                 onClick={saveTeam} 
                 disabled={isSaving || !teamName}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md disabled:opacity-50 mt-2"
+                className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-2"
               >
                 {isSaving ? "Saving..." : (editingTeamId ? 'Update Team' : 'Create Team')}
               </button>
@@ -1355,7 +1355,7 @@ export default function Setup({ activeTab }: SetupProps) {
             
             <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
               <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-50 disabled:opacity-50 transition-colors shadow-md">
+              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                 {isSaving ? 'Saving...' : 'Save Match Squad'}
               </button>
             </div>

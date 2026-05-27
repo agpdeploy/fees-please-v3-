@@ -330,7 +330,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
               <input type="text" placeholder="Location" value={fixtureLocation || ""} onChange={(e) => setFixtureLocation(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <input type="text" placeholder="Match Notes" value={fixtureNotes || ""} onChange={(e) => setFixtureNotes(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
             </div>
-            <button disabled={isSaving} onClick={saveFixture} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md disabled:opacity-50">
+            <button disabled={isSaving} onClick={saveFixture} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
               {isSaving ? "Saving..." : "Save Fixture"}
             </button>
           </div>
@@ -419,7 +419,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
                 <button 
                   onClick={saveBulkFixtures}
                   disabled={isSaving || draftFixtures.length === 0}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-md disabled:opacity-50 active:scale-95"
+                  className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
                 >
                   {isSaving ? "Saving Matches..." : `Import ${draftFixtures.filter(f => f.opponent.trim() !== "").length} Matches`}
                 </button>
@@ -509,7 +509,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, ope
 
         <div className="flex gap-2 mt-1">
           <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase transition-colors">Cancel</button>
-          <button onClick={handleUpdate} disabled={isSaving} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase transition-colors disabled:opacity-50">Save</button>
+          <button onClick={handleUpdate} disabled={isSaving} className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">Save</button>
         </div>
       </div>
     );

@@ -227,7 +227,7 @@ export function SetupPlayersCard({ teamId, clubId, onDismiss, onSuccess }: { tea
               </div>
             ))}
           </div>
-          <button onClick={saveBulkPlayers} disabled={isSaving} className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase shadow-md active:scale-95 disabled:opacity-50">
+          <button onClick={saveBulkPlayers} disabled={isSaving} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
             {isSaving ? "Saving..." : `Import ${draftPlayers.length} Players`}
           </button>
         </div>
@@ -384,7 +384,7 @@ export function SetupFixturesCard({ teamId, teamName, onDismiss, onSuccess }: { 
               </div>
             ))}
           </div>
-          <button onClick={saveBulkFixtures} disabled={isSaving} className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase shadow-md active:scale-95 disabled:opacity-50">
+          <button onClick={saveBulkFixtures} disabled={isSaving} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
             {isSaving ? "Saving..." : `Import ${draftFixtures.length} Matches`}
           </button>
         </div>

@@ -105,7 +105,7 @@ export default function Step2_Branding({ onNext, clubId }: { onNext: () => void,
         <button 
           onClick={saveAndContinue}
           disabled={isUploading || isSaving}
-          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-emerald-700 shadow-md active:scale-95 transition-all disabled:opacity-50"
+          className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
         >
           {isSaving ? "Saving..." : (logoUrl ? "Save & Continue" : "Skip for now")}
         </button>

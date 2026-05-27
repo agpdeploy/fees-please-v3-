@@ -830,7 +830,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                   </div>
                 </div>
                 {clubCreateError && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest text-center mt-2">{clubCreateError}</div>}
-                <button type="submit" disabled={isCreatingClub} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase tracking-widest text-[10px] transition-all shadow-md disabled:opacity-50 mt-4 group">
+                <button type="submit" disabled={isCreatingClub} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4 group">
                       {isCreatingClub ? "Setting up..." : "Let's Go"}
                     </button>
                   </form>
@@ -949,7 +949,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                             </div>
                           </div>
 
-                          <button onClick={saveBulkPlayers} disabled={isSavingPlayer || draftPlayers.length === 0} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                          <button onClick={saveBulkPlayers} disabled={isSavingPlayer || draftPlayers.length === 0} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                             {isSavingPlayer ? 'Saving...' : `Import ${draftPlayers.length} Players`}
                           </button>
                         </div>
@@ -989,7 +989,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                            </button>
                         </div>
 
-                        <button disabled={isSavingPlayer || !firstName} onClick={handleSavePlayerManual} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                        <button disabled={isSavingPlayer || !firstName} onClick={handleSavePlayerManual} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                           {isSavingPlayer ? 'Saving...' : 'Add Player'}
                         </button>
                       </div>
@@ -1085,7 +1085,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                             </div>
                           </div>
 
-                          <button onClick={saveBulkFixtures} disabled={isSavingFixture || draftFixtures.length === 0} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                          <button onClick={saveBulkFixtures} disabled={isSavingFixture || draftFixtures.length === 0} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                             {isSavingFixture ? 'Saving...' : `Import ${draftFixtures.length} Matches`}
                           </button>
                         </div>
@@ -1111,7 +1111,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                           </div>
                         </div>
                         
-                        <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixtureManual} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                        <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixtureManual} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                           {isSavingFixture ? 'Saving...' : 'Save Fixture'}
                         </button>
                       </div>
@@ -1163,7 +1163,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                       </div>
                     </div>
 
-                    <button onClick={handleSaveSeason} disabled={isSavingSeason || !seasonName || memberFee === ""} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-4">
+                    <button onClick={handleSaveSeason} disabled={isSavingSeason || !seasonName || memberFee === ""} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4">
                       {isSavingSeason ? 'Saving...' : 'Save Settings'}
                     </button>
                   </div>
@@ -1226,7 +1226,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                       </div>
                     </div>
 
-                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!isSquareEnabled && !payId)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-sm disabled:opacity-50 mt-4">
+                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!isSquareEnabled && !payId)} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4">
                       {isSavingFinancials ? 'Saving...' : 'Complete Setup'}
                     </button>
                   </div>
@@ -1241,7 +1241,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-bottom-4">
           <button 
             onClick={onDismiss}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-sm active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
+            className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
           >
             <i className="fa-solid fa-flag-checkered"></i> Setup Complete! Continue
           </button>

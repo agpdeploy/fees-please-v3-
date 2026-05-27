@@ -215,7 +215,7 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-colors shadow-md disabled:opacity-50 mt-4"
+            className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4"
           >
             {loading ? "Setting Up..." : "Continue to Dashboard"}
           </button>

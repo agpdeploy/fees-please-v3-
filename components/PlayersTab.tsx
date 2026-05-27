@@ -324,7 +324,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
                    </button>
                 </div>
               </div>
-              <button disabled={isSaving} onClick={saveManualPlayer} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-md disabled:opacity-50 mt-2">
+              <button disabled={isSaving} onClick={saveManualPlayer} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-2">
                 {isSaving ? "Saving..." : "Save Player"}
               </button>
             </div>
@@ -399,7 +399,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
                   <button 
                     onClick={saveBulkPlayers}
                     disabled={isSaving || draftPlayers.length === 0}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-md disabled:opacity-50 active:scale-95"
+                    className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
                   >
                     {isSaving ? "Saving Players..." : `Import ${draftPlayers.filter(p => p.first_name.trim() !== "").length} Players`}
                   </button>
@@ -538,7 +538,7 @@ function PlayerRow({
           </button>
           <div className="flex gap-2">
             <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Cancel</button>
-            <button onClick={handleUpdate} disabled={isSaving} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md">Save</button>
+            <button onClick={handleUpdate} disabled={isSaving} className="px-6 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">Save</button>
           </div>
         </div>
       </div>

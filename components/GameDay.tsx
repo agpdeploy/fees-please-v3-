@@ -1899,7 +1899,7 @@ export default function GameDay() {
                                      <button onClick={() => { setReporterText(""); setReporterImages([]); setReporterNotes(""); }} className="flex-1 py-4 rounded-xl bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 transition-colors font-black uppercase tracking-widest text-[10px] text-zinc-600 dark:text-zinc-400 shadow-sm">
                                        New
                                      </button>
-                                     <button onClick={handleShareReport} className="flex-[2] py-4 rounded-xl text-white font-black uppercase tracking-widest text-[11px] shadow-md transition-transform active:scale-95 bg-emerald-600 hover:bg-emerald-500">
+                                     <button onClick={handleShareReport} className="flex-[2] py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                                        <i className="fa-solid fa-share-nodes mr-2"></i> Share Report
                                      </button>
                                    </div>
@@ -1945,7 +1945,7 @@ export default function GameDay() {
                 </button>
                 <button 
                   onClick={handleConfirmSendReminders} 
-                  className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-sm transition-colors"
+                  className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
                 >
                   Yes - Send
                 </button>

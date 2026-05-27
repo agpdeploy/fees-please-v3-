@@ -272,7 +272,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
               <button 
                 onClick={handleConfirmSend}
                 disabled={getPreviewRecipients(confirmSendReport).length === 0}
-                className="flex-[2] py-3 text-xs font-black uppercase text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-[2] py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
               >
                 Send Now
               </button>
@@ -324,7 +324,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button type="submit" className="w-full py-4 text-xs font-black uppercase text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-500 transition-all active:scale-95">
+              <button type="submit" className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
                 Schedule Send
               </button>
             </div>

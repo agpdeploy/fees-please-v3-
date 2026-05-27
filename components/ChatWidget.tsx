@@ -124,7 +124,7 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
             placeholder="Ask dAIve..."
             className="flex-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition-colors"
           />
-          <button type="submit" disabled={isLoading || !text.trim()} className="w-12 h-[46px] bg-emerald-600 text-white rounded-xl flex items-center justify-center disabled:opacity-30">
+          <button type="submit" disabled={isLoading || !text.trim()} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
             <i className="fa-solid fa-paper-plane"></i>
           </button>
         </form>
