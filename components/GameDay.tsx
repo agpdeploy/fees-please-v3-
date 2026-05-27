@@ -45,7 +45,7 @@ export default function GameDay() {
   
   // Manage Availability States
   const [isManageAvailabilityExpanded, setIsManageAvailabilityExpanded] = useState(false);
-  const [availabilityMode, setAvailabilityMode] = useState<'menu' | 'email_players'>('menu');
+  const [availabilityMode, setAvailabilityMode] = useState<'menu' | 'email_players' | 'email_stats'>('menu');
   const [emailSelectedPlayerIds, setEmailSelectedPlayerIds] = useState<string[]>([]);
   
   const [expandedPoolSections, setExpandedPoolSections] = useState<Record<string, boolean>>({ yes: true, maybe: true, no_reply: false, no: false });
@@ -77,7 +77,6 @@ export default function GameDay() {
   const [reporterLoadingText, setReporterLoadingText] = useState("");
   
   // --- EMAIL ANALYTICS STATES ---
-  const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState(false);
   const [emailStats, setEmailStats] = useState<Record<string, number>>({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 });
   const [emailLogDetails, setEmailLogDetails] = useState<any[]>([]);
   const [activeStatFilter, setActiveStatFilter] = useState<'sent' | 'delivered' | 'opened' | 'bounced' | null>(null);
@@ -806,7 +805,6 @@ export default function GameDay() {
     
     // Close other panels
     setIsManageSquadExpanded(false);
-    setIsAnalyticsExpanded(false);
 
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     if (!resolvedClubId || !activeFixture) return;
@@ -921,14 +919,14 @@ export default function GameDay() {
   const [isSendingReminders, setIsSendingReminders] = useState(false);
 
   async function toggleEmailAnalytics() {
-    if (isAnalyticsExpanded) {
-      setIsAnalyticsExpanded(false);
+    if (availabilityMode === 'email_stats') {
+      setAvailabilityMode('menu');
       return;
     }
     
     if (!activeFixture) return;
     setIsStatsLoading(true);
-    setIsAnalyticsExpanded(true);
+    setAvailabilityMode('email_stats');
     
     try {
       const { data } = await supabase.from('email_logs').select('id, status, players(id, first_name, last_name, nickname, email)').eq('fixture_id', activeFixture.id);
@@ -1126,93 +1124,6 @@ export default function GameDay() {
               </div>
             </div>
 
-            {/* INLINE EMAIL ANALYTICS EXPANSION COMPONENT */}
-            {isAnalyticsExpanded && (
-              <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2 fade-in duration-200">
-                 {isStatsLoading ? (
-                   <div className="text-center p-4">
-                     <i className="fa-solid fa-circle-notch fa-spin text-zinc-400"></i>
-                     <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-2">Loading Stats...</p>
-                   </div>
-                 ) : (
-                   <>
-                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'sent' ? null : 'sent')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'sent' ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Sent</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.sent}</span>
-                       </button>
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'delivered' ? null : 'delivered')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'delivered' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-emerald-200 dark:hover:border-emerald-800'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Delivered</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.delivered}</span>
-                       </button>
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'opened' ? null : 'opened')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'opened' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-800'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Opened</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.opened}</span>
-                       </button>
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'bounced' ? null : 'bounced')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'bounced' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-red-200 dark:hover:border-red-800'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Bounced</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.bounced}</span>
-                       </button>
-                     </div>
-                     
-                     {activeStatFilter && (
-                       <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2">
-                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 px-1">
-                           Players ({activeStatFilter})
-                         </h4>
-                         <div className="space-y-1">
-                           {emailLogDetails.filter(log => {
-                              if (activeStatFilter === 'sent') return true;
-                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
-                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
-                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
-                              return false;
-                           }).map((log, index) => {
-                              const p = log.players;
-                              return (
-                                <div key={log.id || index} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                                      <i className={`fa-solid ${p ? 'fa-user' : 'fa-user-slash'} text-[10px] text-zinc-400`}></i>
-                                    </div>
-                                    <div className="flex flex-col overflow-hidden">
-                                      <span className={`text-xs font-bold truncate ${p ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 italic'}`}>
-                                        {p ? `${p.first_name} ${p.last_name || ''} ${p.nickname ? `"${p.nickname}"` : ''}` : 'Deleted Player'}
-                                      </span>
-                                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate max-w-[150px]">
-                                        {p ? (p.email || 'No email') : 'Record removed'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <span className={`shrink-0 ml-2 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 ${
-                                    log.status === 'opened' || log.status === 'clicked' ? 'text-blue-500' :
-                                    log.status === 'bounced' ? 'text-red-500' :
-                                    ['delivered', 'complained'].includes(log.status) ? 'text-emerald-500' :
-                                    'text-zinc-500'
-                                  }`}>
-                                    {log.status}
-                                  </span>
-                                </div>
-                              );
-                           })}
-                           {emailLogDetails.filter(log => {
-                              if (activeStatFilter === 'sent') return true;
-                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
-                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
-                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
-                              return false;
-                           }).length === 0 && (
-                             <div className="text-center py-4 text-xs font-bold text-zinc-400">
-                               No players in this category
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     )}
-                   </>
-                 )}
-              </div>
-            )}
           </div>
 
           <div className="p-4 flex items-center justify-between gap-2">
@@ -1301,6 +1212,97 @@ export default function GameDay() {
                       </div>
                     </button>
                   )}
+                </div>
+              ) : availabilityMode === 'email_stats' ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <button onClick={() => setAvailabilityMode('menu')} className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 flex items-center gap-2">
+                      <i className="fa-solid fa-arrow-left"></i> Back
+                    </button>
+                  </div>
+                  
+                 {isStatsLoading ? (
+                   <div className="text-center p-4">
+                     <i className="fa-solid fa-circle-notch fa-spin text-zinc-400"></i>
+                     <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-2">Loading Stats...</p>
+                   </div>
+                 ) : (
+                   <>
+                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'sent' ? null : 'sent')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'sent' ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Sent</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.sent}</span>
+                       </button>
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'delivered' ? null : 'delivered')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'delivered' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-emerald-200 dark:hover:border-emerald-800'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Delivered</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.delivered}</span>
+                       </button>
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'opened' ? null : 'opened')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'opened' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-800'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Opened</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.opened}</span>
+                       </button>
+                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'bounced' ? null : 'bounced')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'bounced' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-red-200 dark:hover:border-red-800'}`}>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Bounced</span>
+                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.bounced}</span>
+                       </button>
+                     </div>
+                     
+                     {activeStatFilter && (
+                       <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2">
+                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 px-1">
+                           Players ({activeStatFilter})
+                         </h4>
+                         <div className="space-y-1">
+                           {emailLogDetails.filter(log => {
+                              if (activeStatFilter === 'sent') return true;
+                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
+                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
+                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
+                              return false;
+                           }).map((log, index) => {
+                              const p = log.players;
+                              return (
+                                <div key={log.id || index} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                                      <i className={`fa-solid ${p ? 'fa-user' : 'fa-user-slash'} text-[10px] text-zinc-400`}></i>
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden">
+                                      <span className={`text-xs font-bold truncate ${p ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 italic'}`}>
+                                        {p ? `${p.first_name} ${p.last_name || ''} ${p.nickname ? `"${p.nickname}"` : ''}` : 'Deleted Player'}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate max-w-[150px]">
+                                        {p ? (p.email || 'No email') : 'Record removed'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className={`shrink-0 ml-2 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 ${
+                                    log.status === 'opened' || log.status === 'clicked' ? 'text-blue-500' :
+                                    log.status === 'bounced' ? 'text-red-500' :
+                                    ['delivered', 'complained'].includes(log.status) ? 'text-emerald-500' :
+                                    'text-zinc-500'
+                                  }`}>
+                                    {log.status}
+                                  </span>
+                                </div>
+                              );
+                           })}
+                           {emailLogDetails.filter(log => {
+                              if (activeStatFilter === 'sent') return true;
+                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
+                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
+                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
+                              return false;
+                           }).length === 0 && (
+                             <div className="text-center py-4 text-xs font-bold text-zinc-400">
+                               No players in this category
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     )}
+                   </>
+                 )}
                 </div>
               ) : (
                 <div className="space-y-4">
