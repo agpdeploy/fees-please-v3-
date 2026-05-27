@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     });
 
     const body = await req.json();
-    const { fixtureId, teamId, action = 'send', senderName = "Your Captain" } = body;
+    const { fixtureId, teamId, action = 'send', senderName = "Your Captain", selectedPlayerIds } = body;
 
     if (!fixtureId || !teamId) {
       return NextResponse.json({ error: 'Missing fixtureId or teamId' }, { status: 400 });
@@ -87,8 +87,16 @@ export async function POST(req: Request) {
       availability?.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id) || []
     );
 
-    // 4. Filter players who haven't responded
-    let pendingPlayers = players.filter(p => !respondedPlayerIds.has(p.id) && p.email && p.email.trim() !== '');
+    // 4. Filter players
+    let pendingPlayers = players.filter(p => p.email && p.email.trim() !== '');
+    
+    if (selectedPlayerIds && Array.isArray(selectedPlayerIds) && selectedPlayerIds.length > 0) {
+      // If specific players are selected, only email them (bypasses already responded check)
+      pendingPlayers = pendingPlayers.filter(p => selectedPlayerIds.includes(p.id));
+    } else {
+      // Default behavior: email those who haven't responded
+      pendingPlayers = pendingPlayers.filter(p => !respondedPlayerIds.has(p.id));
+    }
 
     const isTestingEnv = process.env.NODE_ENV !== 'production';
     

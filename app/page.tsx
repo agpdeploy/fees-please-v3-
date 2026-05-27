@@ -404,7 +404,8 @@ export default function Home() {
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
               {canManage && (
                 <div>
-                  <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Management</div>
+                  {/* APP MANAGEMENT SECTION */}
+                  <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">App Management</div>
                   
                   {profile?.role === 'super_admin' && (
                     <button onClick={() => window.location.assign('/admin')} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
@@ -412,14 +413,6 @@ export default function Home() {
                     </button>
                   )}
                   
-                  <button onClick={() => handleTabChange('my-team')} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'my-team' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-users w-5 text-center"></i> My Team
-                  </button>
-
-                  <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                    <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
-                  </button>
-
                   {isAdmin && (
                     <>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
@@ -428,23 +421,42 @@ export default function Home() {
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('access'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'access' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-shield-halved w-5 text-center"></i> Admins
                       </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('reports'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'reports' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-chart-pie w-5 text-center"></i> Reports
+                      </button>
+                    </>
+                  )}
+
+                  {/* TEAM MANAGEMENT SECTION */}
+                  <div className="px-6 py-2 mt-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Team Management</div>
+
+                  <button onClick={() => handleTabChange('my-team')} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'my-team' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                    <i className="fa-solid fa-users w-5 text-center"></i> Availability Hub
+                  </button>
+
+                  {isAdmin && (
+                    <>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
                       </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase ${activeTab === 'setup' && setupTab === 'fixtures' ? 'bg-zinc-100 dark:bg-zinc-800/50 text-emerald-600 dark:text-emerald-500' : 'text-zinc-500'}`}>
-                        <div className="w-6 flex justify-center"><i className="fa-solid fa-calendar-days"></i></div> Fixtures
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('reports'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase ${activeTab === 'setup' && setupTab === 'reports' ? 'bg-zinc-100 dark:bg-zinc-800/50 text-emerald-600 dark:text-emerald-500' : 'text-zinc-500'}`}>
-                        <div className="w-6 flex justify-center"><i className="fa-solid fa-chart-pie"></i></div> Reports
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
                       </button>
                     </>
                   )}
+
+                  {/* BOTTOM SECTION */}
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                    <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                      <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
+                    </button>
+                  </div>
                   
                   {/* MANUAL FORCE REFRESH FOR ADMINS (Bypass Cache) */}
-                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
                     <button onClick={applyUpdate} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
                       <i className="fa-solid fa-arrows-rotate w-5 text-center"></i> Force Update App
                     </button>

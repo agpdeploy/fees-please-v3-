@@ -42,6 +42,12 @@ export default function GameDay() {
   
   // Manage Squad States (Inline Expanding UI)
   const [isManageSquadExpanded, setIsManageSquadExpanded] = useState(false);
+  
+  // Manage Availability States
+  const [isManageAvailabilityExpanded, setIsManageAvailabilityExpanded] = useState(false);
+  const [availabilityMode, setAvailabilityMode] = useState<'menu' | 'email_players'>('menu');
+  const [emailSelectedPlayerIds, setEmailSelectedPlayerIds] = useState<string[]>([]);
+  
   const [expandedPoolSections, setExpandedPoolSections] = useState<Record<string, boolean>>({ yes: true, maybe: true, no_reply: false, no: false });
   const [clubPlayers, setClubPlayers] = useState<any[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
@@ -791,6 +797,37 @@ export default function GameDay() {
     }
   }
 
+  // --- Inline Manage Availability Toggle ---
+  async function toggleManageAvailability() {
+    if (isManageAvailabilityExpanded) {
+      setIsManageAvailabilityExpanded(false);
+      return;
+    }
+    
+    // Close other panels
+    setIsManageSquadExpanded(false);
+    setIsAnalyticsExpanded(false);
+
+    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
+    if (!resolvedClubId || !activeFixture) return;
+    
+    setIsProcessing(true);
+    
+    // Fetch all players for the club
+    const { data: playersData } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
+    if (playersData) {
+      setClubPlayers(playersData);
+    }
+
+    // Fetch availability for this specific match
+    const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", activeFixture.id);
+    setAvailabilityData(availData || []);
+
+    setAvailabilityMode('menu');
+    setIsManageAvailabilityExpanded(true);
+    setIsProcessing(false);
+  }
+
   // --- Clean Insert for RLS ---
   async function toggleSquadMember(playerId: string) {
     if (!activeFixture) return;
@@ -968,15 +1005,21 @@ export default function GameDay() {
           fixtureId: activeFixture.id, 
           teamId: selectedTeamId, 
           action: 'send',
-          senderName: profile?.first_name || "Your Captain" 
+          senderName: profile?.first_name || "Your Captain",
+          selectedPlayerIds: emailSelectedPlayerIds.length > 0 ? emailSelectedPlayerIds : undefined
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send reminders");
       
-      showToast(`Sent ${data.sentCount} reminder${data.sentCount > 1 ? 's' : ''}!`);
+      showToast(`Sent ${data.sentCount} reminder${data.sentCount !== 1 ? 's' : ''}!`);
       setActiveFixture((prev: any) => prev ? { ...prev, reminder_sent: true } : prev);
+      
+      // Return to menu after sending
+      if (availabilityMode === 'email_players') {
+        setAvailabilityMode('menu');
+      }
     } catch (err: any) {
       console.error(err);
       showToast(err.message || "Failed to send reminders", "error");
@@ -1080,42 +1123,6 @@ export default function GameDay() {
                     </>
                   )}
                 </span>
-              </div>
-              <div className="flex gap-2">
-                {canManage && (
-                  <button 
-                    onClick={handleSendRemindersCheck} 
-                    disabled={isSendingReminders || activeFixture?.reminder_sent}
-                    className={`h-8 px-3 rounded-full border flex items-center justify-center transition-colors disabled:opacity-50 ${
-                      activeFixture?.reminder_sent 
-                        ? 'bg-zinc-100 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-zinc-400 dark:text-zinc-600'
-                        : 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
-                    }`}
-                    title={activeFixture?.reminder_sent ? "Reminder already sent for this game" : "Send Reminders"}
-                  >
-                    {isSendingReminders ? (
-                      <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
-                    ) : (
-                      <i className="fa-regular fa-paper-plane text-xs"></i>
-                    )}
-                  </button>
-                )}
-                {canManage && activeFixture?.reminder_sent && (
-                  <button 
-                    onClick={toggleEmailAnalytics} 
-                    className={`h-8 px-3 rounded-full border flex items-center justify-center transition-colors shadow-sm ${
-                      isAnalyticsExpanded 
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-800'
-                    }`}
-                    title="View Email Analytics"
-                  >
-                    <i className="fa-solid fa-chart-column text-xs"></i>
-                  </button>
-                )}
-                <button onClick={handleShareMatch} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-500 hover:text-emerald-500 transition-colors">
-                  <i className="fa-solid fa-share-nodes text-xs"></i>
-                </button>
               </div>
             </div>
 
@@ -1235,6 +1242,140 @@ export default function GameDay() {
               </div>
             </div>
           </div>
+
+          {/* INLINE MANAGE AVAILABILITY EXPANSION COMPONENT */}
+          {canManage && (
+            <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
+              <button 
+                onClick={toggleManageAvailability} 
+                disabled={isProcessing}
+                className={`w-full py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all disabled:opacity-50 ${isManageAvailabilityExpanded ? 'bg-emerald-50 dark:bg-emerald-500/10' : ''}`}
+              >
+                {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageAvailabilityExpanded ? 'fa-chevron-up' : 'fa-bullhorn'}`}></i>}
+                {isManageAvailabilityExpanded ? 'Hide Availability' : 'Manage Availability'}
+              </button>
+            </div>
+          )}
+
+          {isManageAvailabilityExpanded && canManage && (
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111] animate-in slide-in-from-top-2 overflow-hidden">
+              {availabilityMode === 'menu' ? (
+                <div className="flex flex-col gap-3">
+                  <button onClick={handleShareMatch} className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500 shrink-0">
+                      <i className="fa-solid fa-share-nodes"></i>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Share to Social</h4>
+                      <p className="text-[10px] font-medium text-zinc-500">Copy or share the availability link to your team group chat.</p>
+                    </div>
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      // Pre-select players who haven't responded
+                      const respondedIds = new Set(availabilityData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
+                      const pending = clubPlayers.filter(p => !respondedIds.has(p.id) && p.email);
+                      setEmailSelectedPlayerIds(pending.map(p => p.id));
+                      setAvailabilityMode('email_players');
+                    }}
+                    className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0">
+                      <i className="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Email Players</h4>
+                      <p className="text-[10px] font-medium text-zinc-500">Send an availability email directly to specific players.</p>
+                    </div>
+                  </button>
+                  
+                  {activeFixture?.reminder_sent && (
+                    <button onClick={toggleEmailAnalytics} className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left">
+                      <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 shrink-0">
+                        <i className="fa-solid fa-chart-column"></i>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Email Stats</h4>
+                        <p className="text-[10px] font-medium text-zinc-500">See who has received, opened or bounced the reminder email.</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <button onClick={() => setAvailabilityMode('menu')} className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 flex items-center gap-2">
+                      <i className="fa-solid fa-arrow-left"></i> Back
+                    </button>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">
+                      Selected: {emailSelectedPlayerIds.length}
+                    </span>
+                  </div>
+                  
+                  <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                    {clubPlayers.map(p => {
+                      const avail = availabilityData.find(a => a.player_id === p.id);
+                      const isSelected = emailSelectedPlayerIds.includes(p.id);
+                      const hasEmail = !!p.email;
+                      const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
+                      
+                      return (
+                        <div key={p.id} className={`flex items-center justify-between p-3 rounded-xl border ${isSelected ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#1A1A1A]'} transition-colors`}>
+                           <div className="flex flex-col">
+                             <span className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white">
+                               {p.first_name} {p.last_name || ''}
+                             </span>
+                             {hasEmail ? (
+                               <span className="text-[10px] text-zinc-500 truncate max-w-[150px]">{p.email}</span>
+                             ) : (
+                               <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">No Email</span>
+                             )}
+                           </div>
+                           <div className="flex items-center gap-3">
+                              {hasResponded && (
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
+                                  avail.status === 'yes' ? 'bg-emerald-100 text-emerald-600' :
+                                  avail.status === 'no' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                                }`}>
+                                  {avail.status}
+                                </span>
+                              )}
+                              <button 
+                                onClick={() => {
+                                  if (!hasEmail) return;
+                                  if (isSelected) {
+                                    setEmailSelectedPlayerIds(prev => prev.filter(id => id !== p.id));
+                                  } else {
+                                    setEmailSelectedPlayerIds(prev => [...prev, p.id]);
+                                  }
+                                }}
+                                disabled={!hasEmail}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${
+                                  !hasEmail ? 'opacity-30 border-zinc-300' :
+                                  isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-zinc-50 border-zinc-300 dark:bg-zinc-800 dark:border-zinc-600 text-transparent'
+                                }`}
+                              >
+                                <i className="fa-solid fa-check text-[10px]"></i>
+                              </button>
+                           </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <button 
+                    onClick={handleConfirmSendReminders}
+                    disabled={emailSelectedPlayerIds.length === 0 || isSendingReminders}
+                    className="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
+                    Send {emailSelectedPlayerIds.length > 0 ? `to ${emailSelectedPlayerIds.length} Player${emailSelectedPlayerIds.length !== 1 ? 's' : ''}` : 'Emails'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* INLINE PLAYER POOL EXPANSION COMPONENT */}
           {canManage && (
