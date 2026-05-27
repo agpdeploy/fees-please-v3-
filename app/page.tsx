@@ -16,6 +16,7 @@ import InitialSetup from "../components/InitialSetup";
 import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
+import { Logo } from "../components/Brand";
 
 export default function Home() {
   useOfflineSync(); 
