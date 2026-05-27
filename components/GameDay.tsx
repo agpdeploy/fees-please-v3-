@@ -1160,7 +1160,7 @@ export default function GameDay() {
               <button 
                 onClick={toggleManageAvailability} 
                 disabled={isProcessing}
-                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl transition-all shadow-sm disabled:opacity-50 ${isManageAvailabilityExpanded ? 'ring-2 ring-emerald-500/50' : ''}`}
+                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 ${isManageAvailabilityExpanded ? 'bg-emerald-700 ring-2 ring-emerald-500/50' : ''}`}
               >
                 {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageAvailabilityExpanded ? 'fa-chevron-up' : 'fa-bullhorn'}`}></i>}
                 {isManageAvailabilityExpanded ? 'Hide Availability' : 'Manage Availability'}
@@ -1385,7 +1385,7 @@ export default function GameDay() {
               <button 
                 onClick={() => toggleManageSquad(false)} 
                 disabled={isProcessing}
-                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl transition-all shadow-sm disabled:opacity-50 ${isManageSquadExpanded ? 'ring-2 ring-emerald-500/50' : ''}`}
+                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 ${isManageSquadExpanded ? 'bg-emerald-700 ring-2 ring-emerald-500/50' : ''}`}
               >
                 {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageSquadExpanded ? 'fa-chevron-up' : 'fa-user-plus'}`}></i>}
                 {isManageSquadExpanded ? 'Hide Team' : 'Manage Team'}
@@ -1680,7 +1680,7 @@ export default function GameDay() {
               </span>
             </div>
             
-            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full text-white bg-emerald-600 dark:bg-emerald-500 font-black py-5 rounded-xl uppercase tracking-widest text-sm shadow-md active:scale-95 transition-all disabled:opacity-50">
+            <button onClick={processBatchPayments} disabled={isProcessing || processableCount === 0} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
               {isProcessing ? 'Saving...' : `Save ${processableCount} Payment${processableCount === 1 ? '' : 's'}`}
             </button>
           </div>
@@ -1739,7 +1739,7 @@ export default function GameDay() {
                 setUnpaidPlayerActions(newActions);
                 setIsFinaliseModalOpen(true); 
               }} 
-              className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-sm active:scale-95 transition-all"
+              className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               Finalise Match
             </button>
