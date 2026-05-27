@@ -16,7 +16,6 @@ import InitialSetup from "../components/InitialSetup";
 import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
-import { Logo } from "../components/Brand";
 
 export default function Home() {
   useOfflineSync(); 
@@ -292,8 +291,8 @@ export default function Home() {
             </div>
           )}
           <div>
-            <Logo variant="auto" className="h-5 w-auto" />
-            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-1.5">
+            <h1 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Fees Please</h1>
+            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-0.5">
               <span className="truncate max-w-[160px]">{clubMeta.name || 'Select Club'}</span>
               {uniqueClubs.length > 1 && <i className="fa-solid fa-caret-down text-zinc-400"></i>}
             </div>
