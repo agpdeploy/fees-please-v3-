@@ -48,12 +48,11 @@ export async function POST(req: Request) {
     const teamSlug = team.slug || teamId;
     const teamName = team.name || "Your Team";
 
-    // 2. Fetch all players for this team who have emails and haven't unsubscribed
+    // 2. Fetch all players for this team who have emails
     const { data: players } = await supabaseAdmin
       .from('players')
-      .select('id, first_name, nickname, email')
+      .select('id, first_name, nickname, email, unsubscribed')
       .eq('default_team_id', teamId)
-      .eq('unsubscribed', false)
       .not('email', 'is', null);
 
     if (!players || players.length === 0) {
@@ -88,7 +87,7 @@ export async function POST(req: Request) {
     );
 
     // 4. Filter players
-    let pendingPlayers = players.filter(p => p.email && p.email.trim() !== '');
+    let pendingPlayers = players.filter(p => p.email && p.email.trim() !== '' && p.unsubscribed !== true);
     
     if (selectedPlayerIds && Array.isArray(selectedPlayerIds) && selectedPlayerIds.length > 0) {
       // If specific players are selected, only email them (bypasses already responded check)
