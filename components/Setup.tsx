@@ -9,7 +9,7 @@ import FixturesTab from "@/components/FixturesTab";
 import AutomationsTab from "@/components/AutomationsTab";
 
 interface SetupProps {
-  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports';
+  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments';
 }
 
 interface UserRole {
@@ -65,11 +65,13 @@ export default function Setup({ activeTab }: SetupProps) {
   
   const [squareAccessToken, setSquareAccessToken] = useState("");
   const [squareLocationId, setSquareLocationId] = useState("");
-  const [isSquareEnabled, setIsSquareEnabled] = useState(false);
+  const [squareMerchantId, setSquareMerchantId] = useState("");
+
 
   // CLUB LEVEL MANUAL PAYMENT STATE
   const [payIdType, setPayIdType] = useState<'mobile' | 'email' | 'bank_account'>('mobile');
   const [payIdValue, setPayIdValue] = useState("");
+  const [overridePlatformFee, setOverridePlatformFee] = useState(false);
 
   // TEAM STATE
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -100,6 +102,7 @@ export default function Setup({ activeTab }: SetupProps) {
   };
 
   const { profile, loading: profileLoading } = useProfile();
+  const isSuperAdmin = profile?.role === 'super_admin';
   const { activeClubId, setActiveClubId } = useActiveClub();
   const [clubId, setClubId] = useState<string | null>(null);
 
@@ -147,9 +150,11 @@ export default function Setup({ activeTab }: SetupProps) {
       setDefaultUmpireFee(clubData.default_umpire_fee != null ? clubData.default_umpire_fee : "");
       setSquareAccessToken(clubData.square_access_token || "");
       setSquareLocationId(clubData.square_location_id || "");
-      setIsSquareEnabled(clubData.is_square_enabled || false);
+      setSquareMerchantId(clubData.square_merchant_id || "");
+
       setPayIdType(clubData.pay_id_type || 'mobile');
       setPayIdValue(clubData.pay_id_value || "");
+      setOverridePlatformFee(clubData.override_platform_fee || false);
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
@@ -269,9 +274,11 @@ export default function Setup({ activeTab }: SetupProps) {
       default_umpire_fee: defaultUmpireFee === "" ? 0 : defaultUmpireFee,
       square_access_token: squareAccessToken,
       square_location_id: squareLocationId,
-      is_square_enabled: isSquareEnabled,
+      square_merchant_id: squareMerchantId,
+
       pay_id_type: payIdValue ? payIdType : null,
-      pay_id_value: payIdValue || null
+      pay_id_value: payIdValue || null,
+      override_platform_fee: overridePlatformFee
     };
     
     if (clubId && clubId !== 'new') {
@@ -787,30 +794,93 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
+
+
+          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+            {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Club")}
+          </button>
+        </div>
+      )}
+
+      {(!clubId || clubId === 'new') && activeTab !== 'config' && (
+        <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mt-6 shadow-sm transition-colors">
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your club configuration first.</p>
+        </div>
+      )}
+
+      {/* --- PAYMENTS TAB --- */}
+      {clubId && clubId !== 'new' && activeTab === 'payments' && (
+        <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Payment Integration (Square)</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 transition-colors">
-                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-300 uppercase">Enable Square</span>
-                <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-xs font-black uppercase px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Active' : 'Disabled'}</button>
+              <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl border border-zinc-300 dark:border-zinc-700">
+                {squareAccessToken ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-500 font-bold text-sm">
+                      <i className="fa-solid fa-circle-check"></i>
+                      <span>Connected to Square</span>
+                    </div>
+                    {squareMerchantId && (
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                        Merchant ID: {squareMerchantId}
+                      </span>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setSquareAccessToken("");
+                        setSquareLocationId("");
+                        setSquareMerchantId("");
+                        showToast("Disconnected locally. Click Save Settings.");
+                      }}
+                      className="mt-2 bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-colors self-start"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                      Connect your Square account to process card payments directly via your club page. Don't have a Square account? <a href="https://squareup.com/signup" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">Create one for free</a>.
+                    </p>
+                    <a 
+                      href={`/api/pay/square/connect?clubId=${clubId}`}
+                      className="w-full flex items-center justify-center gap-2 bg-[#3D3A3B] hover:bg-black text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm"
+                    >
+                      <i className="fa-brands fa-square"></i> Connect Square
+                    </a>
+                  </div>
+                )}
               </div>
-              {isSquareEnabled && (
-                <>
-                  <div>
-                    <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Access Token</label>
-                    <input type="password" placeholder="EAAA..." value={squareAccessToken || ""} onChange={(e) => setSquareAccessToken(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Square Location ID</label>
-                    <input type="text" placeholder="L..." value={squareLocationId || ""} onChange={(e) => setSquareLocationId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                  </div>
-                </>
+
+              {isSuperAdmin && (
+                <div className="mt-4 p-4 border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-bl-lg">Super Admin</div>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <div className="relative inline-block w-10 mt-0.5">
+                      <input 
+                        type="checkbox" 
+                        className="peer sr-only" 
+                        checked={overridePlatformFee}
+                        onChange={(e) => setOverridePlatformFee(e.target.checked)}
+                      />
+                      <div className="block h-6 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700 peer-checked:bg-emerald-500 transition-colors"></div>
+                      <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-4 shadow-sm"></div>
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-emerald-800 dark:text-emerald-400 block">Override Platform Fee</span>
+                      <span className="text-xs text-emerald-600/80 dark:text-emerald-500/80">Disable the 1.4% platform clip for this club. Square wholesale fees still apply.</span>
+                    </div>
+                  </label>
+                </div>
               )}
             </div>
           </div>
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Club Level)</h2>
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Club Level)</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold mb-4 leading-relaxed">If you don't connect Square (or if a player prefers bank transfer), they will be given these details to transfer funds directly via their banking app. <strong className="text-zinc-700 dark:text-zinc-300">Note:</strong> These payments are self-reported by the player and won't be automatically verified.</p>
             <div className="space-y-4">
               <div className="flex gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
                 <div className="w-1/3">
@@ -838,16 +908,10 @@ export default function Setup({ activeTab }: SetupProps) {
               </div>
             </div>
           </div>
-
+          
           <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-            {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Club")}
+            {isSaving ? "Saving Settings..." : "Save Payment Settings"}
           </button>
-        </div>
-      )}
-
-      {(!clubId || clubId === 'new') && activeTab !== 'config' && (
-        <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mt-6 shadow-sm transition-colors">
-          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your club configuration first.</p>
         </div>
       )}
 
@@ -982,14 +1046,7 @@ export default function Setup({ activeTab }: SetupProps) {
                             </div>
                           )}
 
-                          {user.role !== 'club_admin' && editingRoleId !== user.id && (
-                            <div className="flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2 transition-colors">
-                              <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">Square Payments</span>
-                              <button onClick={() => togglePaymentPermission(user.id, user.can_take_payments)} className={`text-[9px] font-black uppercase px-2 py-1 rounded transition-colors shadow-sm ${user.can_take_payments ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'}`}>
-                                {user.can_take_payments ? 'Enabled' : 'Disabled'}
-                              </button>
-                            </div>
-                          )}
+
                         </div>
                       ))}
                     </div>

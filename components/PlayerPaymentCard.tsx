@@ -9,7 +9,7 @@ interface PaymentCardProps {
   amountOwed: number;
   expenseLabel: string;
   club?: {
-    is_square_enabled: boolean;
+    square_access_token: string | null;
     pay_id_type: 'mobile' | 'email' | 'bank_account' | null;
     pay_id_value: string | null;
   };
@@ -78,7 +78,7 @@ export default function PlayerPaymentCard({
   }
 
   const renderPaymentOptions = () => {
-    if (club?.is_square_enabled) {
+    if (club?.square_access_token) {
       return (
         <div className="space-y-3">
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest text-center">

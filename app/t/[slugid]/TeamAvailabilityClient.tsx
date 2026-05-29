@@ -10,9 +10,10 @@ interface ClientProps {
   teamId: string;
   clubId: string;
   teamName: string;
+  initialPlayerId?: string;
 }
 
-export default function TeamAvailabilityClient({ teamId, clubId, teamName }: ClientProps) {
+export default function TeamAvailabilityClient({ teamId, clubId, teamName, initialPlayerId }: ClientProps) {
   const [teamInfo, setTeamInfo] = useState<any>({ team_id: teamId, team_name: teamName });
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -57,7 +58,13 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName }: Cli
 
         if (clubRes.data?.announcement) setClubAnnouncement(clubRes.data.announcement);
         setHasMultipleTeams((teamCountRes.count || 0) > 1);
-        if (playerRes.data) setAllClubPlayers(playerRes.data);
+        if (playerRes.data) {
+          setAllClubPlayers(playerRes.data);
+          if (initialPlayerId) {
+            const player = playerRes.data.find((p: any) => p.id === initialPlayerId);
+            if (player) setSelectedPlayer(player);
+          }
+        }
 
         const today = new Date().toISOString();
         const { data: fixtureData } = await supabase

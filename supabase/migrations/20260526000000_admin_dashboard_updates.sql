@@ -20,6 +20,7 @@ USING (
 );
 
 -- RPC for Super Admin Stats
+DROP FUNCTION IF EXISTS public.get_super_admin_stats();
 CREATE OR REPLACE FUNCTION public.get_super_admin_stats()
 RETURNS json
 LANGUAGE plpgsql
@@ -65,6 +66,7 @@ END;
 $$;
 
 -- RPC for Cross Club Players
+DROP FUNCTION IF EXISTS public.get_cross_club_players();
 CREATE OR REPLACE FUNCTION public.get_cross_club_players()
 RETURNS TABLE (
   email TEXT,
@@ -95,6 +97,7 @@ END;
 $$;
 
 -- RPC for Paginated Active Clubs
+DROP FUNCTION IF EXISTS public.get_active_clubs_paginated(INT, INT);
 CREATE OR REPLACE FUNCTION public.get_active_clubs_paginated(limit_val INT, offset_val INT)
 RETURNS TABLE (
   id UUID,
