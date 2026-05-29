@@ -57,7 +57,11 @@ export async function POST(req: Request) {
 
     if (playersError) {
       console.error('Supabase players error:', playersError);
-      return NextResponse.json({ sentCount: 0, message: 'Database error fetching players' }, { status: 200 });
+      return NextResponse.json({ 
+        sentCount: 0, 
+        message: 'Database error fetching players',
+        errorDetails: playersError.message 
+      }, { status: 200 });
     }
 
     if (!players || players.length === 0) {
