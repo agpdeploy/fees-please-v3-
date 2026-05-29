@@ -291,7 +291,7 @@ export async function POST(req: Request) {
           <div style="text-align: center; margin-top: 32px;">
             <a href="https://feesplease.app" target="_blank" style="text-decoration: none;">
               <p style="font-size: 10px; font-weight: 700; color: #a1a1aa; margin-bottom: 8px; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">Powered By</p>
-              <img src="https://app.feesplease.app/branding/logo-dark-1000x300.png" alt="Fees Please" height="20" style="height: 20px; width: auto; opacity: 0.5;" />
+              <img src="https://app.feesplease.app/branding/logo-green-1000x300.png" alt="Fees Please" height="32" style="height: 32px; width: auto;" />
             </a>
           </div>
         </div>
