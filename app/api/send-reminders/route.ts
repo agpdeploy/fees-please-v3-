@@ -49,11 +49,16 @@ export async function POST(req: Request) {
     const teamName = team.name || "Your Team";
 
     // 2. Fetch all players for this team who have emails
-    const { data: players } = await supabaseAdmin
+    const { data: players, error: playersError } = await supabaseAdmin
       .from('players')
       .select('id, first_name, nickname, email, unsubscribed')
       .eq('default_team_id', teamId)
       .not('email', 'is', null);
+
+    if (playersError) {
+      console.error('Supabase players error:', playersError);
+      return NextResponse.json({ sentCount: 0, message: 'Database error fetching players' }, { status: 200 });
+    }
 
     if (!players || players.length === 0) {
       return NextResponse.json({ sentCount: 0, message: 'No players with emails found' }, { status: 200 });
@@ -105,7 +110,15 @@ export async function POST(req: Request) {
     }
 
     if (pendingPlayers.length === 0) {
-      return NextResponse.json({ sentCount: 0, message: 'Everyone has already responded' }, { status: 200 });
+      return NextResponse.json({ 
+        sentCount: 0, 
+        message: 'No pending players after filtering',
+        debug: {
+          originalPlayersCount: players.length,
+          selectedPlayerIds: selectedPlayerIds || [],
+          playersInDbIds: players.map(p => p.id)
+        }
+      }, { status: 200 });
     }
 
     if (action === 'check') {
