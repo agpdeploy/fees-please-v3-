@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     // 1. Fetch Fixture and Team details
     const { data: fixture } = await supabaseAdmin
       .from('fixtures')
-      .select('*, teams (name, slug, club_id, public_team_profiles(club_logo_url))')
+      .select('*, teams (name, slug, club_id, public_team_profiles(club_logo_url, sponsor_1_logo, sponsor_1_url, sponsor_2_logo, sponsor_2_url, sponsor_3_logo, sponsor_3_url))')
       .eq('id', fixtureId)
       .maybeSingle();
 
@@ -140,6 +140,29 @@ export async function POST(req: Request) {
     // We can use resend.batch.send to send up to 100 emails at once
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isTestingEnv ? 'http://localhost:3000' : 'https://app.feesplease.app');
 
+    const tp = fixture.teams?.public_team_profiles;
+    let sponsorsHtml = '';
+    if (tp && (tp.sponsor_1_logo || tp.sponsor_2_logo || tp.sponsor_3_logo)) {
+      const sponsors = [
+        { logo: tp.sponsor_1_logo, url: tp.sponsor_1_url },
+        { logo: tp.sponsor_2_logo, url: tp.sponsor_2_url },
+        { logo: tp.sponsor_3_logo, url: tp.sponsor_3_url }
+      ].filter(s => s.logo);
+      
+      if (sponsors.length > 0) {
+        sponsorsHtml = `
+          <div style="margin-top: 32px; margin-bottom: 8px; text-align: center;">
+            <p style="font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 0;">Supported By</p>
+            <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+              <tr>
+                ${sponsors.map(s => `<td align="center" style="padding: 0 8px;">${s.url ? `<a href="${s.url}" target="_blank">` : ''}<img src="${s.logo}" alt="Sponsor" height="32" style="max-height: 32px; width: auto; display: block;" />${s.url ? `</a>` : ''}</td>`).join('')}
+              </tr>
+            </table>
+          </div>
+        `;
+      }
+    }
+
     const emailPayloads = pendingPlayers.map(player => {
       const publicHubUrl = `${baseUrl}/t/${teamSlug}?fixture=${fixture.id}`;
       const unsubscribeUrl = `${baseUrl}/t/${teamSlug}/unsubscribe?player=${player.id}`;
@@ -171,7 +194,6 @@ export async function POST(req: Request) {
             <div style="padding: 24px;">
               <p style="color: #18181b; font-size: 15px; margin-top: 0; margin-bottom: 16px;">Hi ${player.nickname || player.first_name},</p>
               <p style="color: #52525b; font-size: 15px; margin-top: 0; margin-bottom: 24px; line-height: 1.5;">${teamName} needs to confirm your availability for the upcoming match. Please indicate via the buttons below.</p>
-              <p style="color: #18181b; font-size: 15px; margin-top: 0; margin-bottom: 0;">Cheers,<br/><strong>${senderName}</strong></p>
             </div>
           </div>
           
@@ -217,7 +239,7 @@ export async function POST(req: Request) {
             <div style="background-color: #fafafa; padding: 16px; border-top: 1px solid #f4f4f5;">
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
                 <tr>
-                  <td align="left"><span style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">Squad Status</span></td>
+                  <td align="left"><span style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">Team Status</span></td>
                   <td align="right"><span style="font-size: 10px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px;">${yesCount} / ${totalSquadSize} Confirmed</span></td>
                 </tr>
               </table>
@@ -261,9 +283,16 @@ export async function POST(req: Request) {
             </div>
           </div>
           
+          ${sponsorsHtml}
           <div style="text-align: center; margin-top: 24px;">
             <p style="color: #a1a1aa; font-size: 12px;">You received this email because you are a member of ${teamName} on Fees Please.</p>
             <p style="color: #a1a1aa; font-size: 12px;"><a href="${unsubscribeUrl}" style="color: #71717a; text-decoration: underline;">Unsubscribe from availability reminders</a></p>
+          </div>
+          <div style="text-align: center; margin-top: 32px;">
+            <a href="https://feesplease.app" target="_blank" style="text-decoration: none;">
+              <p style="font-size: 10px; font-weight: 700; color: #a1a1aa; margin-bottom: 8px; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">Powered By</p>
+              <img src="https://app.feesplease.app/branding/logo-dark-1000x300.png" alt="Fees Please" height="20" style="height: 20px; width: auto; opacity: 0.5;" />
+            </a>
           </div>
         </div>
       `;
@@ -271,7 +300,7 @@ export async function POST(req: Request) {
       const targetEmail = isTestingEnv ? 'emailtesting@feesplease.app' : player.email;
 
       return {
-        from: `${teamName} on Fees Please <reminders@mail.feesplease.app>`,
+        from: `${teamName} Availability Hub <reminders@mail.feesplease.app>`,
         to: targetEmail,
         subject: `${isTestingEnv ? '[TEST] ' : ''}Availability for upcoming match ${teamName} vs ${fixture.opponent || 'TBA'}`,
         html: htmlContent,
