@@ -35,6 +35,7 @@ END;
 $$;
 
 -- 2. Expand get_super_admin_stats to include cash/card funds and email/google logins
+DROP FUNCTION IF EXISTS public.get_super_admin_stats();
 CREATE OR REPLACE FUNCTION public.get_super_admin_stats()
 RETURNS json
 LANGUAGE plpgsql

@@ -110,7 +110,7 @@ export default function Ledger() {
     ]);
 
     const fixData = fixRes.data || [];
-    const txData = txRes.data || [];
+    const txData = (txRes.data || []).filter(tx => tx.status !== 'unpaid');
     const teamPlayersData = playersRes.data || [];
 
     setFixtures(fixData);
@@ -232,12 +232,14 @@ export default function Ledger() {
           fee: 0,
           expense: 0,
           isPlayer: isPlayer,
+          raw_transactions: [],
         };
         map.set(groupKey, newGroup);
         groups.push(newGroup);
       }
 
       const g = map.get(groupKey);
+      g.raw_transactions.push(tx);
       if (tx.transaction_type === 'payment') g.paid += Number(tx.amount);
       if (tx.transaction_type === 'fee') g.fee += Number(tx.amount);
       if (tx.transaction_type === 'expense') g.expense += Number(tx.amount);
@@ -355,6 +357,28 @@ export default function Ledger() {
   const nextGame = futureGames.length > 0 ? futureGames[0] : null;
   const relevantAudit = nextGame ? [nextGame, ...pastGames] : pastGames;
   const displayedAudit = showAllAudit ? relevantAudit : relevantAudit.slice(0, 4);
+
+  const [isRefunding, setIsRefunding] = useState<string | null>(null);
+
+  const handleRefund = async (squarePaymentId: string) => {
+    if (!confirm("Are you sure you want to refund this payment? This will refund the card and remove the payment from the ledger.")) return;
+    setIsRefunding(squarePaymentId);
+    try {
+      const res = await fetch('/api/pay/square/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ squarePaymentId, clubId: activeClubId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Refund failed');
+      showToast("Refund processed successfully", "success");
+      fetchLedger();
+    } catch (err: any) {
+      showToast(err.message || "Failed to process refund", "error");
+    } finally {
+      setIsRefunding(null);
+    }
+  };
 
   if (!activeClubId) return <div className="p-4 text-center text-zinc-500 uppercase tracking-widest text-xs font-black">Loading Ledger...</div>;
 
@@ -639,20 +663,42 @@ export default function Ledger() {
                               {groupedFeed.filter(g => g.player_id === player.id).map(group => {
                                 const net = group.paid - group.fee;
                                 return (
-                                  <div key={group.id} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-3.5 rounded-xl flex justify-between items-center transition-colors">
-                                    <div className="flex-1">
-                                      <div className="text-[10px] font-black uppercase text-zinc-900 dark:text-white">
-                                          {group.dateString}
+                                  <div key={group.id} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-3.5 rounded-xl flex flex-col gap-3 transition-colors">
+                                    <div className="flex justify-between items-center">
+                                      <div className="flex-1">
+                                        <div className="text-[10px] font-black uppercase text-zinc-900 dark:text-white">
+                                            {group.dateString}
+                                        </div>
+                                        <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex gap-2">
+                                           <span className="text-emerald-500">Paid: ${group.paid}</span>
+                                           <span>•</span>
+                                           <span className="text-red-500/80">Fee: ${group.fee}</span>
+                                        </div>
                                       </div>
-                                      <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex gap-2">
-                                         <span className="text-emerald-500">Paid: ${group.paid}</span>
-                                         <span>•</span>
-                                         <span className="text-red-500/80">Fee: ${group.fee}</span>
-                                      </div>
+                                      <span className={`text-sm font-black shrink-0 ml-4 ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                          {net > 0 ? '+' : ''}${net.toFixed(0)}
+                                      </span>
                                     </div>
-                                    <span className={`text-sm font-black shrink-0 ml-4 ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {net > 0 ? '+' : ''}${net.toFixed(0)}
-                                    </span>
+
+                                    {/* Refund Button for Square Payments */}
+                                    {group.raw_transactions.some((t: any) => t.square_payment_id) && (profile?.role === 'super_admin' || roles?.some(r => r.role === 'club_admin' && r.club_id === activeClubId)) && (
+                                      <div className="pt-2 border-t border-zinc-100 dark:border-zinc-700/50 flex flex-col gap-2">
+                                        {group.raw_transactions.filter((t: any) => t.square_payment_id && t.transaction_type === 'payment').map((t: any) => (
+                                          <button 
+                                            key={t.id}
+                                            onClick={() => handleRefund(t.square_payment_id)}
+                                            disabled={isRefunding === t.square_payment_id}
+                                            className="w-full py-2 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 font-black uppercase tracking-widest text-[9px] rounded-lg transition-colors flex items-center justify-center gap-2"
+                                          >
+                                            {isRefunding === t.square_payment_id ? (
+                                              <><i className="fa-solid fa-spinner fa-spin"></i> Refunding...</>
+                                            ) : (
+                                              <><i className="fa-solid fa-rotate-left"></i> Refund Square Payment (${t.amount})</>
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}

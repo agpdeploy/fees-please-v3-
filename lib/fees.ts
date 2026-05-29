@@ -1,17 +1,25 @@
 /**
- * Calculates the gross amount to charge via Square to ensure
- * the club receives the exact netAmount after Square's 1.6% card fee.
- * * Formula: Gross = Net / (1 - 0.016)
+ * Calculates the gross amount to charge via Square Online (QR/Web)
+ * Fees Please bundled rate varies by club plan:
+ * Free Tier: 3.6% + $0.30
+ * Plus/Pro/Override Tier: 2.2% + $0.30
+ * Formula: Gross = (Net + Fixed) / (1 - Rate)
  */
-export const calculateSquareGross = (netAmount: number): number => {
+export const calculateSquareOnlineGross = (netAmount: number, club?: any): number => {
   if (netAmount <= 0) return 0;
   
-  // Square Australia POS standard flat tap rate is 1.6%
-  const squareRate = 0.016; 
+  const isFreeTier = club?.plan_tier === 'free';
+  const hasOverride = club?.override_platform_fee === true;
   
-  // Calculate the gross amount needed
-  const grossAmount = netAmount / (1 - squareRate);
+  // Base Square wholesale fee is 2.2% + 30c
+  let fpRate = 0.022; 
+  const fixedFee = 0.30;
   
-  // Round up to the nearest cent to guarantee no shortfall for the club
+  if (isFreeTier && !hasOverride) {
+    fpRate = 0.036; // Free tier pays 3.6%
+  }
+  
+  const grossAmount = (netAmount + fixedFee) / (1 - fpRate);
+  
   return Math.ceil(grossAmount * 100) / 100;
 };

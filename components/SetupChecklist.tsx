@@ -72,7 +72,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(clubInfo?.default_umpire_fee || "");
-  const [isSquareEnabled, setIsSquareEnabled] = useState(clubInfo?.is_square_enabled || false);
+
   const [squareToken, setSquareToken] = useState(clubInfo?.square_access_token || "");
   const [squareLocationId, setSquareLocationId] = useState(clubInfo?.square_location_id || "");
   const [seasonName, setSeasonName] = useState(clubInfo?.season_name || "");
@@ -115,7 +115,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const hasSeason = !!clubInfo.season_name;
   const hasLogo = !!clubInfo.logo;
   const hasTeams = teamsCount > 0;
-  const hasFinancials = !!clubInfo.pay_id_value || !!clubInfo.is_square_enabled;
+  const hasFinancials = !!clubInfo.pay_id_value || !!clubInfo.square_access_token;
 
   const steps = [
     { id: 'club', title: 'Create Your Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
@@ -691,7 +691,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     const { data: finData, error: finError } = await supabase.from('clubs').update({ 
       pay_id_type: payIdType,
       pay_id_value: payId || null,
-      is_square_enabled: isSquareEnabled,
+
       square_access_token: squareToken || null,
       square_location_id: squareLocationId || null
     }).eq('id', activeClubId).select();
@@ -713,14 +713,13 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       onUpdateClubInfo({ 
         ...clubInfo, 
         pay_id_value: payId || null, 
-        is_square_enabled: isSquareEnabled,
+
         pay_id_type: payIdType,
         square_access_token: squareToken || null,
         square_location_id: squareLocationId || null
       });
     } else {
       clubInfo.pay_id_value = payId || null;
-      clubInfo.is_square_enabled = isSquareEnabled;
     }
     
     setIsSavingFinancials(false);
@@ -1172,33 +1171,32 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {/* Financials Inline */}
                 {step.id === 'financials' && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 transition-colors">
-                      <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-300 uppercase tracking-widest">Enable Square</span>
-                      <button onClick={() => setIsSquareEnabled(!isSquareEnabled)} className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors shadow-sm ${isSquareEnabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'}`}>{isSquareEnabled ? 'Enabled' : 'Disabled'}</button>
-                    </div>
-
-                    {isSquareEnabled && (
-                      <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-emerald-500 rounded-xl transition-colors space-y-3 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="aspect-video bg-zinc-200 dark:bg-zinc-900 rounded-lg flex items-center justify-center mb-2 overflow-hidden border border-zinc-300 dark:border-zinc-700">
-                          <div className="text-center p-6">
-                            <i className="fa-brands fa-youtube text-4xl text-red-500 mb-2"></i>
-                            <h4 className="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400">How to integrate Square</h4>
+                    <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl border border-zinc-300 dark:border-zinc-700">
+                      {squareToken ? (
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-500 font-bold text-sm">
+                            <i className="fa-solid fa-circle-check"></i>
+                            <span>Connected to Square</span>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Access Token</label>
-                          <input type="password" value={squareToken} onChange={(e) => setSquareToken(e.target.value)} placeholder="sq0atp-..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                            Connect your Square account to process card payments directly via your club page. Don't have a Square account? <a href="https://squareup.com/signup" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">Create one for free</a>.
+                          </p>
+                          <a 
+                            href={`/api/pay/square/connect?clubId=${activeClubId}`}
+                            className="w-full flex items-center justify-center gap-2 bg-[#3D3A3B] hover:bg-black text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm"
+                          >
+                            <i className="fa-brands fa-square"></i> Connect Square
+                          </a>
                         </div>
-                        <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Location ID</label>
-                          <input type="text" value={squareLocationId} onChange={(e) => setSquareLocationId(e.target.value)} placeholder="L..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                        </div>
-                        <p className="text-[9px] font-bold text-zinc-400 text-center uppercase tracking-widest">You can skip this for now</p>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Manual Payment Fallback</h4>
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-1">Manual Payment Fallback</h4>
+                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold mb-3 leading-relaxed">If you skip Square, players can self-report payments using these details.</p>
                       
                       <div className="flex flex-col gap-2">
                         <div className="w-full">
@@ -1226,7 +1224,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                       </div>
                     </div>
 
-                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!isSquareEnabled && !payId)} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4">
+                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!squareToken && !payId)} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4">
                       {isSavingFinancials ? 'Saving...' : 'Complete Setup'}
                     </button>
                   </div>

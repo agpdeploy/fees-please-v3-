@@ -1,6 +1,7 @@
 -- Super Admin Drilldowns Migration
 
 -- 1. Active Teams Paginated
+DROP FUNCTION IF EXISTS public.get_active_teams_paginated(INT, INT);
 CREATE OR REPLACE FUNCTION public.get_active_teams_paginated(limit_val INT, offset_val INT)
 RETURNS TABLE (
   id UUID,
@@ -38,6 +39,7 @@ $$;
 
 
 -- 2. Players Drilldown
+DROP FUNCTION IF EXISTS public.get_players_drilldown();
 CREATE OR REPLACE FUNCTION public.get_players_drilldown()
 RETURNS TABLE (
   id UUID,
@@ -72,6 +74,7 @@ $$;
 
 
 -- 3. Funds Drilldown
+DROP FUNCTION IF EXISTS public.get_funds_by_team();
 CREATE OR REPLACE FUNCTION public.get_funds_by_team()
 RETURNS TABLE (
   id UUID,
@@ -108,6 +111,7 @@ $$;
 
 
 -- 4. Onboarding Drilldown
+DROP FUNCTION IF EXISTS public.get_onboarding_drilldown();
 CREATE OR REPLACE FUNCTION public.get_onboarding_drilldown()
 RETURNS TABLE (
   id UUID,

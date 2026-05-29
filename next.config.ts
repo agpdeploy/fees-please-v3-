@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.1.107", "192.168.1.107:3000", "localhost:3000"],
   turbopack: {},
   env: {
     // Grabs the first 7 characters of the Vercel commit hash, or defaults to dev-local
