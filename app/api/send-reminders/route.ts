@@ -138,7 +138,7 @@ export async function POST(req: Request) {
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'Fees Please <reminders@mail.feesplease.app>'; 
     
     // We can use resend.batch.send to send up to 100 emails at once
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isTestingEnv ? 'http://localhost:3000' : 'https://feesplease.app');
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isTestingEnv ? 'http://localhost:3000' : 'https://app.feesplease.app');
 
     const emailPayloads = pendingPlayers.map(player => {
       const publicHubUrl = `${baseUrl}/t/${teamSlug}?fixture=${fixture.id}`;
