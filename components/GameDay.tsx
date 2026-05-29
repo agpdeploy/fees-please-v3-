@@ -5,7 +5,9 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
-import { calculateSquareGross } from '@/lib/fees';
+import { calculateSquareOnlineGross } from '@/lib/fees';
+import { QRCodeSVG } from 'qrcode.react';
+import { Mark } from './Brand';
 import InitialSetup from './InitialSetup';
 import SetupChecklist from './SetupChecklist';
 export default function GameDay() {
@@ -39,6 +41,12 @@ export default function GameDay() {
   
   // Square State
   const [isSquareEnabled, setIsSquareEnabled] = useState(false);
+  
+  // QR Code POS States
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrModalPlayer, setQrModalPlayer] = useState<any>(null);
+  const [qrTxId, setQrTxId] = useState<string>("");
+  const [qrTxAmount, setQrTxAmount] = useState<number>(0);
   
   // Manage Squad States (Inline Expanding UI)
   const [isManageSquadExpanded, setIsManageSquadExpanded] = useState(false);
@@ -96,6 +104,34 @@ export default function GameDay() {
   const isTeamCaptain = roles?.some((r: any) => r.role === 'team_admin' && r.team_id === selectedTeamId);
   const canManage = isSuperAdmin || isClubAdmin || isTeamCaptain;
   const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
+
+  // --- QR CODE REALTIME LISTENER ---
+  useEffect(() => {
+    if (!isQrModalOpen || !qrTxId) return;
+    
+    const channel = supabase.channel(`tx-${qrTxId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'transactions', filter: `id=eq.${qrTxId}` },
+        (payload) => {
+          if (payload.new.status === 'paid') {
+             showToast("Payment Successful!");
+             setIsQrModalOpen(false);
+             
+             setPaidPlayerIds(prev => [...prev, qrModalPlayer.id]);
+             setSelectedPlayerIds(prev => prev.filter(id => id !== qrModalPlayer.id));
+             setPaymentData(prev => { const d = {...prev}; delete d[qrModalPlayer.id]; return d; });
+             
+             loadSquadData();
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isQrModalOpen, qrTxId, qrModalPlayer]);
 
   // --- SQUARE POS RETURN HANDLER ---
   useEffect(() => {
@@ -176,7 +212,7 @@ export default function GameDay() {
               season_end: data.season_end,
               default_umpire_fee: data.default_umpire_fee
             });
-            setIsSquareEnabled(data.is_square_enabled || false);
+            setIsSquareEnabled(!!data.square_access_token);
           }
       });
     } else {
@@ -269,7 +305,8 @@ export default function GameDay() {
             if (tx.transaction_type === 'fee') {
               debts[tx.player_id] = (debts[tx.player_id] || 0) + Number(tx.amount);
               // Any fee for today's match means they've been processed
-              if (tx.fixture_id === activeFixture.id && !paidToday.includes(tx.player_id)) {
+              // EXCEPT if it's a pending/unpaid fee created for online checkout
+              if (tx.fixture_id === activeFixture.id && tx.status !== 'unpaid' && !paidToday.includes(tx.player_id)) {
                 paidToday.push(tx.player_id);
               }
             }
@@ -606,69 +643,40 @@ export default function GameDay() {
     }
   }
 
-  const initiateTapToPay = (player: any) => {
+  const initiateOnlinePayment = async (player: any) => {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
-    if (!isMobile) return showToast("Tap-to-Pay requires a mobile phone.", "error");
     if (!resolvedClubId) return showToast("Missing club selection.", "error");
 
     const netAmount = paymentData[player.id]?.amount || 0;
     if (netAmount <= 0) return showToast("Amount must be > $0", "error");
 
-    localStorage.setItem('gameday_draft_state', JSON.stringify({
-      selectedPlayerIds,
-      paymentData,
-      payUmpire
-    }));
-
-    const grossAmount = calculateSquareGross(netAmount);
-    const amountCents = Math.round(grossAmount * 100);
-    const feeAmount = player.is_member ? teamFees.member : teamFees.casual;
-
-    localStorage.setItem('square_pending_tx', JSON.stringify({
-      player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture?.id, club_id: resolvedClubId, amount: netAmount, fee_amount: feeAmount 
-    }));
-
-    const callbackUrl = window.location.origin + '/';
-    const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-    
-    if (!appId) {
-      return showToast("Square App ID is missing.", "error");
+    setIsProcessing(true);
+    try {
+      const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+      const { data: newTx, error: txError } = await supabase.from('transactions').insert({
+        club_id: resolvedClubId,
+        player_id: player.id,
+        team_id: selectedTeamId,
+        fixture_id: activeFixture?.id,
+        amount: netAmount,
+        transaction_type: 'fee',
+        status: 'unpaid',
+        description: matchNotes
+      }).select().single();
+      
+      if (txError) throw txError;
+      
+      setQrTxId(newTx.id);
+      setQrModalPlayer(player);
+      setQrTxAmount(calculateSquareOnlineGross(netAmount, clubInfo));
+      setIsQrModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to generate payment link", "error");
+    } finally {
+      setIsProcessing(false);
     }
-
-    const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
-    const isAndroid = /Android/i.test(navigator.userAgent);
-
-    if (isAndroid) {
-      const androidIntent = 
-        `intent:#Intent;` +
-        `action=com.squareup.pos.action.CHARGE;` +
-        `package=com.squareup;` +
-        `S.com.squareup.pos.WEB_CALLBACK_URI=${callbackUrl};` +
-        `S.com.squareup.pos.CLIENT_ID=${appId};` +
-        `S.com.squareup.pos.API_VERSION=v2.0;` +
-        `i.com.squareup.pos.TOTAL_AMOUNT=${amountCents};` +
-        `S.com.squareup.pos.CURRENCY_CODE=AUD;` +
-        `S.com.squareup.pos.TENDER_TYPES=com.squareup.pos.TENDER_CARD;` +
-        `S.com.squareup.pos.NOTE=${encodeURIComponent(matchNotes)};` + 
-        `end`;
-      window.location.href = androidIntent;
-    } else {
-      const data = {
-        amount_money: { amount: amountCents, currency_code: "AUD" },
-        callback_url: callbackUrl,
-        client_id: appId,
-        version: "1.3",
-        notes: matchNotes,
-        options: { supported_tender_types: ["CREDIT_CARD", "APPLE_PAY", "GOOGLE_PAY"] }
-      };
-      window.location.href = `square-commerce-v1://payment/create?data=${encodeURIComponent(JSON.stringify(data))}`;
-    }
-
-    setTimeout(() => {
-      if (!document.hidden) showToast("Square POS App not found.", "error");
-    }, 2500);
   };
 
   function togglePlayerSelection(id: string) {
@@ -1046,13 +1054,14 @@ export default function GameDay() {
     const shareUrl = `${window.location.origin}/t/${teamSlug}`; // Eventually fixtures/[id]
     const matchDate = new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
     
-    const shareText = `🏏 Game On! vs ${activeFixture.opponent}\n📅 ${matchDate} @ ${activeFixture.start_time || 'TBA'}\n📍 ${activeFixture.location || 'TBA'}\n\nUpdate your availability here:\n${shareUrl}`;
+    const shareTextWithoutUrl = `🏏 Game On! vs ${activeFixture.opponent}\n📅 ${matchDate} @ ${activeFixture.start_time || 'TBA'}\n📍 ${activeFixture.location || 'TBA'}\n\nUpdate your availability here:`;
+    const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: `Match Reminder: vs ${activeFixture.opponent}`,
-          text: shareText,
+          text: shareTextWithoutUrl,
           url: shareUrl,
         });
       } catch (err) {
@@ -1199,7 +1208,7 @@ export default function GameDay() {
                     onClick={() => {
                       // Pre-select players who haven't responded (and belong to this team)
                       const respondedIds = new Set(availabilityData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
-                      const pending = clubPlayers.filter(p => p.default_team_id === selectedTeamId && !respondedIds.has(p.id) && p.email);
+                      const pending = clubPlayers.filter(p => p.default_team_id === selectedTeamId && !respondedIds.has(p.id) && p.email && p.unsubscribed !== true);
                       setEmailSelectedPlayerIds(pending.map(p => p.id));
                       setAvailabilityMode('email_players');
                     }}
@@ -1356,18 +1365,23 @@ export default function GameDay() {
                                   {avail.status}
                                 </span>
                               )}
+                              {p.unsubscribed === true && (
+                                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-zinc-200 text-zinc-600">
+                                  Unsubscribed
+                                </span>
+                              )}
                               <button 
                                 onClick={() => {
-                                  if (!hasEmail) return;
+                                  if (!hasEmail || p.unsubscribed === true) return;
                                   if (isSelected) {
                                     setEmailSelectedPlayerIds(prev => prev.filter(id => id !== p.id));
                                   } else {
                                     setEmailSelectedPlayerIds(prev => [...prev, p.id]);
                                   }
                                 }}
-                                disabled={!hasEmail}
+                                disabled={!hasEmail || p.unsubscribed === true}
                                 className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${
-                                  !hasEmail ? 'opacity-30 border-zinc-300' :
+                                  (!hasEmail || p.unsubscribed === true) ? 'opacity-30 border-zinc-300' :
                                   isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-zinc-50 border-zinc-300 dark:bg-zinc-800 dark:border-zinc-600 text-transparent'
                                 }`}
                               >
@@ -1662,7 +1676,7 @@ export default function GameDay() {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
                         
                         if (isSquareEnabled && canManage) {
-                          initiateTapToPay(player);
+                          initiateOnlinePayment(player);
                         } else if (clubInfo.pay_id_value) {
                           setActivePayIdPlayer(player);
                           setIsPayIdModalOpen(true);
@@ -2094,6 +2108,81 @@ export default function GameDay() {
           </div>
         </div>
       )}
+      {isQrModalOpen && qrModalPlayer && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+            
+            <Mark className="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-sm" />
+            
+            <h2 className="text-xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">Scan to Pay</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
+              Have <span className="font-bold text-zinc-900 dark:text-white">{qrModalPlayer.first_name}</span> scan this code to securely pay <span className="font-black text-emerald-600 dark:text-emerald-400">${qrTxAmount.toFixed(2)}</span> on their phone.
+            </p>
+            
+            <div className="bg-white p-4 rounded-2xl inline-block mb-4 border-4 border-zinc-100 dark:border-zinc-800 shadow-sm relative group cursor-pointer" onClick={() => window.open(`${window.location.origin}/pay/${qrTxId}`, '_blank')}>
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-external-link-alt text-white text-3xl"></i>
+              </div>
+              <QRCodeSVG 
+                value={`${window.location.origin}/pay/${qrTxId}`} 
+                size={220}
+                bgColor={"#ffffff"}
+                fgColor={"#000000"}
+                level={"Q"}
+                includeMargin={false}
+              />
+            </div>
+            
+            <div className="flex justify-center gap-2 mb-6">
+              <button 
+                onClick={() => {
+                  const url = `${window.location.origin}/pay/${qrTxId}`;
+                  if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(url);
+                    showToast("Link copied to clipboard!", "success");
+                  } else {
+                    // Fallback for non-secure HTTP contexts (like 192.168.x.x)
+                    const textArea = document.createElement("textarea");
+                    textArea.value = url;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-999999px";
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                      document.execCommand('copy');
+                      showToast("Link copied to clipboard!", "success");
+                    } catch (error) {
+                      showToast("Failed to copy link.", "error");
+                    }
+                    textArea.remove();
+                  }
+                }}
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"
+              >
+                <i className="fa-solid fa-copy"></i> Copy Link
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-500 mb-6 bg-emerald-50 dark:bg-emerald-500/10 py-2 rounded-lg animate-pulse">
+              <i className="fa-solid fa-circle-notch fa-spin"></i>
+              <span>Waiting for payment...</span>
+            </div>
+            
+            <button 
+              onClick={() => {
+                setIsQrModalOpen(false);
+                setQrTxId(null);
+                setQrModalPlayer(null);
+              }}
+              className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-widest rounded-xl transition-colors shadow-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
