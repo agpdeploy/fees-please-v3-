@@ -325,7 +325,7 @@ export default function GameDay() {
         const debts: Record<string, number> = {};
         const paidToday: string[] = []; 
         if (txData) {
-          txData.forEach(tx => {
+          txData.forEach((tx: any) => {
             if (tx.transaction_type === 'fee') {
               debts[tx.player_id] = (debts[tx.player_id] || 0) + Number(tx.amount);
               // Any fee for today's match means they've been processed
