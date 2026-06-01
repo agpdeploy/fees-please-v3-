@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   }
 
   const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-  const appSecret = process.env.SQUARE_APPLICATION_SECRET;
+  const appSecret = process.env.SQUARE_SECRET;
 
   if (!appId || !appSecret) {
     return NextResponse.json({ error: "Square credentials not configured on server" }, { status: 500 });
