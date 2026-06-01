@@ -21,11 +21,6 @@ export async function POST(req: Request) {
 
     const systemInstruction = CHARACTERS[character as keyof typeof CHARACTERS] || CHARACTERS.DAIVE;
     
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-flash-latest",
-      systemInstruction: systemInstruction 
-    });
-
     const prompt = `
       Context for this game:
       - Match: ${context.competition}
@@ -56,7 +51,9 @@ export async function POST(req: Request) {
       },
     }));
 
-    const result = await model.generateContent([prompt, ...imageParts]);
+    const promptArr = [prompt, ...imageParts];
+    const { generateContentWithFallback } = require("@/lib/gemini-fallback");
+    const result = await generateContentWithFallback(genAI, promptArr, systemInstruction, undefined);
     const response = await result.response;
     
     return NextResponse.json({ report: response.text() });

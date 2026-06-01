@@ -97,7 +97,8 @@ export async function POST(req: Request) {
       }
     };
 
-    const result = await generateText({ ...modelParams, model: google('gemini-2.5-flash') });
+    const { generateTextWithFallback } = require("@/lib/gemini-fallback");
+    const result = await generateTextWithFallback(modelParams);
     let finalText = result.text;
 
     // --- RECOVERY LOGIC (The "Anti-Stupid" Layer) ---
@@ -105,8 +106,7 @@ export async function POST(req: Request) {
         const tr = result.steps?.flatMap(s => s.toolResults).pop();
         if (tr) {
             console.log("Forcing summary of tool result...");
-            const retry = await generateText({
-                model: google('gemini-2.5-flash'),
+            const retry = await generateTextWithFallback({
                 system: "You are dAIve. Summarize this data clearly for the user. Do not be a robot.",
                 prompt: `User asked: ${lastUserMessage}\n\nTool Result: ${tr.result || tr.output}`
             });

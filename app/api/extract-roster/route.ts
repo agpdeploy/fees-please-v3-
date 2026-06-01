@@ -27,21 +27,17 @@ export async function POST(req: Request) {
     // We now accept fileBase64 and mimeType instead of hardcoding imageBase64
     const { fileBase64, mimeType, csvText } = body; 
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-flash-latest",
-      // Maximum safety settings to silently block inappropriate content
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-        },
-      ],
-      systemInstruction: "You are an expert data extraction assistant. Extract the player roster from the provided data. Return ONLY a valid JSON array of objects. Do not include any conversational text. Each object MUST have these exact keys: 'firstName', 'lastName', 'nickname', 'email', and 'mobile'. If a piece of data is missing, leave the string empty." 
-    });
+    const safetySettings = [
+      {
+        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+      },
+    ];
+    const systemInstruction = "You are an expert data extraction assistant. Extract the player roster from the provided data. Return ONLY a valid JSON array of objects. Do not include any conversational text. Each object MUST have these exact keys: 'firstName', 'lastName', 'nickname', 'email', and 'mobile'. If a piece of data is missing, leave the string empty.";
 
     let promptArr: any[] = ["Extract the roster into a JSON array. Look closely for email addresses (containing @) and mobile numbers. If there is a 'preferred name', 'known as', or 'nickname' column, extract it into 'nickname'. Format strictly as [{ \"firstName\": \"...\", \"lastName\": \"...\", \"nickname\": \"...\", \"email\": \"...\", \"mobile\": \"...\" }]"];
 
@@ -59,7 +55,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file data provided." }, { status: 400 });
     }
 
-    const result = await model.generateContent(promptArr);
+    const { generateContentWithFallback } = require("@/lib/gemini-fallback");
+    const result = await generateContentWithFallback(genAI, promptArr, systemInstruction, safetySettings);
     const response = await result.response;
     const responseText = response.text().trim();
     

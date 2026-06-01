@@ -30,16 +30,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Team name is required to filter the draw." }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-flash-latest",
-      safetySettings: [
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-      ],
-      systemInstruction: "You are an expert sports data extraction assistant. Return ONLY a valid JSON array of objects. Do not include conversational text. Keys must be exactly: 'match_date', 'start_time', 'opponent', 'location', 'notes'." 
-    });
+    const safetySettings = [
+      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+    ];
+    const systemInstruction = "You are an expert sports data extraction assistant. Return ONLY a valid JSON array of objects. Do not include conversational text. Keys must be exactly: 'match_date', 'start_time', 'opponent', 'location', 'notes'.";
 
     // THE FIX: Added STRICT MATCHING RULE
     let promptArr: any[] = [
@@ -65,7 +62,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file data provided." }, { status: 400 });
     }
 
-    const result = await model.generateContent(promptArr);
+    const { generateContentWithFallback } = require("@/lib/gemini-fallback");
+    const result = await generateContentWithFallback(genAI, promptArr, systemInstruction, safetySettings);
     const response = await result.response;
     const cleanJson = response.text().trim().replace(new RegExp("\\`\\`\\`json", "gi"), "").replace(new RegExp("\\`\\`\\`", "g"), "").trim();
       
