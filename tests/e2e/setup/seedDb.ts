@@ -19,6 +19,7 @@ export async function seedTestEnvironment() {
   const { error: e1 } = await supabase.from('clubs').insert({
     id: clubId,
     name: `E2E Test Club ${runId}`,
+    slug: `e2e-test-club-${runId}`,
     is_square_enabled: true
   });
   if (e1) console.error("Club Error:", e1);
@@ -27,7 +28,8 @@ export async function seedTestEnvironment() {
   const { error: e2 } = await supabase.from('teams').insert({
     id: teamId,
     club_id: clubId,
-    name: `E2E Team ${runId}`
+    name: `E2E Team ${runId}`,
+    slug: `e2e-test-team-${runId}`
   });
   if (e2) console.error("Team Error:", e2);
 

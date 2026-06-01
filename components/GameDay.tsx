@@ -1113,8 +1113,10 @@ export default function GameDay() {
           />
       )}
 
-      {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 0 && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
+      {(profile?.onboarding_completed === true || profile?.role === 'super_admin') && (
+        <>
+          {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Manager View</label>
           <select value={selectedTeamId || ""} onChange={(e) => { setSelectedTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
@@ -1875,7 +1877,8 @@ export default function GameDay() {
         </div>
       )}
 
-
+        </>
+      )}
     </div>
   );
 }

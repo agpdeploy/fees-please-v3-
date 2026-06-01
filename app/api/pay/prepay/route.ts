@@ -88,7 +88,11 @@ export async function POST(req: Request) {
       }
     };
 
-    const sqRes = await fetch('https://connect.squareup.com/v2/online-checkout/payment-links', {
+    const squareBaseUrl = process.env.NEXT_PUBLIC_SQUARE_APP_ID?.startsWith("sandbox")
+      ? "https://connect.squareupsandbox.com"
+      : "https://connect.squareup.com";
+
+    const sqRes = await fetch(`${squareBaseUrl}/v2/online-checkout/payment-links`, {
       method: 'POST',
       headers: {
         'Square-Version': '2024-05-15',

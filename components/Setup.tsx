@@ -912,7 +912,7 @@ export default function Setup({ activeTab }: SetupProps) {
                       href={`/api/pay/square/connect?clubId=${clubId}`}
                       className="w-full flex items-center justify-center gap-2 bg-[#3D3A3B] hover:bg-black text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm"
                     >
-                      <i className="fa-brands fa-square"></i> Connect Square
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" fillRule="evenodd" clipRule="evenodd"><path d="M19 2H5C3.3 2 2 3.3 2 5V19C2 20.7 3.3 22 5 22H19C20.7 22 22 20.7 22 19V5C22 3.3 20.7 2 19 2ZM16 16H8V8H16V16Z" /></svg> Connect Square
                     </a>
                   </div>
                 )}
