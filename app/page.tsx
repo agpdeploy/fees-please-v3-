@@ -242,7 +242,9 @@ export default function Home() {
 
   if (!session) return <Login />;
 
-
+  if (profile && !profile.has_onboarded && roles?.length === 0 && profile.role !== 'super_admin') {
+    return <InitialSetup user={session.user} onComplete={() => window.location.reload()} />;
+  }
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Account Admin' : 
