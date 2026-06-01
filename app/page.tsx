@@ -8,7 +8,7 @@ import { useActiveClub } from "../contexts/ClubContext";
 import GameDay from "../components/GameDay";
 import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
-import Analytics from "../components/Analytics"; 
+import Team from "../components/Team"; 
 import MyTeam from "../components/MyTeam"; 
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
@@ -45,6 +45,7 @@ export default function Home() {
   const [clubMeta, setClubMeta] = useState({ name: 'FP', logo: '' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showClubMenu, setShowClubMenu] = useState(false);
+  const [clubSearchTerm, setClubSearchTerm] = useState('');
   
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
   const [allClubs, setAllClubs] = useState<any[]>([]);
@@ -95,15 +96,19 @@ export default function Home() {
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
-      supabase.from('clubs').select('id, name, logo_url').order('name').then(({ data }) => {
-        if (data) setAllClubs(data);
+      supabase.from('clubs').select('id, name, logo_url, is_active').order('name').then(({ data }) => {
+        if (data) setAllClubs(data.filter((c: any) => c.is_active !== false));
       });
     }
   }, [profile]);
 
   const uniqueClubs = profile?.role === 'super_admin' 
     ? allClubs 
-    : Array.from(new Map(roles?.map((r: any) => [r.club_id, r.clubs])).values()).filter(Boolean);
+    : Array.from(new Map(roles?.map((r: any) => [r.club_id, r.clubs])).values()).filter((c: any) => c && c.is_active !== false);
+
+  const filteredClubs = uniqueClubs.filter((c: any) => 
+    c.name.toLowerCase().includes(clubSearchTerm.toLowerCase())
+  );
 
   const handleTabChange = (tab: string) => {
     if (tab === "daive") {
@@ -227,7 +232,7 @@ export default function Home() {
   if (isCheckingAuth || profileLoading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
-        <i className="fa-solid fa-bolt-lightning text-emerald-500 text-3xl animate-pulse mb-4"></i>
+        <i className="fa-solid fa-circle-notch animate-spin text-emerald-500 text-3xl mb-4"></i>
         <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">
           {isCheckingAuth ? 'Authenticating...' : 'Loading...'}
         </div>
@@ -240,7 +245,7 @@ export default function Home() {
 
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
-                      currentClubRole === 'club_admin' ? 'Club Manager' : 
+                      currentClubRole === 'club_admin' ? 'Account Admin' : 
                       currentClubRole === 'team_admin' ? 'Team Manager' : 'Player';
 
   const userMeta = session?.user?.user_metadata || {};
@@ -313,11 +318,25 @@ export default function Home() {
                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Switch Club</h3>
                <button onClick={() => setShowClubMenu(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>
             </div>
+            {uniqueClubs.length > 5 && (
+              <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-[#111]">
+                <div className="relative">
+                  <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
+                  <input 
+                    type="text" 
+                    value={clubSearchTerm}
+                    onChange={(e) => setClubSearchTerm(e.target.value)}
+                    placeholder="Search clubs..."
+                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+            )}
             <div className="p-2 max-h-[60vh] overflow-y-auto">
-               {uniqueClubs.map((club: any) => (
+               {filteredClubs.map((club: any) => (
                   <button
                      key={club.id}
-                     onClick={() => { setActiveClubId(club.id); setShowClubMenu(false); }}
+                     onClick={() => { setActiveClubId(club.id); setShowClubMenu(false); setClubSearchTerm(''); }}
                      className={`w-full flex items-center gap-4 p-3 rounded-2xl transition-colors text-left ${activeClubId === club.id ? 'bg-emerald-500/10 dark:bg-emerald-500/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
                   >
                      {club.logo_url ? (
@@ -326,7 +345,7 @@ export default function Home() {
                        <div className="w-10 h-10 rounded-xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center font-black text-xs text-zinc-500 uppercase">{club.name.substring(0,2)}</div>
                      )}
                      <div className="flex-1">
-                       <div className={`font-black uppercase tracking-wide text-sm ${activeClubId === club.id ? 'text-emerald-600 dark:text-emerald-500' : 'text-zinc-900 dark:text-white'}`}>{club.name}</div>
+                       <div className={`font-black uppercase tracking-wide text-sm ${activeClubId === club.id ? 'text-emerald-600 dark:text-emerald-500' : 'text-zinc-900 dark:text-white'}`}>{club.name} {club.is_active === false && <span className="text-[10px] text-red-500 ml-1">(Deactivated)</span>}</div>
                      </div>
                      {activeClubId === club.id && <i className="fa-solid fa-circle-check text-emerald-500 text-lg"></i>}
                   </button>
@@ -341,7 +360,7 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto">
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
-          {activeTab === "analytics" && <div className="p-4"><Analytics /></div>}
+          {activeTab === "team" && <div className="p-4"><Team /></div>}
           {activeTab === "my-team" && <div className="p-4"><MyTeam /></div>}
           {activeTab === "setup" && isAdmin && <div className="p-4"><Setup activeTab={setupTab} /></div>}
         </div>
@@ -357,13 +376,13 @@ export default function Home() {
       <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pt-3 pb-2">
         <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
           <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-bolt-lightning text-xl mb-1"></i><span>GameDay</span>
+            <i className="fa-solid fa-stopwatch text-xl mb-1"></i><span>GameDay</span>
           </button>
           <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
             <i className="fa-solid fa-wallet text-xl mb-1"></i><span>Ledger</span>
           </button>
-          <button onClick={() => handleTabChange("analytics")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "analytics" ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-chart-simple text-xl mb-1"></i><span>Insights</span>
+          <button onClick={() => setActiveTab("team")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "team" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+            <i className="fa-solid fa-users text-xl mb-1"></i><span>Team Hub</span>
           </button>
         </div>
       </nav>
@@ -431,17 +450,17 @@ export default function Home() {
                   )}
 
                   {/* TEAM MANAGEMENT SECTION */}
-                  <div className="px-6 py-2 mt-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Team Management</div>
-
-                  <button onClick={() => handleTabChange('my-team')} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'my-team' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                    <i className="fa-solid fa-users w-5 text-center"></i> Availability Hub
-                  </button>
+                  {canManage && (
+                    <div className="px-6 py-2 mt-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Team Management</div>
+                  )}
 
                   {isAdmin && (
+                    <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                      <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
+                    </button>
+                  )}
+                  {canManage && (
                     <>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
-                      </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
                       </button>

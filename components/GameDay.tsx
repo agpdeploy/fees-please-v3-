@@ -50,29 +50,50 @@ export default function GameDay() {
   
   // Manage Squad States (Inline Expanding UI)
   const [isManageSquadExpanded, setIsManageSquadExpanded] = useState(false);
-  
-  // Manage Availability States
-  const [isManageAvailabilityExpanded, setIsManageAvailabilityExpanded] = useState(false);
-  const [availabilityMode, setAvailabilityMode] = useState<'menu' | 'email_players' | 'email_stats'>('menu');
-  const [emailSelectedPlayerIds, setEmailSelectedPlayerIds] = useState<string[]>([]);
-  
-  const [expandedPoolSections, setExpandedPoolSections] = useState<Record<string, boolean>>({ yes: true, maybe: true, no_reply: false, no: false });
-  const [clubPlayers, setClubPlayers] = useState<any[]>([]);
-  const [playerSearch, setPlayerSearch] = useState("");
   const manageTeamRef = useRef<HTMLDivElement>(null);
+  const [fixtureAvailability, setFixtureAvailability] = useState<any[]>([]);
+  const [expandedPoolSections, setExpandedPoolSections] = useState<Record<string, boolean>>({
+    yes: true, maybe: true, no_reply: false, no: false
+  });
 
   // Digital Transfer / PayID Modal States
   const [isPayIdModalOpen, setIsPayIdModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [pendingReminderCount, setPendingReminderCount] = useState(0);
+
+  const handleConfirmSendReminders = async () => {
+    if (!activeFixture) return;
+    try {
+      const res = await fetch("/api/send-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          fixtureId: activeFixture.id, 
+          teamId: selectedTeamId, 
+          action: 'send',
+          senderName: profile?.first_name || "Your Captain"
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reminders");
+      showToast(`Sent ${data.sentCount} reminder${data.sentCount !== 1 ? 's' : ''}!`);
+    } catch (error: any) {
+      showToast(error.message, "error");
+    } finally {
+      setIsReminderModalOpen(false);
+    }
+  };
   const [activePayIdPlayer, setActivePayIdPlayer] = useState<any>(null);
+  const [clubPlayers, setClubPlayers] = useState<any[]>([]);
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [newPlayerEmail, setNewPlayerEmail] = useState("");
 
   // Finalise Match Modal States
   const [isFinaliseModalOpen, setIsFinaliseModalOpen] = useState(false);
   const [finaliseStatus, setFinaliseStatus] = useState<'completed' | 'abandoned'>('completed');
   const [chargeAbandonedFee, setChargeAbandonedFee] = useState(false);
-  const [unpaidPlayerActions, setUnpaidPlayerActions] = useState<Record<string, 'charge' | 'remove'>>({});
+  const [unpaidPlayerActions, setUnpaidPlayerActions] = useState<Record<string, 'charge' | 'remove' | 'paid'>>({});
   
   // --- INLINE AI REPORTER STATES ---
   const [expandedPastFixtureId, setExpandedPastFixtureId] = useState<string | null>(null);
@@ -84,12 +105,6 @@ export default function GameDay() {
   const [reporterLoading, setReporterLoading] = useState(false);
   const [reporterLoadingText, setReporterLoadingText] = useState("");
   
-  // --- EMAIL ANALYTICS STATES ---
-  const [emailStats, setEmailStats] = useState<Record<string, number>>({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 });
-  const [emailLogDetails, setEmailLogDetails] = useState<any[]>([]);
-  const [activeStatFilter, setActiveStatFilter] = useState<'sent' | 'delivered' | 'opened' | 'bounced' | null>(null);
-  const [isStatsLoading, setIsStatsLoading] = useState(false);
-
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -210,7 +225,9 @@ export default function GameDay() {
               season_name: data.season_name,
               season_start: data.season_start,
               season_end: data.season_end,
-              default_umpire_fee: data.default_umpire_fee
+              default_umpire_fee: data.default_umpire_fee,
+              accepts_cash: data.accepts_cash,
+              accepts_card: data.accepts_card
             });
             setIsSquareEnabled(!!data.square_access_token);
           }
@@ -244,7 +261,14 @@ export default function GameDay() {
       const { data } = await query;
       if (data) {
         setTeams(data);
-        if (data.length > 0) setSelectedTeamId(data[0].id); 
+        if (data.length > 0) {
+          const savedTeam = localStorage.getItem('fp_selected_team_id');
+          if (savedTeam && data.find((t: any) => t.id === savedTeam)) {
+            setSelectedTeamId(savedTeam);
+          } else {
+            setSelectedTeamId(data[0].id);
+          }
+        }
       }
       setLoading(false);
     }
@@ -297,7 +321,7 @@ export default function GameDay() {
       if (playerDetails) {
         setSquad(playerDetails.sort((a, b) => (a.first_name || "").localeCompare(b.first_name || "")));
         
-        const { data: txData } = await supabase.from("transactions").select("player_id, amount, transaction_type, fixture_id").in("player_id", playerIds);
+        const { data: txData } = await supabase.from("transactions").select("player_id, amount, transaction_type, fixture_id, status").in("player_id", playerIds);
         const debts: Record<string, number> = {};
         const paidToday: string[] = []; 
         if (txData) {
@@ -349,6 +373,10 @@ export default function GameDay() {
     } else {
       setSquad([]);
     }
+    
+    const { data: availData } = await supabase.from('player_availability').select('*').eq('fixture_id', activeFixture.id);
+    if (availData) setFixtureAvailability(availData);
+    
     setIsSquadLoading(false);
   }
   
@@ -540,20 +568,53 @@ export default function GameDay() {
 
       // 1. Process Debts & Removals
       if (shouldChargeFees) {
-        const unpaidPlayers = squad.filter(p => !paidPlayerIds.includes(p.id));
+        // Prevent duplicate fees: Fetch existing fee transactions for this fixture
+        const { data: existingFees } = await supabase
+          .from('transactions')
+          .select('player_id')
+          .eq('fixture_id', activeFixture.id)
+          .eq('transaction_type', 'fee');
+          
+        const playersWithExistingFees = existingFees?.map(tx => tx.player_id) || [];
         
-        if (unpaidPlayers.length > 0) {
-          unpaidPlayers.forEach(player => {
+        if (squad.length > 0) {
+          squad.forEach(player => {
+            // Even if they paid, we still need to process their action (charge/remove)
+            // so their ledger correctly reflects the match fee they owed.
             const action = unpaidPlayerActions[player.id] || 'charge';
             
             if (action === 'charge') {
+              // Only charge if they don't already have a fee for this fixture
+              if (!playersWithExistingFees.includes(player.id)) {
+                batchTxPayload.push({
+                  player_id: player.id,
+                  team_id: selectedTeamId,
+                  fixture_id: activeFixture.id,
+                  club_id: resolvedClubId,
+                  amount: player.is_member ? teamFees.member : teamFees.casual,
+                  transaction_type: 'fee'
+                });
+              }
+            } else if (action === 'paid') {
+              if (!playersWithExistingFees.includes(player.id)) {
+                batchTxPayload.push({
+                  player_id: player.id,
+                  team_id: selectedTeamId,
+                  fixture_id: activeFixture.id,
+                  club_id: resolvedClubId,
+                  amount: player.is_member ? teamFees.member : teamFees.casual,
+                  transaction_type: 'fee'
+                });
+              }
               batchTxPayload.push({
                 player_id: player.id,
                 team_id: selectedTeamId,
                 fixture_id: activeFixture.id,
                 club_id: resolvedClubId,
                 amount: player.is_member ? teamFees.member : teamFees.casual,
-                transaction_type: 'fee'
+                transaction_type: 'payment',
+                payment_method: 'cash',
+                description: 'Match Fees'
               });
             } else if (action === 'remove') {
               playersToRemove.push(player.id);
@@ -643,24 +704,24 @@ export default function GameDay() {
     }
   }
 
-  const initiateOnlinePayment = async (player: any) => {
+  const initiateOnlinePayment = async (player: any, overrideAmount?: number) => {
     const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
     
     if (!resolvedClubId) return showToast("Missing club selection.", "error");
 
-    const netAmount = paymentData[player.id]?.amount || 0;
+    const netAmount = overrideAmount !== undefined ? overrideAmount : (paymentData[player.id]?.amount || 0);
     if (netAmount <= 0) return showToast("Amount must be > $0", "error");
 
     setIsProcessing(true);
     try {
-      const matchNotes = `${player.first_name} Match Fees (${activeFixture?.opponent || 'TBA'})`;
+      const matchNotes = `Combined Payment (${activeFixture?.opponent || 'TBA'})`;
       const { data: newTx, error: txError } = await supabase.from('transactions').insert({
         club_id: resolvedClubId,
         player_id: player.id,
         team_id: selectedTeamId,
         fixture_id: activeFixture?.id,
         amount: netAmount,
-        transaction_type: 'fee',
+        transaction_type: 'checkout_link',
         status: 'unpaid',
         description: matchNotes
       }).select().single();
@@ -681,8 +742,12 @@ export default function GameDay() {
 
   function togglePlayerSelection(id: string) {
     if (selectedPlayerIds.includes(id)) {
-      setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
-      setPaymentData(prev => { const newData = { ...prev }; delete newData[id]; return newData; });
+      setSelectedPlayerIds(prev => prev.filter(p => p !== id));
+      setPaymentData(prev => {
+        const newData = { ...prev };
+        delete newData[id];
+        return newData;
+      });
     } else {
       const player = squad.find(p => p.id === id);
       if (!player) return;
@@ -694,8 +759,22 @@ export default function GameDay() {
       // Math.max ensures it never drops below $0 to collect.
       const totalToCollect = Math.max(0, matchFee + currentBalance);
 
+      const defaultMethod = (clubInfo?.accepts_cash !== false) ? 'cash' : 'card';
+
       setSelectedPlayerIds(prev => [...prev, id]);
-      setPaymentData(prev => ({ ...prev, [id]: { amount: totalToCollect, method: 'cash' } }));
+      setPaymentData(prev => ({ ...prev, [id]: { amount: totalToCollect, method: defaultMethod } }));
+
+      // If the club is strictly Digital/Card Only, and ONLY 1 player is selected (or we are selecting the first one),
+      // we could pop open checkout. But since they can select multiple, auto-popping modal for Square/PayID 
+      // on EVERY click might be annoying. Let's only auto-pop if it's the first selection.
+      if (clubInfo?.accepts_cash === false && selectedPlayerIds.length === 0) {
+        if (isSquareEnabled && canManage) {
+          initiateOnlinePayment(player, totalToCollect);
+        } else if (clubInfo?.pay_id_value) {
+          setActivePayIdPlayer(player);
+          setIsPayIdModalOpen(true);
+        }
+      }
     }
   }
 
@@ -724,6 +803,16 @@ export default function GameDay() {
 
     const offlinePayload: any[] = [];
     
+    // Check for existing fees to prevent double billing if they pay late
+    const { data: existingFees } = await supabase
+      .from('transactions')
+      .select('player_id')
+      .eq('fixture_id', activeFixture.id)
+      .eq('transaction_type', 'fee')
+      .in('player_id', newlyPaidIds);
+      
+    const playersWithExistingFees = existingFees?.map(tx => tx.player_id) || [];
+    
     for (const player of selectedPlayers) {
       const method = payloadData[player.id]?.method || 'cash';
       const amount = payloadData[player.id]?.amount || 0;
@@ -735,8 +824,10 @@ export default function GameDay() {
          }
       }
 
-      // Always charge the match fee
-      offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: fee, transaction_type: 'fee' });
+      // Only charge the match fee if it hasn't already been charged (e.g. during Match Finalization)
+      if (!playersWithExistingFees.includes(player.id)) {
+        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: fee, transaction_type: 'fee' });
+      }
       
       // Only log a payment if they actually handed over cash/card today
       if (amount > 0) {
@@ -771,6 +862,59 @@ export default function GameDay() {
     }
   }
 
+  async function addPlayerToSquad(playerId: string) {
+    if (!activeFixture) return;
+    setIsProcessing(true);
+    const { error } = await supabase.from('match_squads').insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
+    if (error) showToast(error.message, "error");
+    else {
+      showToast("Player Added!");
+      setPlayerSearch("");
+      loadSquadData();
+    }
+    setIsProcessing(false);
+  }
+
+  async function createAndAddPlayer(fullName: string, email?: string) {
+    if (!activeFixture) return;
+    setIsProcessing(true);
+    try {
+      const parts = fullName.trim().split(' ');
+      const firstName = parts[0];
+      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : null;
+
+      const { data: newPlayer, error: playerError } = await supabase
+        .from('players')
+        .insert([{
+          first_name: firstName,
+          last_name: lastName,
+          email: email || null,
+          club_id: activeClubId,
+          is_member: true,
+          default_team_id: activeFixture.team_id
+        }])
+        .select()
+        .single();
+
+      if (playerError) throw playerError;
+
+      if (newPlayer) {
+        const { error: squadError } = await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: newPlayer.id }]);
+        if (squadError) throw squadError;
+        
+        showToast("Player Created & Added");
+        setPlayerSearch("");
+        setNewPlayerEmail("");
+        setIsManageSquadExpanded(false);
+        loadSquadData();
+      }
+    } catch (err: any) {
+      showToast(err.message || "Failed to create player", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   // --- Inline Managed Squad Toggle ---
   async function toggleManageSquad(smoothScroll: boolean = false) {
     if (isManageSquadExpanded) {
@@ -784,7 +928,7 @@ export default function GameDay() {
     setIsProcessing(true);
     
     // Fetch all players for the club
-    const { data: playersData } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
+    const { data: playersData } = await supabase.from("players").select("*").eq("club_id", resolvedClubId).eq("is_active", true);
     if (playersData) {
       setClubPlayers(playersData);
     }
@@ -804,275 +948,7 @@ export default function GameDay() {
     }
   }
 
-  // --- Inline Manage Availability Toggle ---
-  async function toggleManageAvailability() {
-    if (isManageAvailabilityExpanded) {
-      setIsManageAvailabilityExpanded(false);
-      return;
-    }
-    
-    // Close other panels
-    setIsManageSquadExpanded(false);
-
-    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
-    if (!resolvedClubId || !activeFixture) return;
-    
-    setIsProcessing(true);
-    
-    // Fetch all players for the club
-    const { data: playersData } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
-    if (playersData) {
-      setClubPlayers(playersData);
-    }
-
-    // Fetch availability for this specific match
-    const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", activeFixture.id);
-    setAvailabilityData(availData || []);
-
-    setAvailabilityMode('menu');
-    setIsManageAvailabilityExpanded(true);
-    setIsProcessing(false);
-  }
-
-  // --- Clean Insert for RLS ---
-  async function toggleSquadMember(playerId: string) {
-    if (!activeFixture) return;
-    setIsProcessing(true);
-    
-    const isCurrentlyInSquad = squad.some(p => p.id === playerId);
-    
-    try {
-      if (isCurrentlyInSquad) {
-        const { error } = await supabase.from("match_squads").delete().match({ fixture_id: activeFixture.id, player_id: playerId });
-        if (error) {
-            console.error("Supabase Delete Error:", error);
-            throw error;
-        }
-      } else {
-        const { error } = await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: playerId }]);
-        if (error) {
-            console.error("Supabase Insert Error:", error);
-            throw error;
-        }
-      }
-      await loadSquadData(); 
-    } catch (err: any) {
-      console.error("Full toggleSquadMember Error:", err);
-      // More specific error message for permission issues
-      if (err?.code === '42501' || err?.message?.includes('403')) {
-          showToast("Permission denied. You must be a Team Manager to edit this squad.", "error");
-      } else {
-          showToast("Error updating squad. Please try logging out and back in.", "error");
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  // --- Clean Insert for RLS ---
-  async function createAndAddPlayer(fullName: string) {
-    const resolvedClubId = activeClubId || teams.find(t => t.id === selectedTeamId)?.club_id;
-    if (!resolvedClubId || !activeFixture) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      let email = null;
-      let nameStr = fullName.trim();
-      
-      // Extract email if provided
-      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/;
-      const emailMatch = nameStr.match(emailRegex);
-      if (emailMatch) {
-        email = emailMatch[0];
-        nameStr = nameStr.replace(emailMatch[0], '').trim();
-      }
-      
-      const parts = nameStr.split(' ');
-      const firstName = parts[0];
-      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '(New)';
-
-      const { data: newPlayer, error: playerError } = await supabase
-        .from('players')
-        .insert([{
-          first_name: firstName,
-          last_name: lastName,
-          email: email,
-          club_id: resolvedClubId,
-          default_team_id: selectedTeamId,
-          is_member: true 
-        }])
-        .select()
-        .single();
-
-      if (playerError) {
-          console.error("Supabase Player Creation Error:", playerError);
-          throw playerError;
-      }
-
-      if (newPlayer) {
-        const { error: squadError } = await supabase.from("match_squads").insert([{ fixture_id: activeFixture.id, player_id: newPlayer.id }]);
-        
-        if (squadError) {
-             console.error("Supabase Squad Insert Error:", squadError);
-             throw squadError;
-        }
-        
-        showToast("Player Created & Added");
-        setPlayerSearch("");
-        loadSquadData();
-        const { data } = await supabase.from("players").select("*").eq("club_id", resolvedClubId);
-        if (data) setClubPlayers(data);
-      }
-
-    } catch (err: any) {
-      console.error("Full createAndAddPlayer Error:", err);
-      if (err?.code === '42501' || err?.message?.includes('403')) {
-          showToast("Permission denied. You must be a Team Manager to add players.", "error");
-      } else {
-          showToast(err.message || "Failed to create player", "error");
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  const [isSendingReminders, setIsSendingReminders] = useState(false);
-
-  async function toggleEmailAnalytics() {
-    if (availabilityMode === 'email_stats') {
-      setAvailabilityMode('menu');
-      return;
-    }
-    
-    if (!activeFixture) return;
-    setIsStatsLoading(true);
-    setAvailabilityMode('email_stats');
-    
-    try {
-      const { data } = await supabase.from('email_logs').select('id, status, players(id, first_name, last_name, nickname, email)').eq('fixture_id', activeFixture.id);
-      
-      if (data) {
-         const stats: Record<string, number> = { sent: data.length, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 };
-         data.forEach(log => {
-           stats[log.status] = (stats[log.status] || 0) + 1;
-           if (['delivered', 'opened', 'clicked', 'complained'].includes(log.status)) {
-             stats.delivered++;
-           }
-         });
-         setEmailStats(stats);
-         setEmailLogDetails(data);
-         setActiveStatFilter(null);
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("Error loading analytics", "error");
-    } finally {
-      setIsStatsLoading(false);
-    }
-  }
-
-  const handleSendRemindersCheck = async () => {
-    if (!activeFixture) return;
-    if (activeFixture.reminder_sent) {
-      showToast("A reminder has already been sent for this game.", "error");
-      return;
-    }
-    
-    setIsSendingReminders(true);
-    
-    try {
-      const res = await fetch("/api/send-reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fixtureId: activeFixture.id, teamId: selectedTeamId, action: 'check' }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to check reminders");
-      
-      if (data.reminderSent) {
-         setActiveFixture((prev: any) => prev ? { ...prev, reminder_sent: true } : prev);
-         showToast("A reminder has already been sent for this game.", "error");
-         return;
-      }
-      
-      if (data.pendingCount === 0) {
-        showToast("Everyone has already responded.", "success");
-      } else {
-        setPendingReminderCount(data.pendingCount);
-        setIsReminderModalOpen(true);
-      }
-    } catch (err: any) {
-      console.error(err);
-      showToast(err.message || "Failed to check reminders", "error");
-    } finally {
-      setIsSendingReminders(false);
-    }
-  };
-
-  const handleConfirmSendReminders = async () => {
-    if (!activeFixture) return;
-    setIsReminderModalOpen(false);
-    setIsSendingReminders(true);
-    
-    try {
-      const res = await fetch("/api/send-reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          fixtureId: activeFixture.id, 
-          teamId: selectedTeamId, 
-          action: 'send',
-          senderName: profile?.first_name || "Your Captain",
-          selectedPlayerIds: emailSelectedPlayerIds.length > 0 ? emailSelectedPlayerIds : undefined
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send reminders");
-      
-      showToast(`Sent ${data.sentCount} reminder${data.sentCount !== 1 ? 's' : ''}!`);
-      setActiveFixture((prev: any) => prev ? { ...prev, reminder_sent: true } : prev);
-      
-      // Return to menu after sending
-      if (availabilityMode === 'email_players') {
-        setAvailabilityMode('menu');
-      }
-    } catch (err: any) {
-      console.error(err);
-      showToast(err.message || "Failed to send reminders", "error");
-    } finally {
-      setIsSendingReminders(false);
-    }
-  };
-
-  const handleShareMatch = async () => {
-    if (!activeFixture) return;
-    
-    const teamSlug = teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId;
-    const shareUrl = `${window.location.origin}/t/${teamSlug}`; // Eventually fixtures/[id]
-    const matchDate = new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-    
-    const shareTextWithoutUrl = `🏏 Game On! vs ${activeFixture.opponent}\n📅 ${matchDate} @ ${activeFixture.start_time || 'TBA'}\n📍 ${activeFixture.location || 'TBA'}\n\nUpdate your availability here:`;
-    const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Match Reminder: vs ${activeFixture.opponent}`,
-          text: shareTextWithoutUrl,
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.error("Share failed", err);
-      }
-    } else {
-      // Fallback: Copy to clipboard
-      await navigator.clipboard.writeText(shareText);
-      showToast("Reminder copied to clipboard!");
-    }
-  };
+  // Removed Manage Availability and Squad toggles here
 
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
@@ -1085,6 +961,129 @@ export default function GameDay() {
   }).length;
 
   if (loading && !profile) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
+
+  if (isFinaliseModalOpen && activeFixture) {
+    return (
+      <div className="animate-in fade-in slide-in-from-right-4 duration-300 min-h-[calc(100vh-64px)] bg-zinc-50 dark:bg-black pb-32">
+        <div className="max-w-md mx-auto pt-6 px-4">
+          <button onClick={() => setIsFinaliseModalOpen(false)} className="flex items-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white font-black text-[10px] uppercase tracking-widest mb-6 transition-colors">
+            <i className="fa-solid fa-arrow-left"></i> BACK
+          </button>
+          
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Wrap Up Match</h2>
+            </div>
+            <div className="p-6 space-y-6">
+              {new Date(activeFixture.match_date) > new Date() && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl flex items-start gap-3">
+                  <i className="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                    <strong>Future Match:</strong> This match hasn't happened yet. Are you sure you want to wrap it up?
+                  </p>
+                </div>
+              )}
+              <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors mb-2">
+                  <button onClick={() => setFinaliseStatus('completed')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${finaliseStatus === 'completed' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Played</button>
+                  <button onClick={() => setFinaliseStatus('abandoned')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${finaliseStatus === 'abandoned' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Abandoned</button>
+                </div>
+                
+                {finaliseStatus === 'abandoned' && (
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                     <div className="flex items-center justify-between mb-3">
+                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Charge Match Fees?</span>
+                       <button 
+                         onClick={() => setChargeAbandonedFee(!chargeAbandonedFee)}
+                         className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${chargeAbandonedFee ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                       >
+                         <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${chargeAbandonedFee ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                       </button>
+                     </div>
+                     <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                       {chargeAbandonedFee
+                         ? `Any unpaid fees from today's squad (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
+                         : "No match fees will be collected or added to player balances for this match."}
+                     </p>
+                  </div>
+                )}
+
+                {finaliseStatus === 'completed' && activeFixture?.umpire_fee > 0 && (
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                     <div className="flex items-center justify-between mb-3">
+                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Record {clubInfo.expense_label || 'Expenses'}? (${activeFixture.umpire_fee})</span>
+                       {isUmpirePaid ? (
+                         <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md">Paid</span>
+                       ) : (
+                         <button 
+                           onClick={() => setPayUmpire(!payUmpire)}
+                           className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-orange-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                         >
+                           <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                         </button>
+                       )}
+                     </div>
+                     <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                       {payUmpire || isUmpirePaid ? "An expense transaction will be recorded for this match." : "No expense transaction will be recorded."}
+                     </p>
+                  </div>
+                )}
+
+                {finaliseStatus === 'completed' && squad.filter(p => !paidPlayerIds.includes(p.id)).length > 0 && (
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 mb-3 block">Unpaid Players ({squad.filter(p => !paidPlayerIds.includes(p.id)).length})</span>
+                     <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
+                        {squad.filter(p => !paidPlayerIds.includes(p.id)).map(p => (
+                           <div key={p.id} className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-2.5 rounded-xl">
+                              <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase truncate pr-2">
+                                 {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                              </span>
+                              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
+                                 <button
+                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'charge'}))}
+                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'charge' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                    Owes Fees
+                                 </button>
+                                 <button
+                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'paid'}))}
+                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'paid' ? 'bg-emerald-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                    Paid
+                                 </button>
+                                 <button
+                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'remove'}))}
+                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'remove' ? 'bg-zinc-300 dark:bg-zinc-600 text-zinc-800 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                    Did Not Play
+                                 </button>
+                               </div>
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+                )}
+
+                {finaliseStatus === 'completed' && (
+                   <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed mt-4">
+                     Review unpaid players above. Marking as 'Owe Fees' rolls the fee to their account. 'Paid' logs their fee as settled. 'Did Not Play' removes them from the match.
+                   </p>
+                )}
+              </div>
+
+              <button 
+                onClick={executeMatchFinalization} 
+                disabled={isProcessing}
+                className={`w-full py-4 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 disabled:opacity-50 ${finaliseStatus === 'completed' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}
+              >
+                {isProcessing ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-32 relative overflow-x-hidden">
@@ -1114,12 +1113,12 @@ export default function GameDay() {
           />
       )}
 
-      {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.length > 1 && (
+      {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 0 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Manager View</label>
-          <select value={selectedTeamId || ""} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+          <select value={selectedTeamId || ""} onChange={(e) => { setSelectedTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {teams.filter(t => t.is_active !== false).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
       )}
@@ -1176,340 +1175,7 @@ export default function GameDay() {
             </div>
           </div>
 
-          {/* INLINE MANAGE AVAILABILITY EXPANSION COMPONENT */}
-          {canManage && (
-            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
-              <button 
-                onClick={toggleManageAvailability} 
-                disabled={isProcessing}
-                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 ${isManageAvailabilityExpanded ? 'bg-emerald-700 ring-2 ring-emerald-500/50' : ''}`}
-              >
-                {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageAvailabilityExpanded ? 'fa-chevron-up' : 'fa-bullhorn'}`}></i>}
-                {isManageAvailabilityExpanded ? 'Hide Availability' : 'Manage Availability'}
-              </button>
-            </div>
-          )}
-
-          {isManageAvailabilityExpanded && canManage && (
-            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111] animate-in slide-in-from-top-2 overflow-hidden">
-              {availabilityMode === 'menu' ? (
-                <div className="flex flex-col gap-3">
-                  <button onClick={handleShareMatch} className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left">
-                    <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500 shrink-0">
-                      <i className="fa-solid fa-share-nodes"></i>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Share to Social</h4>
-                      <p className="text-[10px] font-medium text-zinc-500">Copy or share the availability link to your team group chat.</p>
-                    </div>
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      // Pre-select players who haven't responded (and belong to this team)
-                      const respondedIds = new Set(availabilityData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
-                      const pending = clubPlayers.filter(p => p.default_team_id === selectedTeamId && !respondedIds.has(p.id) && p.email && p.unsubscribed !== true);
-                      setEmailSelectedPlayerIds(pending.map(p => p.id));
-                      setAvailabilityMode('email_players');
-                    }}
-                    className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0">
-                      <i className="fa-solid fa-paper-plane"></i>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Email Players</h4>
-                      <p className="text-[10px] font-medium text-zinc-500">Send an availability email directly to specific players.</p>
-                    </div>
-                  </button>
-                  
-                  {activeFixture?.reminder_sent && (
-                    <button onClick={toggleEmailAnalytics} className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left">
-                      <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 shrink-0">
-                        <i className="fa-solid fa-chart-column"></i>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Email Stats</h4>
-                        <p className="text-[10px] font-medium text-zinc-500">See who has received, opened or bounced the reminder email.</p>
-                      </div>
-                    </button>
-                  )}
-                </div>
-              ) : availabilityMode === 'email_stats' ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <button onClick={() => setAvailabilityMode('menu')} className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 flex items-center gap-2">
-                      <i className="fa-solid fa-arrow-left"></i> Back
-                    </button>
-                  </div>
-                  
-                 {isStatsLoading ? (
-                   <div className="text-center p-4">
-                     <i className="fa-solid fa-circle-notch fa-spin text-zinc-400"></i>
-                     <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-2">Loading Stats...</p>
-                   </div>
-                 ) : (
-                   <>
-                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'sent' ? null : 'sent')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'sent' ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Sent</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.sent}</span>
-                       </button>
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'delivered' ? null : 'delivered')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'delivered' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-emerald-200 dark:hover:border-emerald-800'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Delivered</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.delivered}</span>
-                       </button>
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'opened' ? null : 'opened')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'opened' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-800'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Opened</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.opened}</span>
-                       </button>
-                       <button onClick={() => setActiveStatFilter(activeStatFilter === 'bounced' ? null : 'bounced')} className={`p-3 rounded-xl border flex flex-col items-center transition-colors ${activeStatFilter === 'bounced' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 hover:border-red-200 dark:hover:border-red-800'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Bounced</span>
-                         <span className="text-xl font-black text-zinc-900 dark:text-white">{emailStats.bounced}</span>
-                       </button>
-                     </div>
-                     
-                     {activeStatFilter && (
-                       <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2">
-                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 px-1">
-                           Players ({activeStatFilter})
-                         </h4>
-                         <div className="space-y-1">
-                           {emailLogDetails.filter(log => {
-                              if (activeStatFilter === 'sent') return true;
-                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
-                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
-                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
-                              return false;
-                           }).map((log, index) => {
-                              const p = log.players;
-                              return (
-                                <div key={log.id || index} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                                      <i className={`fa-solid ${p ? 'fa-user' : 'fa-user-slash'} text-[10px] text-zinc-400`}></i>
-                                    </div>
-                                    <div className="flex flex-col overflow-hidden">
-                                      <span className={`text-xs font-bold truncate ${p ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 italic'}`}>
-                                        {p ? `${p.first_name} ${p.last_name || ''} ${p.nickname ? `"${p.nickname}"` : ''}` : 'Deleted Player'}
-                                      </span>
-                                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate max-w-[150px]">
-                                        {p ? (p.email || 'No email') : 'Record removed'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <span className={`shrink-0 ml-2 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 ${
-                                    log.status === 'opened' || log.status === 'clicked' ? 'text-blue-500' :
-                                    log.status === 'bounced' ? 'text-red-500' :
-                                    ['delivered', 'complained'].includes(log.status) ? 'text-emerald-500' :
-                                    'text-zinc-500'
-                                  }`}>
-                                    {log.status}
-                                  </span>
-                                </div>
-                              );
-                           })}
-                           {emailLogDetails.filter(log => {
-                              if (activeStatFilter === 'sent') return true;
-                              if (activeStatFilter === 'delivered') return ['delivered', 'opened', 'clicked', 'complained'].includes(log.status);
-                              if (activeStatFilter === 'opened') return ['opened', 'clicked'].includes(log.status);
-                              if (activeStatFilter === 'bounced') return log.status === 'bounced';
-                              return false;
-                           }).length === 0 && (
-                             <div className="text-center py-4 text-xs font-bold text-zinc-400">
-                               No players in this category
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     )}
-                   </>
-                 )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <button onClick={() => setAvailabilityMode('menu')} className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 flex items-center gap-2">
-                      <i className="fa-solid fa-arrow-left"></i> Back
-                    </button>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">
-                      Selected: {emailSelectedPlayerIds.length}
-                    </span>
-                  </div>
-                  
-                  <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                    {clubPlayers.filter(p => p.default_team_id === selectedTeamId).map(p => {
-                      const avail = availabilityData.find(a => a.player_id === p.id);
-                      const isSelected = emailSelectedPlayerIds.includes(p.id);
-                      const hasEmail = !!p.email;
-                      const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
-                      
-                      return (
-                        <div key={p.id} className={`flex items-center justify-between p-3 rounded-xl border ${isSelected ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#1A1A1A]'} transition-colors`}>
-                           <div className="flex flex-col">
-                             <span className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white">
-                               {p.first_name} {p.last_name || ''}
-                             </span>
-                             {hasEmail ? (
-                               <span className="text-[10px] text-zinc-500 truncate max-w-[150px]">{p.email}</span>
-                             ) : (
-                               <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">No Email</span>
-                             )}
-                           </div>
-                           <div className="flex items-center gap-3">
-                              {hasResponded && (
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
-                                  avail.status === 'yes' ? 'bg-emerald-100 text-emerald-600' :
-                                  avail.status === 'no' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
-                                }`}>
-                                  {avail.status}
-                                </span>
-                              )}
-                              {p.unsubscribed === true && (
-                                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-zinc-200 text-zinc-600">
-                                  Unsubscribed
-                                </span>
-                              )}
-                              <button 
-                                onClick={() => {
-                                  if (!hasEmail || p.unsubscribed === true) return;
-                                  if (isSelected) {
-                                    setEmailSelectedPlayerIds(prev => prev.filter(id => id !== p.id));
-                                  } else {
-                                    setEmailSelectedPlayerIds(prev => [...prev, p.id]);
-                                  }
-                                }}
-                                disabled={!hasEmail || p.unsubscribed === true}
-                                className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${
-                                  (!hasEmail || p.unsubscribed === true) ? 'opacity-30 border-zinc-300' :
-                                  isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-zinc-50 border-zinc-300 dark:bg-zinc-800 dark:border-zinc-600 text-transparent'
-                                }`}
-                              >
-                                <i className="fa-solid fa-check text-[10px]"></i>
-                              </button>
-                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  <button 
-                    onClick={handleConfirmSendReminders}
-                    disabled={emailSelectedPlayerIds.length === 0 || isSendingReminders}
-                    className="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
-                  >
-                    {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                    Send {emailSelectedPlayerIds.length > 0 ? `to ${emailSelectedPlayerIds.length} Player${emailSelectedPlayerIds.length !== 1 ? 's' : ''}` : 'Emails'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* INLINE PLAYER POOL EXPANSION COMPONENT */}
-          {canManage && (
-            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
-              <button 
-                onClick={() => toggleManageSquad(false)} 
-                disabled={isProcessing}
-                className={`w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 ${isManageSquadExpanded ? 'bg-emerald-700 ring-2 ring-emerald-500/50' : ''}`}
-              >
-                {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${isManageSquadExpanded ? 'fa-chevron-up' : 'fa-user-plus'}`}></i>}
-                {isManageSquadExpanded ? 'Hide Team' : 'Manage Team'}
-              </button>
-            </div>
-          )}
-
-          {isManageSquadExpanded && canManage && (
-            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#111] animate-in slide-in-from-top-2 overflow-hidden">
-              <input 
-                type="text" 
-                placeholder={teams.length > 1 ? "Search across club..." : "Search or add a player..."} 
-                value={playerSearch || ""} 
-                onChange={(e) => setPlayerSearch(e.target.value)} 
-                className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors mb-4 shadow-sm" 
-              />
-
-              <div className="space-y-3">
-                {/* CREATE ON THE FLY BUTTON */}
-                {playerSearch.trim().length > 0 && !clubPlayers.some(p => `${p.first_name} ${p.last_name}`.toLowerCase() === playerSearch.trim().toLowerCase()) && (
-                  <button 
-                    onClick={() => createAndAddPlayer(playerSearch)}
-                    disabled={isProcessing}
-                    className="w-full flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors text-left group disabled:opacity-50"
-                  >
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
-                      + Add "{playerSearch}"
-                    </span>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-200 dark:bg-emerald-900 px-2 py-1 rounded-md">New Member</span>
-                  </button>
-                )}
-
-                {/* Categorized Sections */}
-                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
-                  const sectionPlayers = clubPlayers.filter(p => {
-                    const avail = availabilityData.find(a => a.player_id === p.id);
-                    const status = avail ? avail.status : 'no_reply';
-                    const isRelevant = p.default_team_id === selectedTeamId || squad.some(s => s.id === p.id) || avail !== undefined;
-                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
-
-                    if (playerSearch) {
-                      return status === section && matchesSearch;
-                    } else {
-                      return status === section && isRelevant;
-                    }
-                  });
-
-                  if (sectionPlayers.length === 0) return null;
-
-                  const config = {
-                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
-                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
-                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
-                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
-
-                  // FIX: Auto-expand if the user is typing in the search box
-                  const isSecExpanded = expandedPoolSections[section] || playerSearch.trim().length > 0;
-                  const toggleSec = () => setExpandedPoolSections(prev => ({...prev, [section]: !prev[section]}));
-
-                  return (
-                    <div key={section} className="mb-2">
-                      <button onClick={toggleSec} className="w-full flex items-center justify-between py-2 text-left group">
-                        <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} flex items-center gap-2`}>
-                          <i className={`fa-solid ${config.icon}`}></i> {config.label} ({sectionPlayers.length})
-                        </h3>
-                        <i className={`fa-solid fa-chevron-${isSecExpanded ? 'up' : 'down'} text-[10px] text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors`}></i>
-                      </button>
-                      
-                      {isSecExpanded && (
-                        <div className="flex flex-wrap gap-2.5 pt-2 pb-1 animate-in fade-in">
-                          {sectionPlayers.map(p => {
-                            const isInSquad = squad.some(s => s.id === p.id);
-                            return (
-                              <button 
-                                key={p.id} 
-                                onClick={() => toggleSquadMember(p.id)} 
-                                disabled={isProcessing}
-                                className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isInSquad ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
-                              >
-                                {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
-                                {isInSquad ? (
-                                  <i className="fa-solid fa-check text-[10px]"></i>
-                                ) : (
-                                  <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* INLINE TABS COMPONENT (Migrated to Team Hub) */}
         </div>
       ) : selectedTeamId && profile?.onboarding_completed ? (
         <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-2 animate-in fade-in">
@@ -1557,7 +1223,7 @@ export default function GameDay() {
             </>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-               Waiting for a Club Manager to set up the club.
+               Waiting for an Account Admin to set up the club.
             </p>
           )}
         </div>
@@ -1570,8 +1236,123 @@ export default function GameDay() {
           
           <div className="flex justify-between items-center mb-4 px-1">
              <h2 className="text-[11px] font-black uppercase italic tracking-widest text-emerald-600 dark:text-emerald-500">To Pay ({squadToPay.length})</h2>
-             <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400">Clear All</button>
+             <div className="flex items-center gap-4">
+               {canManage && squad.length > 0 && (
+                 <button onClick={() => toggleManageSquad()} className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 flex items-center gap-1.5"><i className="fa-solid fa-user-plus"></i> Add</button>
+               )}
+               <button onClick={() => {setSelectedPlayerIds([]); setPaymentData({});}} className="text-[9px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-400">Clear All</button>
+             </div>
           </div>
+
+          {/* INLINE ADD PLAYER */}
+          {isManageSquadExpanded && (
+            <div className="bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 mb-6 animate-in slide-in-from-top-2 shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-[10px] font-black text-zinc-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                  <i className="fa-solid fa-user-plus text-emerald-500"></i> Add Player to Squad
+                </h2>
+                <button onClick={() => setIsManageSquadExpanded(false)} className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">
+                  <i className="fa-solid fa-xmark text-xs"></i>
+                </button>
+              </div>
+              
+              <div className="relative mb-4">
+                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"></i>
+                <input 
+                  type="text" 
+                  placeholder="Search existing players or type a new name..." 
+                  value={playerSearch}
+                  onChange={(e) => setPlayerSearch(e.target.value)}
+                  className="w-full bg-white dark:bg-[#222] border border-zinc-200 dark:border-zinc-800 rounded-xl pl-11 pr-4 py-3 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors font-bold shadow-sm"
+                />
+              </div>
+
+              <div className="max-h-96 overflow-y-auto pr-1">
+                {playerSearch.trim().length > 0 && !clubPlayers.some(p => p.first_name.toLowerCase() === playerSearch.toLowerCase().split(' ')[0]) && (
+                   <div className="bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 shadow-sm animate-in fade-in mb-3">
+                     <h3 className="text-[9px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1.5"><i className="fa-solid fa-sparkles"></i> Create New Member</h3>
+                     <div className="flex flex-col sm:flex-row gap-2">
+                       <input 
+                         type="email" 
+                         placeholder="Email (Optional)" 
+                         value={newPlayerEmail}
+                         onChange={(e) => setNewPlayerEmail(e.target.value)}
+                         className="flex-1 bg-white dark:bg-black border border-emerald-200 dark:border-emerald-500/30 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-500 font-bold"
+                       />
+                       <button 
+                         onClick={() => createAndAddPlayer(playerSearch, newPlayerEmail)}
+                         disabled={isProcessing}
+                         className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                       >
+                         {isProcessing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : "Create & Add"}
+                       </button>
+                     </div>
+                   </div>
+                )}
+                
+                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
+                  const sectionPlayers = clubPlayers.filter(p => {
+                    const avail = fixtureAvailability.find(a => a.player_id === p.id);
+                    const status = avail ? avail.status : 'no_reply';
+                    const isRelevant = p.default_team_id === selectedTeamId || avail !== undefined;
+                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name || ''} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
+                    
+                    const isNotAlreadyInSquad = !squad.some(sp => sp.id === p.id);
+
+                    return isNotAlreadyInSquad && (playerSearch ? (status === section && matchesSearch) : (status === section && isRelevant));
+                  });
+
+                  if (sectionPlayers.length === 0) return null;
+
+                  const config = {
+                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
+                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
+                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
+                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
+
+                  const isSecExpanded = expandedPoolSections[section] || playerSearch.trim().length > 0;
+                  const toggleSec = () => setExpandedPoolSections(prev => ({...prev, [section]: !prev[section]}));
+
+                  return (
+                    <div key={section} className="mb-2">
+                      <button onClick={toggleSec} className="w-full flex items-center justify-between py-2 text-left group">
+                        <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} flex items-center gap-2`}>
+                          <i className={`fa-solid ${config.icon}`}></i> {config.label} ({sectionPlayers.length})
+                        </h3>
+                        <i className={`fa-solid fa-chevron-${isSecExpanded ? 'up' : 'down'} text-[10px] text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors`}></i>
+                      </button>
+                      
+                      {isSecExpanded && (
+                        <div className="flex flex-wrap gap-2.5 pt-2 pb-1 animate-in fade-in">
+                          {sectionPlayers.map(p => (
+                            <button 
+                              key={p.id}
+                              onClick={() => {
+                                 addPlayerToSquad(p.id);
+                                 if (playerSearch.trim().length > 0) setPlayerSearch("");
+                              }}
+                              disabled={isProcessing}
+                              className="px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-sm disabled:opacity-50"
+                            >
+                              <span>{p.nickname || `${p.first_name} ${p.last_name ? p.last_name.charAt(0) + '.' : ''}`}</span>
+                              <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                
+                {playerSearch.trim() === "" && clubPlayers.filter(p => !squad.some(sp => sp.id === p.id)).length === 0 && (
+                   <div className="text-center py-4 text-[10px] uppercase font-bold text-zinc-400">
+                     All players are in the squad!
+                   </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2.5 mb-6">
             {isSquadLoading ? (
@@ -1616,7 +1397,7 @@ export default function GameDay() {
                   <button 
                     key={player.id} 
                     onClick={() => togglePlayerSelection(player.id)} 
-                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
+                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                   >
                     {player.nickname || `${player.first_name} ${player.last_name?.charAt(0)}.`}
                     {currentBalance > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
@@ -1662,32 +1443,57 @@ export default function GameDay() {
                     </div>
                   </div>
                   
-                  <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
-                    <button 
-                      onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
-                      title="Cash"
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                    >
-                      <i className="fa-solid fa-money-bill-wave"></i>
-                    </button>
-                    
+                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.accepts_card !== false)) && (
+                    <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
+                      <button 
+                        onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
+                        title="Cash"
+                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'cash' ? 'bg-emerald-500 text-black shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      >
+                        <i className="fa-solid fa-money-bill-wave"></i>
+                      </button>
+                      
+                      <button 
+                        onClick={() => {
+                          setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
+                          
+                          if (isSquareEnabled && canManage) {
+                            initiateOnlinePayment(player);
+                          } else if (clubInfo?.pay_id_value) {
+                            setActivePayIdPlayer(player);
+                            setIsPayIdModalOpen(true);
+                          }
+                        }} 
+                        title="Card / Digital"
+                        className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      >
+                        <i className="fa-solid fa-credit-card"></i>
+                      </button>
+                    </div>
+                  )}
+
+                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.accepts_card === false)) && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-[9px] uppercase tracking-widest px-3 py-2 rounded-lg flex items-center gap-2">
+                       <i className="fa-solid fa-money-bill-wave"></i> Cash Only
+                    </div>
+                  )}
+
+                  {((clubInfo?.accepts_cash === false) && (clubInfo?.accepts_card !== false)) && (
                     <button 
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
-                        
                         if (isSquareEnabled && canManage) {
                           initiateOnlinePayment(player);
-                        } else if (clubInfo.pay_id_value) {
+                        } else if (clubInfo?.pay_id_value) {
                           setActivePayIdPlayer(player);
                           setIsPayIdModalOpen(true);
                         }
-                      }} 
-                      title="Card / Digital"
-                      className={`w-10 h-8 rounded-lg flex items-center justify-center text-xs transition-colors ${data?.method === 'card' ? 'bg-blue-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                      }}
+                      className="bg-blue-500 text-white font-black text-[9px] uppercase tracking-widest px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 hover:bg-blue-600 active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-credit-card"></i>
+                       <i className="fa-solid fa-qrcode"></i> Digital Checkout
                     </button>
-                  </div>
+                  )}
                 </div>
                 <div className="bg-zinc-50 dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 flex justify-between items-center transition-colors">
                     <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Amount Paid</span>
@@ -1718,48 +1524,14 @@ export default function GameDay() {
       {activeFixture && selectedPlayerIds.length === 0 && (
         <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 space-y-6">
           
-          {/* --- MOVED: UMPIRE / EXPENSE TOGGLE --- */}
-          {activeFixture?.umpire_fee > 0 && (
-            <div className="mb-2">
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-600 mb-3 ml-1">Match Expenses</h3>
-              <div 
-                className={`border rounded-xl p-4 flex justify-between items-center transition-all shadow-sm ${isUmpirePaid ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-[#1A1A1A] border-zinc-200 dark:border-zinc-800 cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700 active:scale-[0.98]'}`} 
-                onClick={() => !isUmpirePaid && setPayUmpire(!payUmpire)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isUmpirePaid ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : payUmpire ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
-                    <i className={`fa-solid ${isUmpirePaid ? 'fa-check' : 'fa-whistle'} text-sm`}></i>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Record Payment?</span>
-                    <span className="block text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
-                      {clubInfo.expense_label || 'Umpire'} (${activeFixture?.umpire_fee})
-                    </span>
-                  </div>
-                </div>
-                
-                {isUmpirePaid ? (
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg">Paid</span>
-                ) : (
-                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${payUmpire ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${payUmpire ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                  </div>
-                )}
-              </div>
-              {!isUmpirePaid && !payUmpire && (
-                 <p className="text-[10px] text-zinc-400 dark:text-zinc-500 italic mt-2 ml-1">
-                   Toggle this if you paid the {clubInfo.expense_label || 'Umpire'} today.
-                 </p>
-              )}
-            </div>
-          )}
+          {/* --- MOVED: UMPIRE / EXPENSE TOGGLE INTO FINALISE MODAL --- */}
 
           <div className="space-y-3">
             <button 
               onClick={() => { 
                 setFinaliseStatus('completed'); 
                 setChargeAbandonedFee(false); 
-                const newActions: Record<string, 'charge' | 'remove'> = {};
+                const newActions: Record<string, 'charge' | 'remove' | 'paid'> = {};
                 squad.filter(p => !paidPlayerIds.includes(p.id)).forEach(p => {
                   newActions[p.id] = 'charge'; 
                 });
@@ -1982,87 +1754,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {/* --- FINALISE MATCH MODAL --- */}
-      {isFinaliseModalOpen && activeFixture && (
-        <div className="fixed inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[400px] rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-lg font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Wrap Up Match</h2>
-              <button onClick={() => setIsFinaliseModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
-            </div>
 
-            <div className="p-6 space-y-6">
-              <div className="bg-zinc-50 dark:bg-[#1A1A1A] p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors mb-2">
-                  <button onClick={() => setFinaliseStatus('completed')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${finaliseStatus === 'completed' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Played</button>
-                  <button onClick={() => setFinaliseStatus('abandoned')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-colors ${finaliseStatus === 'abandoned' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Abandoned</button>
-                </div>
-                
-                {finaliseStatus === 'abandoned' && (
-                  <div className="mt-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Charge Match Fees?</span>
-                     <button 
-                       onClick={() => setChargeAbandonedFee(!chargeAbandonedFee)}
-                       className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${chargeAbandonedFee ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
-                     >
-                       <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${chargeAbandonedFee ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                     </button>
-                  </div>
-                )}
-
-                {finaliseStatus === 'completed' && squad.filter(p => !paidPlayerIds.includes(p.id)).length > 0 && (
-                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 mb-3 block">Unpaid Players ({squad.filter(p => !paidPlayerIds.includes(p.id)).length})</span>
-                     <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
-                        {squad.filter(p => !paidPlayerIds.includes(p.id)).map(p => (
-                           <div key={p.id} className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-2.5 rounded-xl">
-                              <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase truncate pr-2">
-                                 {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
-                              </span>
-                              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
-                                 <button
-                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'charge'}))}
-                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'charge' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                                 >
-                                    Owes Fees
-                                 </button>
-                                 <button
-                                   onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'remove'}))}
-                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'remove' ? 'bg-zinc-300 dark:bg-zinc-600 text-zinc-800 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                                 >
-                                    Did Not Play
-                                 </button>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-                )}
-
-                <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed mt-3">
-                  {finaliseStatus === 'abandoned' && !chargeAbandonedFee
-                    ? "No match fees will be collected or added to player balances for this match."
-                    : finaliseStatus === 'abandoned' && chargeAbandonedFee
-                      ? `Any unpaid fees from today's squad (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
-                      : "Review unpaid players above. Marking as 'Owe Fees' rolls the fee to their account. 'Did Not Play' removes them from the match."
-                  }
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button onClick={() => setIsFinaliseModalOpen(false)} className="flex-1 py-4 bg-zinc-200 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase tracking-widest transition-colors hover:bg-zinc-300 dark:hover:bg-zinc-800">Cancel</button>
-                <button 
-                  onClick={executeMatchFinalization} 
-                  disabled={isProcessing}
-                  className={`flex-1 py-4 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 disabled:opacity-50 ${finaliseStatus === 'completed' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}
-                >
-                  {isProcessing ? 'Saving...' : 'Confirm'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* --- DIGITAL TRANSFER / PAYID MODAL --- */}
       {isPayIdModalOpen && activePayIdPlayer && (
@@ -2172,7 +1864,7 @@ export default function GameDay() {
             <button 
               onClick={() => {
                 setIsQrModalOpen(false);
-                setQrTxId(null);
+                setQrTxId("");
                 setQrModalPlayer(null);
               }}
               className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-widest rounded-xl transition-colors shadow-sm"
@@ -2182,6 +1874,7 @@ export default function GameDay() {
           </div>
         </div>
       )}
+
 
     </div>
   );

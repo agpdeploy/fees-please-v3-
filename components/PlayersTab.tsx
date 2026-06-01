@@ -8,6 +8,7 @@ interface PlayersTabProps {
   teams: any[];
   players: any[];
   clubUsers: any[]; // <-- 1. ADDED TO RECEIVE PERMISSIONS
+  isSuperAdmin?: boolean;
   loadClubData: () => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
@@ -21,7 +22,7 @@ interface DraftPlayer {
   is_member: boolean;
 }
 
-export default function PlayersTab({ clubId, teams, players, clubUsers = [], loadClubData, showToast }: PlayersTabProps) {
+export default function PlayersTab({ clubId, teams, players, clubUsers = [], isSuperAdmin = false, loadClubData, showToast }: PlayersTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -43,7 +44,12 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
 
   useEffect(() => {
     if (teams && teams.length > 0 && !addTeamId) {
-      setAddTeamId(teams[0].id);
+      const savedTeam = localStorage.getItem('fp_selected_team_id');
+      if (savedTeam && teams.find((t: any) => t.id === savedTeam)) {
+        setAddTeamId(savedTeam);
+      } else {
+        setAddTeamId(teams[0].id);
+      }
     }
   }, [teams, addTeamId]);
 
@@ -275,7 +281,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
           </h2>
         </div>
         
-        <select value={addTeamId || ""} onChange={(e) => setAddTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
+        <select value={addTeamId || ""} onChange={(e) => { setAddTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
           {teams.length > 1 && <option value="">-- View All Club Players --</option>}
           {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
@@ -427,7 +433,8 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], loa
             key={p.id} 
             player={p} 
             teams={teams} 
-            clubUsers={clubUsers} // <-- 2. PASSING DOWN PERMISSIONS HERE
+            clubUsers={clubUsers} 
+            isSuperAdmin={isSuperAdmin}
             loadClubData={loadClubData} 
             showToast={showToast} 
           />
@@ -442,12 +449,14 @@ function PlayerRow({
   player, 
   teams, 
   clubUsers, 
+  isSuperAdmin = false,
   loadClubData, 
   showToast 
 }: { 
   player: any, 
   teams: any[], 
   clubUsers: any[], 
+  isSuperAdmin?: boolean,
   loadClubData: () => Promise<void>, 
   showToast: (msg: string, type?: 'success'|'error') => void 
 }) {
@@ -455,7 +464,7 @@ function PlayerRow({
   const [isSaving, setIsSaving] = useState(false);
   
   const [editForm, setEditForm] = useState({
-    default_team_id: player.default_team_id || "",
+    default_team_id: player.default_team_id || (teams.length === 1 ? teams[0].id : ""),
     first_name: player.first_name || "",
     last_name: player.last_name || "",
     nickname: player.nickname || "",
@@ -485,10 +494,21 @@ function PlayerRow({
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Are you sure you want to delete ${player.first_name}?`)) return;
+    if (!window.confirm(`⚠️ EXTREME DANGER: Are you sure you want to PERMANENTLY hard-delete ${player.first_name}? This wipes all their data and history.`)) return;
+    setIsSaving(true);
     const { error } = await supabase.from("players").delete().eq("id", player.id);
+    setIsSaving(false);
     if (error) showToast(error.message, "error"); 
-    else { showToast("Player deleted."); loadClubData(); }
+    else { showToast("Player permanently deleted."); loadClubData(); }
+  }
+
+  async function handleToggleActive() {
+    const newStatus = player.is_active === false ? true : false;
+    setIsSaving(true);
+    const { error } = await supabase.from("players").update({ is_active: newStatus }).eq("id", player.id);
+    setIsSaving(false);
+    if (error) showToast(error.message, "error");
+    else { showToast(`Player ${newStatus ? 'reactivated' : 'deactivated'}.`); loadClubData(); }
   }
 
   async function handleResubscribe() {
@@ -513,10 +533,12 @@ function PlayerRow({
   if (isEditing) {
     return (
       <div className="bg-white dark:bg-zinc-900 border-2 border-emerald-500 p-4 rounded-xl flex flex-col gap-3 shadow-md transition-colors animate-in fade-in">
-        <select value={editForm.default_team_id || ""} onChange={(e) => setEditForm({...editForm, default_team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
-          <option value="" disabled>-- Select a valid team --</option>
-          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        {teams.length > 1 && (
+          <select value={editForm.default_team_id || ""} onChange={(e) => setEditForm({...editForm, default_team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
+            <option value="" disabled>-- Select a valid team --</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
         
         <div className="flex gap-2">
           <input type="text" placeholder="First Name" value={editForm.first_name || ""} onChange={(e) => setEditForm({...editForm, first_name: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
@@ -570,7 +592,7 @@ function PlayerRow({
           {/* RENDER MANAGER BADGES */}
           {hasClubAdmin && (
             <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
-              Club Manager
+              Account Admin
             </span>
           )}
           {!hasClubAdmin && hasTeamAdmin && (
@@ -582,6 +604,11 @@ function PlayerRow({
           {player.unsubscribed && (
             <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
               Unsubscribed
+            </span>
+          )}
+          {player.is_active === false && (
+            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              Deactivated
             </span>
           )}
         </div>
@@ -605,8 +632,13 @@ function PlayerRow({
         {player.unsubscribed && (
           <button onClick={handleResubscribe} disabled={isSaving} className="px-3 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors shadow-sm whitespace-nowrap">Resubscribe</button>
         )}
+        <button onClick={handleToggleActive} disabled={isSaving} className={`px-3 h-8 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm whitespace-nowrap ${player.is_active === false ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/30'}`}>
+          {player.is_active === false ? 'Reactivate' : 'Deactivate'}
+        </button>
         <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-pen text-xs"></i></button>
-        <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-trash text-xs"></i></button>
+        {isSuperAdmin && (
+          <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-trash text-xs"></i></button>
+        )}
       </div>
     </div>
   );

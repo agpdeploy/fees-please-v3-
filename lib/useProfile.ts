@@ -39,7 +39,7 @@ export function useProfile() {
         const [profileRes, rolesRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
           supabase.from('user_roles')
-            .select('*, clubs(id, name, logo_url)')
+            .select('*, clubs(id, name, logo_url, is_active)')
             .or(`user_id.eq.${user.id},email.eq.${user.email}`) 
         ]);
 
@@ -116,7 +116,7 @@ export function useProfile() {
         ? `user_id.eq.${userId},email.eq.${email}` 
         : `user_id.eq.${userId}`;
         
-      const { data: rolesData } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url)').or(query);
+      const { data: rolesData } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active)').or(query);
       const adminRole = rolesData?.find((r: any) => r.role === 'club_admin');
       const teamRole = rolesData?.find((r: any) => r.role === 'team_admin');
 

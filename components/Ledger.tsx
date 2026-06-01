@@ -20,6 +20,7 @@ export default function Ledger() {
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
   const [overallNet, setOverallNet] = useState(0);
   const [seasonWallet, setSeasonWallet] = useState({ cash: 0, card: 0 });
+  const [financialHealth, setFinancialHealth] = useState({ collected: 0, cashIn: 0, cardIn: 0, outstanding: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
   // Player Accounts & Feed States
@@ -56,7 +57,7 @@ export default function Ledger() {
 
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('players').select('id, first_name, last_name, nickname, default_team_id').eq('club_id', activeClubId).order('first_name').then(({data}) => {
+      supabase.from('players').select('id, first_name, last_name, nickname, default_team_id, is_active').eq('club_id', activeClubId).order('first_name').then(({data}) => {
         if (data) setAllPlayers(data);
       });
     }
@@ -90,8 +91,14 @@ export default function Ledger() {
       const { data, error } = await query;
       if (!error && data) {
         setTeams(data);
-        if (data.length === 1) setActiveTeamId(data[0].id);
-        else if (data.length > 0 && !data.find(t => t.id === activeTeamId)) setActiveTeamId(""); 
+        const savedTeam = localStorage.getItem('fp_selected_team_id');
+        if (savedTeam && data.find((t: any) => t.id === savedTeam)) {
+          setActiveTeamId(savedTeam);
+        } else if (data.length === 1) {
+          setActiveTeamId(data[0].id);
+        } else if (data.length > 0 && !data.find((t: any) => t.id === activeTeamId)) {
+          setActiveTeamId(""); 
+        }
       }
       setIsLoading(false);
     }
@@ -105,8 +112,8 @@ export default function Ledger() {
     // 🔥 FIX: Fetch transactions and players at the CLUB level so balances track across multiple teams
     const [fixRes, txRes, playersRes] = await Promise.all([
       supabase.from("fixtures").select("*").eq("team_id", activeTeamId).order("match_date", { ascending: false }),
-      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname ), fixtures ( opponent )`).eq("club_id", activeClubId).order("created_at", { ascending: false }),
-      supabase.from("players").select('id, first_name, last_name, nickname').eq("club_id", activeClubId)
+      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname, is_active ), fixtures ( opponent )`).eq("club_id", activeClubId).order("created_at", { ascending: false }),
+      supabase.from("players").select('id, first_name, last_name, nickname, is_active').eq("club_id", activeClubId)
     ]);
 
     const fixData = fixRes.data || [];
@@ -133,6 +140,7 @@ export default function Ledger() {
         id: p.id, 
         name: p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`.trim(), 
         full_name: `${p.first_name} ${p.last_name}`, 
+        is_active: p.is_active,
         owed: 0,
         total_paid: 0,
         total_fees: 0
@@ -167,6 +175,7 @@ export default function Ledger() {
             id: tx.player_id, 
             name: tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim(), 
             full_name: `${tx.players.first_name} ${tx.players.last_name}`, 
+            is_active: tx.players.is_active,
             owed: 0,
             total_paid: 0,
             total_fees: 0
@@ -193,17 +202,25 @@ export default function Ledger() {
     setSeasonWallet({ cash: totalCashIn - totalExpenses, card: totalCardIn });
     setOverallNet((totalCashIn + totalCardIn) - totalExpenses);
     
-    // Only show players in the list if they are in this default team, OR if they have played for this team and have a balance
     const activeTeamPlayerIds = new Set(teamFeedTransactions.filter(tx => tx.player_id).map(tx => tx.player_id));
     const filteredBalances = Object.values(balances).filter((b: any) => {
         const isDefaultTeam = allPlayers.find(p => p.id === b.id)?.default_team_id === activeTeamId;
         return isDefaultTeam || activeTeamPlayerIds.has(b.id);
     });
 
-    setPlayerBalances(filteredBalances.sort((a: any, b: any) => {
+    const sortedBalances = filteredBalances.sort((a: any, b: any) => {
       if (b.owed !== a.owed) return b.owed - a.owed;
       return a.name.localeCompare(b.name);
-    }));
+    });
+    setPlayerBalances(sortedBalances);
+
+    const totalOutstanding = sortedBalances.reduce((sum: number, p: any) => sum + (p.owed > 0 ? p.owed : 0), 0);
+    setFinancialHealth({
+      collected: totalCashIn + totalCardIn,
+      cashIn: totalCashIn,
+      cardIn: totalCardIn,
+      outstanding: totalOutstanding
+    });
     
     setIsLoading(false);
   }
@@ -395,15 +412,80 @@ export default function Ledger() {
       {teams.length > 1 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Viewing Ledger As</label>
-          <select value={activeTeamId} onChange={(e) => setActiveTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+          <select value={activeTeamId} onChange={(e) => { setActiveTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
             <option value="" disabled>-- Select a Team --</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_active === false ? ' (Deactivated)' : ''}</option>)}
           </select>
         </div>
       )}
 
       {activeTeamId && !isLoading ? (
         <>
+          {/* --- FINANCIAL HEALTH --- */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm transition-colors mb-6">
+            <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
+                 <i className="fa-solid fa-heart-pulse text-sm"></i>
+              </div>
+              <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Financial Health</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500">${financialHealth.collected.toFixed(0)}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600/70 dark:text-emerald-500/70 mt-1">Fees Collected</p>
+                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-400 mt-1">
+                   ${financialHealth.cashIn.toFixed(0)} Cash | ${financialHealth.cardIn.toFixed(0)} Card
+                </div>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-red-500">${financialHealth.outstanding.toFixed(0)}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-red-500/70 mt-1">Outstanding Debts</p>
+                <div className="text-[8px] font-black uppercase tracking-widest text-zinc-400 mt-1">
+                   {playerBalances.filter(p => p.owed > 0).length} Players Owe
+                </div>
+              </div>
+            </div>
+            
+            {/* Top Debtors & Credits */}
+            <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50 flex flex-col sm:flex-row gap-4">
+               <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50">
+                  <h3 className="text-[9px] font-black uppercase tracking-widest text-red-500 mb-2">Top Debtors</h3>
+                  {playerBalances.filter(p => p.owed > 0).slice(0, 3).map(p => (
+                    <button 
+                       key={p.id} 
+                       onClick={() => {
+                          setGlobalSelectedPlayerId(p.id);
+                          setIsGlobalManualFormOpen(true);
+                       }}
+                       className="w-full flex justify-between items-center text-xs mb-1.5 last:mb-0 font-bold hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                       <span className="text-zinc-700 dark:text-zinc-300 truncate max-w-[100px] text-left">{p.name}</span>
+                       <span className="text-red-500">-${p.owed.toFixed(0)}</span>
+                    </button>
+                  ))}
+                  {playerBalances.filter(p => p.owed > 0).length === 0 && <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">No Debts!</span>}
+               </div>
+               
+               <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50">
+                  <h3 className="text-[9px] font-black uppercase tracking-widest text-emerald-500 mb-2">In Credit</h3>
+                  {playerBalances.filter(p => p.owed < 0).slice(0, 3).map(p => (
+                    <button 
+                       key={p.id} 
+                       onClick={() => {
+                          setGlobalSelectedPlayerId(p.id);
+                          setIsGlobalManualFormOpen(true);
+                       }}
+                       className="w-full flex justify-between items-center text-xs mb-1.5 last:mb-0 font-bold hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                       <span className="text-zinc-700 dark:text-zinc-300 truncate max-w-[100px] text-left">{p.name}</span>
+                       <span className="text-emerald-500">+${Math.abs(p.owed).toFixed(0)}</span>
+                    </button>
+                  ))}
+                  {playerBalances.filter(p => p.owed < 0).length === 0 && <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">No Credits!</span>}
+               </div>
+            </div>
+          </div>
+
           {/* --- SEASON AUDIT --- */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm relative overflow-hidden transition-colors">
             <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-emerald-500 z-10"></div>
@@ -607,7 +689,7 @@ export default function Ledger() {
                       >
                         <div className="flex-1">
                           <div className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-emerald-500 transition-colors">
-                            {player.name}
+                            {player.name} {!player.is_active && <span className="ml-2 text-[8px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded uppercase tracking-widest font-black inline-block align-middle">Deactivated</span>}
                           </div>
                           <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1 flex gap-2">
                             <span className="text-emerald-600 dark:text-emerald-500">Paid: ${player.total_paid.toFixed(0)}</span>
@@ -705,6 +787,26 @@ export default function Ledger() {
 
                               {groupedFeed.filter(g => g.player_id === player.id).length === 0 && (
                                   <p className="text-center text-zinc-400 dark:text-zinc-600 text-[10px] uppercase font-black py-6 transition-colors">No history found.</p>
+                              )}
+                              
+                              {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && (
+                                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                                  <button 
+                                    onClick={async () => {
+                                      if (!confirm(`Are you sure you want to ${player.is_active ? 'deactivate' : 'reactivate'} this player?`)) return;
+                                      const { error } = await supabase.from('players').update({ is_active: !player.is_active }).eq('id', player.id);
+                                      if (error) showToast(error.message, 'error');
+                                      else {
+                                        showToast(`Player ${player.is_active ? 'deactivated' : 'reactivated'}`);
+                                        fetchLedger();
+                                      }
+                                    }}
+                                    className={`w-full py-3 ${player.is_active ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'} font-black uppercase tracking-widest text-[9px] rounded-xl transition-colors flex items-center justify-center gap-2`}
+                                  >
+                                    <i className={`fa-solid ${player.is_active ? 'fa-user-slash' : 'fa-user-check'}`}></i>
+                                    {player.is_active ? 'Deactivate Player' : 'Reactivate Player'}
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}

@@ -95,8 +95,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: data.errors?.[0]?.detail || "Payment failed at Square" }, { status: 400 });
     }
 
-    // Payment succeeded. Update ledger.
-    // 1. Mark existing fee as paid and link to square payment
+    // 1. Mark existing checkout_link as paid and link to square payment
     const { error: markPaidError } = await supabase.from('transactions').update({ 
       status: 'paid',
       square_payment_id: data.payment.id
@@ -104,6 +103,35 @@ export async function POST(request: Request) {
     
     if (markPaidError) {
        console.error("Failed to mark tx as paid:", markPaidError);
+    }
+
+    // 1.5. Ledger Reconciliation: Mark old unpaid fees as paid until the payment amount is consumed
+    let remainingPayment = transaction.amount;
+    
+    const { data: unpaidDebts } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('player_id', transaction.player_id)
+      .eq('club_id', transaction.club_id)
+      .neq('status', 'paid')
+      .in('transaction_type', ['fee', 'expense'])
+      .order('created_at', { ascending: true });
+      
+    if (unpaidDebts && unpaidDebts.length > 0) {
+      const debtsToMarkPaid = [];
+      for (const debt of unpaidDebts) {
+        if (remainingPayment >= debt.amount) {
+          debtsToMarkPaid.push(debt.id);
+          remainingPayment -= debt.amount;
+        }
+      }
+      
+      if (debtsToMarkPaid.length > 0) {
+        await supabase
+          .from('transactions')
+          .update({ status: 'paid', square_payment_id: data.payment.id })
+          .in('id', debtsToMarkPaid);
+      }
     }
 
     // 2. Insert corresponding payment transaction linked to square payment

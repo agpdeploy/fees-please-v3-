@@ -40,6 +40,8 @@ export default function Setup({ activeTab }: SetupProps) {
 
   // CONFIG STATE
   const [clubName, setClubName] = useState("");
+  const [isClubActive, setIsClubActive] = useState(true);
+  const [godModeSearch, setGodModeSearch] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [announcement, setAnnouncement] = useState(""); 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -70,8 +72,10 @@ export default function Setup({ activeTab }: SetupProps) {
 
   // CLUB LEVEL MANUAL PAYMENT STATE
   const [payIdType, setPayIdType] = useState<'mobile' | 'email' | 'bank_account'>('mobile');
-  const [payIdValue, setPayIdValue] = useState("");
+  const [payIdValue, setPayIdValue] = useState('');
   const [overridePlatformFee, setOverridePlatformFee] = useState(false);
+  const [acceptsCash, setAcceptsCash] = useState(true);
+  const [acceptsCard, setAcceptsCard] = useState(true);
 
   // TEAM STATE
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -81,11 +85,6 @@ export default function Setup({ activeTab }: SetupProps) {
   const [memberFee, setMemberFee] = useState<number | "">("");
   const [casualFee, setCasualFee] = useState<number | "">(25);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
-
-  const [isSquadModalOpen, setIsSquadModalOpen] = useState(false);
-  const [activeSquadFixture, setActiveSquadFixture] = useState<any>(null);
-  const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
-  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   
   const [expandedRosterTeamId, setExpandedRosterTeamId] = useState<string | null>(null);
   const [activeRosterTeam, setActiveRosterTeam] = useState<any>(null);
@@ -115,7 +114,7 @@ export default function Setup({ activeTab }: SetupProps) {
   useEffect(() => {
     if (!profile) return;
     if (profile.role === 'super_admin') {
-      supabase.from('clubs').select('id, name').order('name').then(({ data }) => {
+      supabase.from('clubs').select('id, name, is_active').order('name').then(({ data }) => {
         if (data) {
           setAllClubs(data);
           if (!activeClubId && data.length > 0) {
@@ -139,6 +138,7 @@ export default function Setup({ activeTab }: SetupProps) {
     if (clubData) {
       setClubRecord(clubData);
       setClubName(clubData.name || "");
+      setIsClubActive(clubData.is_active !== false);
       setLogoUrl(clubData.logo_url || "");
       setAnnouncement(clubData.announcement || "");
       setSeasonName(clubData.season_name || "");
@@ -153,8 +153,10 @@ export default function Setup({ activeTab }: SetupProps) {
       setSquareMerchantId(clubData.square_merchant_id || "");
 
       setPayIdType(clubData.pay_id_type || 'mobile');
-      setPayIdValue(clubData.pay_id_value || "");
+      setPayIdValue(clubData.pay_id_value || '');
       setOverridePlatformFee(clubData.override_platform_fee || false);
+      setAcceptsCash(clubData.accepts_cash ?? true);
+      setAcceptsCard(clubData.accepts_card ?? true);
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
@@ -190,7 +192,7 @@ export default function Setup({ activeTab }: SetupProps) {
       loadClubData(); 
     } else if (clubId === 'new') {
       setIsLoading(false);
-      setClubName(""); setLogoUrl(""); setAnnouncement(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd("");
+      setClubName(""); setLogoUrl(""); setAnnouncement(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd(""); setIsClubActive(true);
       setTeams([]); setPlayers([]); setFixtures([]); setClubUsers([]);
     }
   }, [clubId]);
@@ -258,11 +260,53 @@ export default function Setup({ activeTab }: SetupProps) {
     finally { setIsUploadingLogo(false); setIsUploadingSponsor(false); }
   }
 
+  async function handleHardDeleteClub() {
+    if (!clubId || clubId === 'new') return;
+    if (!window.confirm(`⚠️ EXTREME DANGER: Are you sure you want to PERMANENTLY delete the club "${clubName}" and ALL of its teams, players, fixtures, and financial data? This action cannot be undone.`)) return;
+    if (!window.confirm(`FINAL WARNING: To confirm, type "DELETE" into the prompt.`)) return; // Simple double confirm
+    
+    // Simulate a prompt since window.prompt might not work well in all environments, but we can use confirm for now
+    const check = window.prompt(`To confirm permanent deletion, type "${clubName}" exactly:`);
+    if (check !== clubName) {
+      showToast("Deletion cancelled. Name did not match.", "error");
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await supabase.rpc('hard_delete_club', { p_club_id: clubId });
+    if (error) {
+      showToast("Error deleting club: " + error.message, "error");
+      setIsLoading(false);
+      return;
+    }
+
+    showToast("Club permanently deleted.");
+    window.location.reload(); // Reload the entire app to reset state
+  }
+
+  async function handleToggleClubStatus() {
+    if (!clubId || clubId === 'new') return;
+    
+    setIsLoading(true);
+    const newStatus = !isClubActive;
+    
+    const { error } = await supabase.from('clubs').update({ is_active: newStatus }).eq('id', clubId);
+    
+    if (error) {
+      showToast("Error updating status: " + error.message, "error");
+    } else {
+      setIsClubActive(newStatus);
+      showToast(`Club is now ${newStatus ? 'Active' : 'Deactivated'}.`);
+    }
+    setIsLoading(false);
+  }
+
   async function saveConfig() {
     setIsSaving(true);
     const generatedSlug = clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const payload = { 
       name: clubName, 
+      is_active: isClubActive,
       logo_url: logoUrl,
       announcement: announcement,
       season_name: seasonName, 
@@ -278,7 +322,9 @@ export default function Setup({ activeTab }: SetupProps) {
 
       pay_id_type: payIdValue ? payIdType : null,
       pay_id_value: payIdValue || null,
-      override_platform_fee: overridePlatformFee
+      override_platform_fee: overridePlatformFee,
+      accepts_cash: acceptsCash,
+      accepts_card: acceptsCard
     };
     
     if (clubId && clubId !== 'new') {
@@ -299,7 +345,7 @@ export default function Setup({ activeTab }: SetupProps) {
         if (storeError) console.error("Storefront Sync Error:", storeError);
       }
       
-      window.location.reload();
+      showToast("Settings saved successfully!");
     } else {
       const { data: newClub, error } = await supabase.from("clubs").insert([{ ...payload, slug: generatedSlug }]).select().single();
       if (error) { 
@@ -522,41 +568,26 @@ export default function Setup({ activeTab }: SetupProps) {
     showToast(`${activeRosterTeam.name} Roster Updated!`);
   }
   
-  async function openSquadModal(fixture: any) { 
-    setActiveSquadFixture(fixture); 
-    setPlayerSearch(""); 
-    
-    const { data: squadData } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); 
-    setSquadPlayerIds(squadData ? squadData.map(row => row.player_id) : []); 
-
-    const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", fixture.id);
-    setAvailabilityData(availData || []);
-
-    setIsSquadModalOpen(true); 
-  }
-
-  function toggleSquadPlayer(playerId: string) { 
-    setSquadPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); 
-  }
-  
-  async function saveSquad() { 
-    setIsSaving(true); 
-    await supabase.from("match_squads").delete().eq("fixture_id", activeSquadFixture.id); 
-    if (squadPlayerIds.length > 0) { 
-      const inserts = squadPlayerIds.map(playerId => ({ fixture_id: activeSquadFixture.id, player_id: playerId })); 
-      const { error } = await supabase.from("match_squads").insert(inserts); 
-      if (error) showToast(error.message, "error"); 
-      else showToast("Match Players updated!"); 
-    } 
-    setIsSaving(false); 
-    setIsSquadModalOpen(false); 
-  }
-  
   async function deleteItem(table: string, id: string) { 
     if (!window.confirm("Are you sure?")) return; 
     await supabase.from(table).delete().eq("id", id); 
     showToast("Item deleted."); 
     loadClubData(); 
+  }
+
+  async function toggleTeamActiveStatus(teamId: string, currentStatus: boolean) {
+    if (!window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'reactivate'} this team?`)) return;
+    
+    setIsSaving(true);
+    const { error } = await supabase.from('teams').update({ is_active: !currentStatus }).eq('id', teamId);
+    setIsSaving(false);
+    
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Team ${currentStatus ? 'deactivated' : 'reactivated'}.`);
+      loadClubData();
+    }
   }
 
   if (profileLoading) {
@@ -604,7 +635,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm text-center">
             <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1">Looking for your team?</h3>
-            <p className="text-zinc-500 text-xs mb-0">Ask your Club Manager to send an invite to <strong className="text-zinc-800 dark:text-zinc-300">{profile?.email}</strong></p>
+            <p className="text-zinc-500 text-xs mb-0">Ask your Account Admin to send an invite to <strong className="text-zinc-800 dark:text-zinc-300">{profile?.email}</strong></p>
           </div>
         </div>
       </div>
@@ -628,24 +659,38 @@ export default function Setup({ activeTab }: SetupProps) {
       )}
 
       {profile?.role === 'super_admin' && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm mb-6 flex items-center gap-4 transition-colors">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-            <i className="fa-solid fa-crown"></i>
+        <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-500/20 rounded-2xl p-4 sm:p-6 shadow-sm mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+              <i className="fa-solid fa-crown text-emerald-600 dark:text-emerald-500 text-sm"></i>
+            </div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">God Mode: Active Club</h3>
           </div>
-          <div className="flex-1">
-            <label className="text-[9px] text-zinc-500 font-black uppercase tracking-widest block mb-1">God Mode: Active Club</label>
-            <select 
-              value={clubId || ''} 
-              onChange={(e) => {
-                setActiveClubId(e.target.value || null);
-                setClubId(e.target.value || null);
-              }} 
-              className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors"
-            >
-              {allClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value="new">+ Create New Club...</option>
-            </select>
+          
+          <div className="relative mb-2">
+            <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs"></i>
+            <input 
+              type="text" 
+              value={godModeSearch}
+              onChange={(e) => setGodModeSearch(e.target.value)}
+              placeholder="Search clubs..."
+              className="w-full bg-white dark:bg-zinc-900 border border-emerald-500/20 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
+            />
           </div>
+          
+          <select
+            value={clubId || ''}
+            onChange={(e) => {
+              setActiveClubId(e.target.value || null);
+              setClubId(e.target.value || null);
+            }}
+            className="block w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-emerald-500/20 text-zinc-900 dark:text-white rounded-xl shadow-sm appearance-none outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm font-bold"
+          >
+            <option value="new">🌟 Create New Club</option>
+            {allClubs
+              .filter(c => c.name.toLowerCase().includes(godModeSearch.toLowerCase()))
+              .map(c => <option key={c.id} value={c.id}>{c.name} {c.is_active === false ? '(Deactivated)' : ''}</option>)}
+          </select>
         </div>
       )}
 
@@ -671,6 +716,25 @@ export default function Setup({ activeTab }: SetupProps) {
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Name</label>
                 <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
+              
+              {profile?.role === 'super_admin' && clubId && clubId !== 'new' && (
+                <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">Club Status</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{isClubActive ? 'Active' : 'Deactivated (Hidden)'}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleToggleClubStatus} disabled={isLoading} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${isClubActive ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'}`}>
+                      {isClubActive ? 'Deactivate Club' : 'Reactivate Club'}
+                    </button>
+                    {!isClubActive && (
+                      <button onClick={handleHardDeleteClub} disabled={isLoading} className="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-white hover:bg-red-500">
+                        Hard Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {(!clubId || clubId === 'new') ? (
                 <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
@@ -878,6 +942,43 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors mb-6">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Accepted Payment Methods</h2>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className={`w-10 h-6 rounded-full p-1 transition-colors ${acceptsCash ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${acceptsCash ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                </div>
+                <input type="checkbox" className="hidden" checked={acceptsCash} onChange={(e) => {
+                  if (!e.target.checked && !acceptsCard) {
+                    showToast("You must accept at least one payment method", "error");
+                    return;
+                  }
+                  setAcceptsCash(e.target.checked);
+                }} />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white block">Cash Payments</span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer ml-6">
+                <div className={`w-10 h-6 rounded-full p-1 transition-colors ${acceptsCard ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${acceptsCard ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                </div>
+                <input type="checkbox" className="hidden" checked={acceptsCard} onChange={(e) => {
+                  if (!e.target.checked && !acceptsCash) {
+                    showToast("You must accept at least one payment method", "error");
+                    return;
+                  }
+                  setAcceptsCard(e.target.checked);
+                }} />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white block">Card / Digital Payments</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Club Level)</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold mb-4 leading-relaxed">If you don't connect Square (or if a player prefers bank transfer), they will be given these details to transfer funds directly via their banking app. <strong className="text-zinc-700 dark:text-zinc-300">Note:</strong> These payments are self-reported by the player and won't be automatically verified.</p>
@@ -934,7 +1035,7 @@ export default function Setup({ activeTab }: SetupProps) {
                   onClick={() => setInviteRole('club_admin')} 
                   className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-all ${inviteRole === 'club_admin' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                 >
-                  Club Manager
+                  Account Admin
                 </button>
                 <button 
                   onClick={() => setInviteRole('team_admin')} 
@@ -998,7 +1099,7 @@ export default function Setup({ activeTab }: SetupProps) {
                         <div key={user.id} className="flex flex-col bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-100 dark:border-zinc-700/50">
                           <div className="flex justify-between items-center">
                             <div className={`text-[9px] font-black uppercase tracking-widest ${user.role === 'club_admin' ? 'text-blue-500 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                              {user.role === 'club_admin' ? 'Club Manager' : 'Team Manager'}
+                              {user.role === 'club_admin' ? 'Account Admin' : 'Team Manager'}
                               {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
                             </div>
                             <div className="flex gap-2">
@@ -1023,7 +1124,7 @@ export default function Setup({ activeTab }: SetupProps) {
                                   onChange={(e) => setEditRoleAssigned(e.target.value as any)} 
                                   className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500"
                                 >
-                                  <option value="club_admin">Club Manager</option>
+                                  <option value="club_admin">Account Admin</option>
                                   <option value="team_admin">Team Manager</option>
                                 </select>
                                 
@@ -1085,8 +1186,13 @@ export default function Setup({ activeTab }: SetupProps) {
                   <div key={t.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm transition-colors group">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex-1">
-                        <div className="font-black text-zinc-900 dark:text-white text-lg uppercase tracking-wide group-hover:text-emerald-500 transition-colors">
+                        <div className="font-black text-zinc-900 dark:text-white text-lg uppercase tracking-wide group-hover:text-emerald-500 transition-colors flex items-center gap-2">
                           {t.name}
+                          {t.is_active === false && (
+                            <span className="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border border-red-200 dark:border-red-800/50">
+                              Deactivated
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest flex items-center gap-2">
                           <span className="text-emerald-600 dark:text-emerald-500">M: ${t.member_fee}</span>
@@ -1116,6 +1222,9 @@ export default function Setup({ activeTab }: SetupProps) {
                         </button>
                         <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center">
                           <i className="fa-solid fa-pen text-xs"></i>
+                        </button>
+                        <button onClick={() => toggleTeamActiveStatus(t.id, t.is_active !== false)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-orange-500 transition-colors flex items-center justify-center" title={t.is_active !== false ? "Deactivate Team" : "Reactivate Team"}>
+                          <i className={`fa-solid ${t.is_active !== false ? 'fa-ban' : 'fa-rotate-left'} text-xs`}></i>
                         </button>
                         <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
                           <i className="fa-solid fa-trash text-xs"></i>
@@ -1245,7 +1354,6 @@ export default function Setup({ activeTab }: SetupProps) {
                 />
               </div>
 
-              {/* NEW SLUG LOGIC INJECTED HERE */}
               <div className="mb-4">
                 <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2 ml-1">
                   Friendly URL Slug (Optional)
@@ -1313,6 +1421,7 @@ export default function Setup({ activeTab }: SetupProps) {
           teams={teams} 
           players={players} 
           clubUsers={clubUsers} 
+          isSuperAdmin={profile?.role === 'super_admin'}
           loadClubData={loadClubData} 
           showToast={showToast} 
         />
@@ -1328,7 +1437,9 @@ export default function Setup({ activeTab }: SetupProps) {
           expenseLabel={expenseLabel}
           loadClubData={loadClubData} 
           showToast={showToast} 
-          openSquadModal={openSquadModal}
+          clubPlayers={players}
+          profile={profile}
+          clubLogoUrl={logoUrl}
         />
       )}
 
@@ -1341,87 +1452,6 @@ export default function Setup({ activeTab }: SetupProps) {
           clubUsers={clubUsers}
         />
       )}
-
-      {/* --- MODALS --- */}
-      {isSquadModalOpen && activeSquadFixture && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-colors">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 w-full max-w-[440px] rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 transition-colors">
-            <div className="p-5 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 transition-colors">
-              <h2 className="text-lg font-black italic text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">MATCH SQUAD: {activeSquadFixture.opponent}</h2>
-              <button onClick={() => setIsSquadModalOpen(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto flex-1 space-y-6 pb-24">
-              <input 
-                type="text" 
-                placeholder="Search or Add a Player..." 
-                value={playerSearch || ""} 
-                onChange={(e) => setPlayerSearch(e.target.value)} 
-                className="w-full bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
-              />
-
-              {/* Categorized Sections */}
-              {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
-                const sectionPlayers = players.filter(p => {
-                  const avail = availabilityData.find(a => a.player_id === p.id);
-                  const status = avail ? avail.status : 'no_reply';
-                  const isRelevant = p.default_team_id === activeSquadFixture.team_id || squadPlayerIds.includes(p.id) || avail !== undefined;
-                  const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
-
-                  if (playerSearch) {
-                    return status === section && matchesSearch;
-                  } else {
-                    return status === section && isRelevant;
-                  }
-                });
-
-                if (sectionPlayers.length === 0) return null;
-
-                const config = {
-                  yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
-                  maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                  no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
-                  no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
-                }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
-
-                return (
-                  <div key={section}>
-                    <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} mb-3 flex items-center gap-2`}>
-                      <i className={`fa-solid ${config.icon}`}></i> {config.label}
-                    </h3>
-                    <div className="flex flex-wrap gap-2.5">
-                      {sectionPlayers.map(p => {
-                        const isSelected = squadPlayerIds.includes(p.id);
-                        return (
-                          <button 
-                            key={p.id} 
-                            onClick={() => toggleSquadPlayer(p.id)} 
-                            disabled={isSaving} 
-                            className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex items-center gap-2 ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'} disabled:opacity-50`}
-                          >
-                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
-                            {isSelected ? <i className="fa-solid fa-check text-[10px]"></i> : <i className="fa-solid fa-plus text-[10px] opacity-50"></i>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="p-5 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 bg-zinc-50 dark:bg-[#111] transition-colors">
-              <button onClick={() => setIsSquadModalOpen(false)} className="flex-1 py-4 rounded-xl text-xs font-black uppercase text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-              <button onClick={saveSquad} disabled={isSaving} className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-                {isSaving ? 'Saving...' : 'Save Match Squad'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL REMOVED - CONVERTED TO INLINE ACCORDION */}
-
     </div>
   );
 }

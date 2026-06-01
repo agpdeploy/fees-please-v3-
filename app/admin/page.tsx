@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 import StatCard from "@/components/admin/StatCard";
 import DynamicDashboardTable from "@/components/admin/DynamicDashboardTable";
+import AuditLogsTable from "@/components/admin/AuditLogsTable";
 import PlayerMatcher from "@/components/admin/PlayerMatcher";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -31,7 +32,7 @@ export default function AdminDashboard() {
   const [statsLoading, setStatsLoading] = useState(true);
 
   // Dynamic Table View State
-  const [activeView, setActiveView] = useState<'teams' | 'players' | 'funds' | 'onboarding'>('teams');
+  const [activeView, setActiveView] = useState<'teams' | 'players' | 'funds' | 'onboarding' | 'audit'>('teams');
 
   useEffect(() => {
     if (!profileLoading && profile?.role !== 'super_admin') {
@@ -95,9 +96,17 @@ export default function AdminDashboard() {
         
         {/* STATS GRID */}
         <section>
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <i className="fa-solid fa-chart-line text-zinc-400"></i>
-            <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Platform Overview</h2>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <div className="flex items-center gap-3">
+              <i className="fa-solid fa-chart-line text-zinc-400"></i>
+              <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Platform Overview</h2>
+            </div>
+            <button 
+              onClick={() => setActiveView('audit')}
+              className="px-4 py-2 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:border-emerald-500 transition-colors shadow-sm flex items-center gap-2"
+            >
+              <i className="fa-solid fa-clock-rotate-left"></i> View Audit Logs
+            </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard 
@@ -150,7 +159,11 @@ export default function AdminDashboard() {
           
           <div className="lg:col-span-2 space-y-8">
             <section>
-              <DynamicDashboardTable activeView={activeView} onResetView={() => setActiveView('teams')} />
+              {activeView === 'audit' ? (
+                <AuditLogsTable onResetView={() => setActiveView('teams')} />
+              ) : (
+                <DynamicDashboardTable activeView={activeView as any} onResetView={() => setActiveView('teams')} />
+              )}
             </section>
           </div>
 

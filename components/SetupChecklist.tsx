@@ -70,6 +70,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [memberFee, setMemberFee] = useState<number | "">(initialMemberFee);
   const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
+  const [acceptsCash, setAcceptsCash] = useState(clubInfo?.accepts_cash ?? true);
+  const [acceptsCard, setAcceptsCard] = useState(clubInfo?.accepts_card ?? true);
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(clubInfo?.default_umpire_fee || "");
 
@@ -691,7 +693,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     const { data: finData, error: finError } = await supabase.from('clubs').update({ 
       pay_id_type: payIdType,
       pay_id_value: payId || null,
-
+      accepts_cash: acceptsCash,
+      accepts_card: acceptsCard,
       square_access_token: squareToken || null,
       square_location_id: squareLocationId || null
     }).eq('id', activeClubId).select();
@@ -720,6 +723,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       });
     } else {
       clubInfo.pay_id_value = payId || null;
+      clubInfo.accepts_cash = acceptsCash;
+      clubInfo.accepts_card = acceptsCard;
     }
     
     setIsSavingFinancials(false);
@@ -1192,6 +1197,43 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                           </a>
                         </div>
                       )}
+                    </div>
+
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3 mb-4">
+                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Accepted Payment Methods</h4>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <div className={`w-10 h-6 rounded-full p-1 transition-colors ${acceptsCash ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${acceptsCash ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                          </div>
+                          <input type="checkbox" className="hidden" checked={acceptsCash} onChange={(e) => {
+                            if (!e.target.checked && !acceptsCard) {
+                              alert("You must accept at least one payment method");
+                              return;
+                            }
+                            setAcceptsCash(e.target.checked);
+                          }} />
+                          <div>
+                            <span className="text-sm font-bold text-zinc-900 dark:text-white block">Cash Payments</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer ml-6">
+                          <div className={`w-10 h-6 rounded-full p-1 transition-colors ${acceptsCard ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${acceptsCard ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                          </div>
+                          <input type="checkbox" className="hidden" checked={acceptsCard} onChange={(e) => {
+                            if (!e.target.checked && !acceptsCash) {
+                              alert("You must accept at least one payment method");
+                              return;
+                            }
+                            setAcceptsCard(e.target.checked);
+                          }} />
+                          <div>
+                            <span className="text-sm font-bold text-zinc-900 dark:text-white block">Card / Digital Payments</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
 
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">

@@ -19,6 +19,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
 
   // Form State for editing
   const [editingReport, setEditingReport] = useState<any | null>(null);
+  const [sponsorStats, setSponsorStats] = useState({ impressions: 0, clicks: 0, ctr: 0 });
   
   const [frequency, setFrequency] = useState<"weekly" | "fortnightly">("weekly");
   const [scheduleDay, setScheduleDay] = useState<string>("monday");
@@ -60,6 +61,22 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
       setReportsConfig(data);
     }
     
+    // Fetch Sponsor Analytics
+    let sponsorQuery = supabase.from("sponsor_analytics").select("event_type").eq("club_id", clubId);
+    if (!isClubAdmin) {
+       const teamIds = manageableTeams.map(t => t.id);
+       if (teamIds.length > 0) sponsorQuery = sponsorQuery.in("team_id", teamIds);
+    }
+    const { data: sponsorData } = await sponsorQuery;
+    let imp = 0, clk = 0;
+    if (sponsorData) {
+      sponsorData.forEach(s => {
+        if (s.event_type === 'impression') imp++;
+        if (s.event_type === 'click') clk++;
+      });
+    }
+    setSponsorStats({ impressions: imp, clicks: clk, ctr: imp > 0 ? (clk / imp) * 100 : 0 });
+
     setIsLoading(false);
   };
 
@@ -232,7 +249,31 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
   });
 
   return (
-    <div className="space-y-4 animate-in slide-in-from-right-4 fade-in">
+    <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+      
+      {/* SPONSOR IMPACT */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 flex items-center justify-center">
+             <i className="fa-solid fa-bullhorn text-sm"></i>
+          </div>
+          <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Sponsorship Impact</h2>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.impressions}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Impressions</p>
+          </div>
+          <div>
+            <p className="text-2xl font-black text-blue-600 dark:text-blue-500">{sponsorStats.clicks}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-blue-600/70 mt-1">Clicks</p>
+          </div>
+          <div>
+            <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.ctr.toFixed(1)}%</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Click Rate</p>
+          </div>
+        </div>
+      </div>
       
       {/* Confirmation Modal */}
       {confirmSendReport && (

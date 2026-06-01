@@ -11,7 +11,9 @@ interface FixturesTabProps {
   expenseLabel: string;
   loadClubData: () => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
-  openSquadModal: (fixture: any) => void;
+  clubPlayers: any[];
+  profile: any;
+  clubLogoUrl?: string;
 }
 
 interface DraftFixture {
@@ -22,7 +24,7 @@ interface DraftFixture {
   notes: string;
 }
 
-export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, openSquadModal }: FixturesTabProps) {
+export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl }: FixturesTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -80,7 +82,8 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
       location: fixtureLocation, 
       notes: fixtureNotes, 
       umpire_fee: umpireFee === "" ? 0 : umpireFee,
-      status: isPast ? 'completed' : 'upcoming'
+      status: isPast ? 'completed' : 'upcoming',
+      is_active: true
     };
 
     const { error } = await supabase.from("fixtures").insert([payload]);
@@ -264,7 +267,8 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
         ...f, 
         team_id: fixtureTeamId, 
         umpire_fee: defaultUmpireFee || 0,
-        status: isPast ? 'completed' : 'upcoming'
+        status: isPast ? 'completed' : 'upcoming',
+        is_active: true
       };
     });
 
@@ -286,9 +290,16 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
   }
 
   // Calculate the specifically filtered fixtures for the selected team
+  // Include deactivated fixtures, but sort them to the bottom
   const displayedFixtures = fixtureTeamId 
     ? fixtures.filter(f => f.team_id === fixtureTeamId)
     : fixtures;
+
+  displayedFixtures.sort((a, b) => {
+    if (a.is_active === false && b.is_active !== false) return 1;
+    if (a.is_active !== false && b.is_active === false) return -1;
+    return new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
+  });
 
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
@@ -304,7 +315,6 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
           {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
 
-        {/* Removed 'uppercase' class to preserve dAIve casing */}
         <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-5 transition-colors">
           <button
             onClick={() => setIsBulkMode(true)}
@@ -357,7 +367,6 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
                     <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
                       <i className="fa-solid fa-wand-magic-sparkles text-3xl text-emerald-600 dark:text-emerald-500"></i>
                     </div>
-                    {/* Removed 'uppercase' class to preserve dAIve casing */}
                     <h3 className="font-black tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-1">GIVE IT TO dAIve</h3>
                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Upload Master Draw (PDF/IMG/CSV)</p>
                   </div>
@@ -442,7 +451,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
       </div>
 
       {/* FIXTURE LIST */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         {displayedFixtures.map(f => (
           <FixtureRow 
             key={f.id} 
@@ -451,7 +460,9 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
             expenseLabel={expenseLabel}
             loadClubData={loadClubData} 
             showToast={showToast} 
-            openSquadModal={openSquadModal}
+            clubPlayers={clubPlayers}
+            profile={profile}
+            clubLogoUrl={clubLogoUrl}
           />
         ))}
         {displayedFixtures.length === 0 && fixtureTeamId && (
@@ -464,11 +475,47 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
   );
 }
 
-// INLINE EDITING COMPONENT
-function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, openSquadModal }: { fixture: any, teams: any[], expenseLabel: string, loadClubData: () => Promise<void>, showToast: (msg: string, type?: 'success'|'error') => void, openSquadModal: (fixture: any) => void }) {
+// INLINE EDITING & SQUAD COMPONENT
+function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl }: { fixture: any, teams: any[], expenseLabel: string, loadClubData: () => Promise<void>, showToast: (msg: string, type?: 'success'|'error') => void, clubPlayers: any[], profile: any, clubLogoUrl?: string }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSquadExpanded, setIsSquadExpanded] = useState(false);
   
+  const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
+  const [isLoadingSquad, setIsLoadingSquad] = useState(false);
+  const [playerSearch, setPlayerSearch] = useState("");
+  
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const isActive = fixture.is_active !== false;
+
+  const team = teams.find(t => t.id === fixture.team_id);
+  const teamName = team ? team.name : 'Unknown Team';
+  const matchDateStr = new Date(fixture.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
+  const matchDate = new Date(fixture.match_date);
+  const today = new Date();
+  const isToday = matchDate.toDateString() === today.toDateString();
+  const isPast = matchDate < new Date(today.setHours(0, 0, 0, 0));
+
+  let displayStatus = "";
+  let statusClasses = "";
+  if (!fixture.is_active) {
+    displayStatus = "Deactivated";
+    statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+  } else if (fixture.status === 'abandoned') {
+    displayStatus = "Abandoned";
+    statusClasses = "bg-red-600 text-white shadow-sm";
+  } else if (fixture.status === 'completed') {
+    displayStatus = "Completed";
+    statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+  } else if (isToday || isPast) {
+    displayStatus = "Active";
+    statusClasses = "bg-emerald-600 text-white shadow-sm";
+  } else {
+    displayStatus = "Upcoming";
+    statusClasses = "bg-emerald-600 text-white shadow-sm";
+  }
+
   const [editForm, setEditForm] = useState({
     team_id: fixture.team_id,
     opponent: fixture.opponent,
@@ -487,66 +534,274 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, ope
     else { showToast("Match updated!"); setIsEditing(false); loadClubData(); }
   }
 
-  async function handleDelete() {
-    if (!window.confirm("Are you sure you want to delete this match?")) return;
+  async function handleToggleActive() {
+    setIsSaving(true);
+    const newActiveState = !isActive;
+    const { error } = await supabase.from("fixtures").update({ is_active: newActiveState }).eq("id", fixture.id);
+    setIsSaving(false);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(newActiveState ? "Fixture reactivated!" : "Fixture deactivated.");
+      loadClubData();
+    }
+  }
+
+  async function handleHardDelete() {
+    if (!window.confirm("SUPER ADMIN ACTION: Are you sure you want to hard delete this match entirely? This will also remove associated availability, squads, and umpire fees.")) return;
     const { error } = await supabase.from("fixtures").delete().eq("id", fixture.id);
     if (error) showToast(error.message, "error"); 
-    else { showToast("Match deleted."); loadClubData(); }
+    else { showToast("Match hard deleted."); loadClubData(); }
+  }
+
+  async function fetchSquadData() {
+    setIsLoadingSquad(true);
+    const { data: squadData } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); 
+    setSquadPlayerIds(squadData ? squadData.map(row => row.player_id) : []); 
+
+    const { data: availData } = await supabase.from("availability").select("player_id, status").eq("fixture_id", fixture.id);
+    setAvailabilityData(availData || []);
+    setIsLoadingSquad(false);
+  }
+
+  function toggleSquadExpansion() {
+    if (!isSquadExpanded && squadPlayerIds.length === 0) {
+      fetchSquadData();
+    }
+    setIsSquadExpanded(!isSquadExpanded);
+  }
+
+  function toggleSquadPlayer(playerId: string) { 
+    setSquadPlayerIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]); 
+  }
+  
+  async function saveSquad() { 
+    setIsSaving(true); 
+    await supabase.from("match_squads").delete().eq("fixture_id", fixture.id); 
+    if (squadPlayerIds.length > 0) { 
+      const inserts = squadPlayerIds.map(playerId => ({ fixture_id: fixture.id, player_id: playerId })); 
+      const { error } = await supabase.from("match_squads").insert(inserts); 
+      if (error) showToast(error.message, "error"); 
+      else showToast("Match Players updated!"); 
+    } else { 
+      showToast("Match Players cleared!"); 
+    }
+    setIsSaving(false); 
+    setIsSquadExpanded(false); 
   }
 
   if (isEditing) {
     return (
-      <div className="bg-white dark:bg-zinc-900 border-2 border-emerald-500 p-4 rounded-xl flex flex-col gap-3 shadow-md transition-colors animate-in fade-in">
-        <select value={editForm.team_id || ""} onChange={(e) => setEditForm({...editForm, team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-emerald-500 p-5 rounded-2xl flex flex-col gap-4 shadow-xl transition-colors animate-in fade-in zoom-in-95">
+        <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-2">Edit Fixture Details</h3>
+        
+        <select value={editForm.team_id || ""} onChange={(e) => setEditForm({...editForm, team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
           {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         
-        <div className="flex gap-2">
-          <input type="text" placeholder="Opponent" value={editForm.opponent || ""} onChange={(e) => setEditForm({...editForm, opponent: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-          <input type="date" value={editForm.match_date || ""} onChange={(e) => setEditForm({...editForm, match_date: e.target.value})} className="flex-[0.8] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors color-scheme-light dark:color-scheme-dark" />
+        <div className="flex gap-3">
+          <input type="text" placeholder="Opponent" value={editForm.opponent || ""} onChange={(e) => setEditForm({...editForm, opponent: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+          <input type="date" value={editForm.match_date || ""} onChange={(e) => setEditForm({...editForm, match_date: e.target.value})} className="flex-[0.8] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors color-scheme-light dark:color-scheme-dark" />
         </div>
 
-        <div className="flex gap-2">
-          <input type="text" placeholder="Time" value={editForm.start_time || ""} onChange={(e) => setEditForm({...editForm, start_time: e.target.value})} className="flex-[0.6] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-          <input type="text" placeholder="Location" value={editForm.location || ""} onChange={(e) => setEditForm({...editForm, location: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+        <div className="flex gap-3">
+          <input type="text" placeholder="Time" value={editForm.start_time || ""} onChange={(e) => setEditForm({...editForm, start_time: e.target.value})} className="flex-[0.6] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+          <input type="text" placeholder="Location" value={editForm.location || ""} onChange={(e) => setEditForm({...editForm, location: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
         </div>
 
-        <div className="flex gap-2">
-           <input type="text" placeholder="Notes" value={editForm.notes || ""} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+        <div className="flex gap-3">
+           <input type="text" placeholder="Notes" value={editForm.notes || ""} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
            <div className="flex-[0.6] relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs">$</span>
-              <input type="number" placeholder={expenseLabel} value={editForm.umpire_fee ?? ""} onChange={(e) => setEditForm({...editForm, umpire_fee: e.target.value === '' ? '' : Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-6 pr-2 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+              <input type="number" placeholder={expenseLabel} value={editForm.umpire_fee ?? ""} onChange={(e) => setEditForm({...editForm, umpire_fee: e.target.value === '' ? '' : Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
            </div>
         </div>
 
-        <div className="flex gap-2 mt-1">
-          <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase transition-colors">Cancel</button>
-          <button onClick={handleUpdate} disabled={isSaving} className="flex-1 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">Save</button>
+        <div className="flex gap-3 mt-2">
+          <button onClick={() => setIsEditing(false)} className="flex-1 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Cancel</button>
+          <button onClick={handleUpdate} disabled={isSaving} className="flex-[2] py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">Save Changes</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex flex-col gap-3 group shadow-sm transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-1">
-            {new Date(fixture.match_date).toLocaleDateString()} {fixture.start_time && `• ${fixture.start_time}`}
+    <div className={`bg-white dark:bg-zinc-900 border ${isActive ? 'border-zinc-200 dark:border-zinc-800' : 'border-zinc-200/50 dark:border-zinc-800/50 border-dashed'} rounded-xl shadow-sm overflow-hidden transition-all ${!isActive ? 'opacity-60 grayscale' : ''}`}>
+      
+      <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center flex-wrap gap-2">
+            <span className={`text-[10px] font-black uppercase px-2 py-1 rounded tracking-widest leading-none shadow-sm ${statusClasses}`}>
+              {displayStatus}
+            </span>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+              {matchDateStr} {fixture.start_time && `• ${fixture.start_time}`} {fixture.location && `@ ${fixture.location}`}
+            </span>
           </div>
-          <div className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            {fixture.teams?.name} vs {fixture.opponent}
+          
+          <div className="flex gap-1 shrink-0">
+            <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-[10px]"></i></button>
+            <button onClick={handleToggleActive} disabled={isSaving} className={`w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 ${isActive ? 'text-zinc-500 hover:text-amber-500' : 'text-zinc-500 hover:text-emerald-500'} dark:text-zinc-400 transition-colors flex items-center justify-center`} title={isActive ? "Deactivate Match" : "Reactivate Match"}>
+              <i className={`fa-solid ${isActive ? 'fa-power-off' : 'fa-rotate-left'} text-[10px]`}></i>
+            </button>
+            {isSuperAdmin && (
+               <button onClick={handleHardDelete} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center" title="Super Admin Hard Delete">
+                 <i className="fa-solid fa-trash text-[10px]"></i>
+               </button>
+            )}
           </div>
-          {fixture.notes && <div className="text-[10px] text-zinc-500 mt-1">{fixture.notes}</div>}
-        </div>
-        <div className="flex gap-2 shrink-0 ml-2">
-          <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-xs"></i></button>
-          <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center"><i className="fa-solid fa-trash text-xs"></i></button>
         </div>
       </div>
-      <button onClick={() => openSquadModal(fixture)} className="w-full py-2 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-        <i className="fa-solid fa-users"></i> Match Players
-      </button>
+
+      {/* Versus Section - GameDay Style Layout */}
+      <div className="p-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
+            {clubLogoUrl ? (
+              <img src={clubLogoUrl} alt="Club Logo" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[10px] font-black text-zinc-500">{teamName?.substring(0, 2).toUpperCase()}</span>
+            )}
+          </div>
+          <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white leading-tight break-words">
+            {teamName}
+          </span>
+        </div>
+
+        <div className="shrink-0 px-2 text-center">
+          <span className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic uppercase tracking-widest">VS</span>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 flex-1">
+          <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
+            {fixture.opponent}
+          </span>
+          <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+            <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-[10px]"></i>
+          </div>
+        </div>
+      </div>
+
+      {/* Optional Notes */}
+      {fixture.notes && (
+        <div className="px-6 pb-4 text-center text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+          {fixture.notes}
+        </div>
+      )}
+
+      {/* Action Bar - GameDay Style */}
+      <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
+        <div className="flex bg-emerald-50 dark:bg-emerald-950/40 p-1 rounded-xl">
+          <button 
+            onClick={toggleSquadExpansion} 
+            className={`flex-1 py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${isSquadExpanded ? 'bg-emerald-700 text-white shadow-inner' : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-500'} disabled:opacity-50`}
+          >
+            <i className={`fa-solid ${isSquadExpanded ? 'fa-clipboard-check' : 'fa-clipboard-user'}`}></i> {isSquadExpanded ? 'Close Squad Selection' : 'Match Squad Selection'}
+          </button>
+        </div>
+      </div>
+
+      {/* Inline Squad Editor (Game Day Aesthetic) */}
+      {isSquadExpanded && (
+        <div className="p-5 border-t border-zinc-100 dark:border-zinc-800/50 bg-white dark:bg-[#111] animate-in slide-in-from-top-2">
+          {isLoadingSquad ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <i className="fa-solid fa-circle-notch fa-spin text-emerald-500 text-2xl mb-3"></i>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/70">Loading Squad...</p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-1">Squad Selection</p>
+                 <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 leading-relaxed">Select players for match day from the club roster.</p>
+              </div>
+              
+              <input 
+                type="text" 
+                placeholder="Search players..." 
+                value={playerSearch || ""} 
+                onChange={(e) => setPlayerSearch(e.target.value)} 
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors mb-4 shadow-sm" 
+              />
+
+              <div className="space-y-4">
+                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
+                  const sectionPlayers = clubPlayers.filter(p => {
+                    const avail = availabilityData.find(a => a.player_id === p.id);
+                    const status = avail ? avail.status : 'no_reply';
+                    const isRelevant = p.default_team_id === fixture.team_id || squadPlayerIds.includes(p.id) || avail !== undefined;
+                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
+
+                    if (playerSearch) {
+                      return status === section && matchesSearch;
+                    } else {
+                      return status === section && isRelevant;
+                    }
+                  });
+
+                  if (sectionPlayers.length === 0) return null;
+
+                  const config = {
+                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check", dot: "text-emerald-400" },
+                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question", dot: "text-amber-400" },
+                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle", dot: "text-zinc-400" },
+                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark", dot: "text-red-400" }
+                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
+
+                  return (
+                    <div key={section} className="mb-4">
+                      <div className="flex items-center gap-2 mb-2 cursor-pointer group">
+                        <i className={`fa-solid fa-circle text-[8px] ${config.dot}`}></i>
+                        <h3 className={`text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors`}>
+                          {config.label} ({sectionPlayers.length})
+                        </h3>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2.5 pt-2 pb-1 animate-in fade-in">
+                        {sectionPlayers.map(p => {
+                          const isInSquad = squadPlayerIds.includes(p.id);
+                          const avail = availabilityData.find(a => a.player_id === p.id);
+                          const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
+                          const hasEmail = !!p.email;
+                          
+                          return (
+                            <button 
+                              key={p.id} 
+                              onClick={() => toggleSquadPlayer(p.id)}
+                              disabled={isSaving}
+                              className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex justify-center items-center gap-1.5 ${
+                                isInSquad 
+                                  ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' 
+                                  : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
+                              } disabled:opacity-50`}
+                            >
+                              {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                              {isInSquad ? (
+                                <i className="fa-solid fa-check text-[10px]"></i>
+                              ) : (
+                                <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                 <button onClick={() => setIsSquadExpanded(false)} className="flex-1 py-4 bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl text-[11px] font-black uppercase tracking-widest transition-colors shadow-sm">
+                   Cancel
+                 </button>
+                 <button onClick={saveSquad} disabled={isSaving} className="flex-[2] py-4 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+                   {isSaving ? "Saving..." : "Save Match Squad"}
+                 </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

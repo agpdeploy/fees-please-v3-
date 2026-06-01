@@ -3,9 +3,9 @@ import { cookies } from 'next/headers'
 import CheckoutForm from './CheckoutForm'
 import TeamAvailabilityClient from '@/app/t/[slugid]/TeamAvailabilityClient'
 
-export default async function PayPage({ params }: { params: { txId: string } }) {
+export default async function PayPage(props: { params: Promise<{ txId: string }> }) {
   // Next.js 15 requires awaiting params
-  const { txId } = await params;
+  const { txId } = await props.params;
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,6 +40,50 @@ export default async function PayPage({ params }: { params: { txId: string } }) 
     .select('*')
     .eq('team_id', transaction.team_id)
     .maybeSingle();
+
+  const { data: fixture } = await supabase
+    .from('fixtures')
+    .select('*')
+    .eq('id', transaction.fixture_id)
+    .maybeSingle();
+
+  const { data: allTxs } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('player_id', transaction.player_id)
+    .eq('club_id', transaction.club_id);
+
+  let balance = 0;
+  allTxs?.forEach(tx => {
+    if (tx.status === 'completed' && tx.transaction_type === 'payment') {
+      balance -= tx.amount;
+    } else if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') {
+      balance += tx.amount;
+    }
+  });
+
+  const unpaidPastTxs = allTxs?.filter(tx => 
+    (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') && 
+    tx.status !== 'paid' && 
+    tx.fixture_id !== transaction.fixture_id
+  ) || [];
+
+  const pastFixtureIds = unpaidPastTxs.map(tx => tx.fixture_id).filter(Boolean);
+  let pastFixturesMap = new Map();
+  if (pastFixtureIds.length > 0) {
+    const { data: pf } = await supabase.from('fixtures').select('id, match_date, opponent').in('id', pastFixtureIds);
+    pf?.forEach(f => pastFixturesMap.set(f.id, f));
+  }
+
+  const outstandingList = unpaidPastTxs.map(tx => {
+     const f = tx.fixture_id ? pastFixturesMap.get(tx.fixture_id) : null;
+     return {
+       id: tx.id,
+       title: f ? `vs ${f.opponent}` : (tx.description || 'Other Fee'),
+       date: f ? new Date(f.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase() : '',
+       amount: tx.amount
+     };
+  });
 
   const sponsors = publicProfile ? [
     { logo: publicProfile.sponsor_1_logo, url: publicProfile.sponsor_1_url, index: 1 },
@@ -80,6 +124,10 @@ export default async function PayPage({ params }: { params: { txId: string } }) 
         transaction={transaction}
         club={club}
         player={player}
+        team={team}
+        fixture={fixture}
+        balance={balance}
+        outstandingList={outstandingList}
         appId={appId}
         locationId={club.square_location_id}
       />
