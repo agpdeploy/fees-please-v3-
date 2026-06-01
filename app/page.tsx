@@ -168,25 +168,39 @@ export default function Home() {
   useEffect(() => {
     const savedClubId = typeof window !== 'undefined' ? localStorage.getItem('fp_active_club_id') : null;
 
-    if (!activeClubId) {
+    let targetClubId = activeClubId;
+
+    if (!targetClubId) {
       if (savedClubId) {
-        setActiveClubId(savedClubId);
+        targetClubId = savedClubId;
       } else if (profile?.role === 'super_admin') {
-        if (allClubs.length > 0) setActiveClubId(allClubs[0].id);
+        if (allClubs.length > 0) targetClubId = allClubs[0].id;
       } else if (profile?.club_id) {
-        setActiveClubId(profile.club_id);
+        targetClubId = profile.club_id;
       } else if (roles && roles.length > 0) {
-        setActiveClubId(roles[0].club_id);
+        targetClubId = roles[0].club_id;
       }
     }
 
-    if (activeClubId) {
+    // Auto-correct if the targetClubId is no longer valid for this user
+    if (targetClubId && profile?.role !== 'super_admin' && roles && roles.length > 0) {
+      const isValid = roles.some((r: any) => r.club_id === targetClubId);
+      if (!isValid) {
+        targetClubId = roles[0].club_id;
+      }
+    }
+
+    if (targetClubId !== activeClubId) {
+      setActiveClubId(targetClubId);
+    }
+
+    if (targetClubId) {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('fp_active_club_id', activeClubId);
+        localStorage.setItem('fp_active_club_id', targetClubId);
       }
 
       const fetchClubMeta = async () => {
-        const { data } = await supabase.from('clubs').select('name, logo_url').eq('id', activeClubId).single();
+        const { data } = await supabase.from('clubs').select('name, logo_url').eq('id', targetClubId).single();
         if (data) {
           setClubMeta({ name: data.name || 'FP', logo: data.logo_url || '' });
         }
