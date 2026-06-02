@@ -690,21 +690,6 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
           {fixture.notes}
         </div>
       )}
-                )}
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                 <button onClick={() => setIsSquadExpanded(false)} className="flex-1 py-4 bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl text-[11px] font-black uppercase tracking-widest transition-colors shadow-sm">
-                   Cancel
-                 </button>
-                 <button onClick={saveSquad} disabled={isSaving} className="flex-[2] py-4 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-                   {isSaving ? "Saving..." : "Save Match Squad"}
-                 </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }
