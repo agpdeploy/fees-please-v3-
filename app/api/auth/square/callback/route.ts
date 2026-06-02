@@ -61,6 +61,7 @@ export async function GET(request: Request) {
         client_secret: appSecret,
         code,
         grant_type: "authorization_code",
+        redirect_uri: `${origin}/api/auth/square/callback`,
       }),
     })
 

@@ -27,6 +27,8 @@ export async function GET(request: Request) {
   const isSandbox = appId.startsWith('sandbox');
   const baseUrl = isSandbox ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
 
+  const origin = new URL(request.url).origin;
+
   try {
     // Exchange code for tokens
     const tokenRes = await fetch(`${baseUrl}/oauth2/token`, {
@@ -38,7 +40,8 @@ export async function GET(request: Request) {
         client_id: appId,
         client_secret: appSecret,
         code: code,
-        grant_type: 'authorization_code'
+        grant_type: 'authorization_code',
+        redirect_uri: `${origin}/api/pay/square/callback`
       })
     });
 

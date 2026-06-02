@@ -50,6 +50,9 @@ export async function GET(request: Request) {
     : "https://connect.squareup.com"
 
   const authUrl = new URL(`${squareBaseUrl}/oauth2/authorize`)
+  const origin = new URL(request.url).origin
+  const redirectUri = `${origin}/api/auth/square/callback`
+  
   authUrl.searchParams.set("client_id", appId)
   authUrl.searchParams.set(
     "scope",
@@ -57,6 +60,7 @@ export async function GET(request: Request) {
   )
   authUrl.searchParams.set("state", clubId)
   authUrl.searchParams.set("session", "false")
+  authUrl.searchParams.set("redirect_uri", redirectUri)
 
   return NextResponse.redirect(authUrl.toString())
 }

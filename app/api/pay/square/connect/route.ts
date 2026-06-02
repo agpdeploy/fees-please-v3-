@@ -54,7 +54,9 @@ export async function GET(request: Request) {
   ].join('+');
 
   // We pass the clubId in the state parameter so we know which club to update in the callback
-  const authUrl = `${baseUrl}/oauth2/authorize?client_id=${appId}&scope=${scopes}&session=false&state=${clubId}`;
+  const origin = new URL(request.url).origin;
+  const redirectUri = encodeURIComponent(`${origin}/api/pay/square/callback`);
+  const authUrl = `${baseUrl}/oauth2/authorize?client_id=${appId}&scope=${scopes}&session=false&state=${clubId}&redirect_uri=${redirectUri}`;
 
   return NextResponse.redirect(authUrl);
 }
