@@ -83,6 +83,22 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [isSavingSeason, setIsSavingSeason] = useState(false);
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
 
+  useEffect(() => {
+    if (clubInfo) {
+      setPayIdType(clubInfo.pay_id_type || 'mobile');
+      setPayId(clubInfo.pay_id_value || "");
+      setAcceptsCash(clubInfo.accepts_cash ?? true);
+      setAcceptsCard(clubInfo.accepts_card ?? true);
+      setExpenseLabel(clubInfo.expense_label || "");
+      setDefaultUmpireFee(clubInfo.default_umpire_fee != null ? clubInfo.default_umpire_fee : "");
+      setSquareToken(clubInfo.square_access_token || "");
+      setSquareLocationId(clubInfo.square_location_id || "");
+      setSeasonName(clubInfo.season_name || "");
+      setSeasonStart(clubInfo.season_start || "");
+      setSeasonEnd(clubInfo.season_end || "");
+    }
+  }, [clubInfo]);
+
   const teamId = teams && teams.length > 0 ? teams[0].id : null;
 
   const [loadingText, setLoadingText] = useState("");

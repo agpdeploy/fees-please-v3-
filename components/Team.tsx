@@ -107,7 +107,7 @@ export default function Team() {
       if (!targetTeamId) { setIsLoading(false); return; }
 
       // Fetch all players for the club to allow cross-team causal adding
-      const { data: playersData } = await supabase.from("players").select("id, first_name, last_name, nickname, default_team_id, is_member").eq("club_id", activeClubId);
+      const { data: playersData } = await supabase.from("players").select("id, first_name, last_name, nickname, email, default_team_id, is_member").eq("club_id", activeClubId);
       const allPlayers = playersData || [];
       setClubPlayers(allPlayers);
 
@@ -183,7 +183,7 @@ export default function Team() {
       today.setHours(0,0,0,0);
       const { data: rawFixtures } = await supabase
         .from("fixtures")
-        .select("id, opponent, match_date, team_id, status")
+        .select("id, opponent, match_date, team_id, status, reminder_sent")
         .eq("team_id", targetTeamId);
 
       let fixtures: any[] = [];
@@ -316,6 +316,8 @@ export default function Team() {
     } catch (err) {
       console.error(err);
       showToast("Error loading analytics", "error");
+    } finally {
+      setIsStatsLoading(false);
     }
   }
 
@@ -368,7 +370,8 @@ export default function Team() {
       showToast(`Sent ${data.sentCount} reminder${data.sentCount !== 1 ? 's' : ''}!`);
       
       if (availabilityMode === 'email_players') {
-        setAvailabilityMode('menu');
+        await fetchEmailLogs(fixture.id);
+        setEmailSelectedPlayerIds([]);
       }
       setRefreshTrigger(prev => prev + 1); // Refresh data so reminder_sent flag is updated
     } catch (err: any) {
@@ -389,7 +392,7 @@ export default function Team() {
         teamId: selectedTeamId,
         selectedPlayerIds: squadEmailSelectedPlayerIds,
         customMessage: squadEmailNote,
-        senderName: profile?.first_name || "Your Team Manager"
+        senderName: profile?.first_name || "Your Team Admin"
       };
 
       const response = await fetch('/api/send-squad', {
@@ -543,12 +546,12 @@ export default function Team() {
 
       {/* SECTION: PLAYER AVAILABILITY */}
       <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm flex flex-col gap-4 mt-2">
-         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-2">
+         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
-                 <i className="fa-solid fa-calendar-days text-sm"></i>
+                 <i className="fa-solid fa-users text-sm"></i>
               </div>
-              <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Player Availability</h2>
+              <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Team Hub</h2>
             </div>
             <div className="flex gap-2">
                <button 
@@ -565,6 +568,10 @@ export default function Team() {
                </button>
             </div>
          </div>
+
+         <p className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 leading-relaxed px-1 mb-2">
+           Manage your players' availability and lock in match squads.
+         </p>
 
          {isHubVisible && selectedTeamId && (
             <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden mb-6 relative bg-zinc-50 dark:bg-zinc-950 animate-in fade-in slide-in-from-top-2">
@@ -608,7 +615,7 @@ export default function Team() {
                              <div className="flex gap-2 sm:gap-3 text-[9px] font-black uppercase tracking-widest">
                                 <span className="text-emerald-600 dark:text-emerald-500">{f.lists.yes.length} YES</span>
                                 <span className="text-amber-500">{f.lists.maybe.length} MAYBE</span>
-                                <span className="text-zinc-400 dark:text-zinc-500">{f.lists.pending.length} NO REPLY</span>
+                                <span className="text-zinc-400 dark:text-zinc-500">{f.lists.pending.length} PENDING</span>
                                 <span className="text-red-500">{f.lists.no.length} NO</span>
                              </div>
                              <i className={`fa-solid fa-chevron-down text-zinc-400 text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
@@ -670,7 +677,7 @@ export default function Team() {
                                                   !respondedIds.has(p.id) && 
                                                   p.email && 
                                                   p.unsubscribed !== true && 
-                                                  (!hasSent || isSuperAdmin);
+                                                  !hasSent;
                                          });
                                          setEmailSelectedPlayerIds(pending.map(p => p.id));
                                          setAvailabilityMode('email_players');
@@ -796,7 +803,7 @@ export default function Team() {
                                              const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
                                              const avail = modalAvailData.find(a => a.player_id === p.id);
                                              const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
-                                             return p.default_team_id === f.team_id && p.email && p.email.trim() !== '' && p.unsubscribed !== true && (!hasSent || isSuperAdmin) && !hasResponded;
+                                             return p.default_team_id === f.team_id && p.email && p.email.trim() !== '' && p.unsubscribed !== true && !hasSent && !hasResponded;
                                            });
                                            if (emailSelectedPlayerIds.length === eligible.length && eligible.length > 0) {
                                               setEmailSelectedPlayerIds([]);
@@ -831,7 +838,7 @@ export default function Team() {
                                          const config = {
                                            yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
                                            maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                                           no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                                           no_reply: { label: "Pending", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
                                            no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
                                          }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
 
@@ -848,61 +855,57 @@ export default function Team() {
                                              </button>
                                              
                                              {isSecExpanded && (
-                                               <div className="flex flex-wrap gap-2.5 pt-2 pb-1 animate-in fade-in">
+                                               <div className="flex flex-wrap gap-2 pt-2 pb-1 animate-in fade-in">
                                                  {sectionPlayers.map(p => {
                                                    const avail = modalAvailData.find(a => a.player_id === p.id);
-                                                   const isSelected = emailSelectedPlayerIds.includes(p.id);
-                                                   const hasEmail = !!p.email;
-                                                   const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
-                                                   const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
-                                                   const isSuperAdmin = profile?.role === 'super_admin';
-                                                   const isLocked = hasSent && !isSuperAdmin;
-                                                   const isDisabled = !hasEmail || p.unsubscribed === true || isLocked;
-                                                   
-                                                   return (
-                                                     <button 
-                                                       key={p.id} 
-                                                       onClick={() => {
-                                                         if (isDisabled) return;
-                                                         if (isSelected) {
-                                                           setEmailSelectedPlayerIds(prev => prev.filter(id => id !== p.id));
-                                                         } else {
-                                                           setEmailSelectedPlayerIds(prev => [...prev, p.id]);
-                                                         }
-                                                       }}
-                                                       disabled={isDisabled}
-                                                       className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex flex-col items-center gap-1.5 ${
-                                                         isSelected 
-                                                           ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' 
-                                                           : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
-                                                       } ${isDisabled ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
-                                                     >
-                                                       <div className="flex items-center gap-2">
-                                                         {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
-                                                         {isSelected ? (
-                                                           <i className="fa-solid fa-check text-[10px]"></i>
-                                                         ) : (
-                                                           <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
-                                                         )}
-                                                       </div>
-                                                       
-                                                       <div className={`text-[8px] font-black tracking-widest mt-0.5 flex items-center gap-1 ${isSelected ? 'text-emerald-100' : 'text-zinc-500'}`}>
-                                                         {!hasEmail ? (
-                                                           <><i className="fa-solid fa-envelope-circle-xmark text-red-500"></i> No Email</>
-                                                         ) : p.unsubscribed ? (
-                                                           <><i className="fa-solid fa-ban text-amber-500"></i> Unsub</>
-                                                         ) : isLocked ? (
-                                                           <><i className="fa-solid fa-paper-plane text-blue-500"></i> Sent</>
-                                                         ) : hasResponded ? (
-                                                           <><i className="fa-solid fa-reply text-emerald-500"></i> Responded</>
-                                                         ) : hasSent ? (
-                                                           <><i className="fa-solid fa-paper-plane text-blue-500"></i> Sent (Resend)</>
-                                                         ) : (
-                                                           <><i className="fa-regular fa-envelope"></i> Sendable</>
-                                                         )}
-                                                       </div>
-                                                     </button>
-                                                   );
+                                                    const isSelected = emailSelectedPlayerIds.includes(p.id);
+                                                    const hasEmail = !!p.email;
+                                                    const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
+                                                    const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
+                                                    const isLocked = hasSent || hasResponded;
+                                                    const isDisabled = !hasEmail || p.unsubscribed === true || isLocked;
+                                                    
+                                                    return (
+                                                      <button 
+                                                        key={p.id}
+                                                        disabled={isDisabled}
+                                                        onClick={() => {
+                                                          if (!isDisabled) {
+                                                             setEmailSelectedPlayerIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
+                                                          }
+                                                        }}
+                                                        className={`relative flex flex-col p-3 rounded-xl border transition-all text-left min-w-[140px] flex-1 sm:flex-none ${
+                                                          isSelected ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-400 dark:border-emerald-500/50 shadow-sm' : 
+                                                          isDisabled ? 'bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-60' : 
+                                                          'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-700'
+                                                        }`}
+                                                      >
+                                                        <div className="flex justify-between items-start mb-2 gap-4 w-full">
+                                                          <span className={`text-[11px] font-black uppercase tracking-widest ${isDisabled ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                                                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                                          </span>
+                                                          {isSelected ? (
+                                                            <div className="w-5 h-5 rounded bg-emerald-500 text-white flex items-center justify-center shadow-sm shrink-0">
+                                                              <i className="fa-solid fa-check text-[10px]"></i>
+                                                            </div>
+                                                          ) : isDisabled ? null : (
+                                                            <div className="text-zinc-300 dark:text-zinc-700 text-xs font-black">+</div>
+                                                          )}
+                                                        </div>
+                                                        
+                                                        <div className="text-[8px] font-bold tracking-widest uppercase flex items-center gap-1 mt-auto">
+                                                          {!hasEmail ? (
+                                                            <span className="text-red-500"><i className="fa-solid fa-envelope-circle-xmark mr-1"></i> No Email</span>
+                                                          ) : p.unsubscribed ? (
+                                                            <span className="text-amber-500"><i className="fa-solid fa-ban mr-1"></i> Unsubscribed</span>
+                                                          ) : isLocked ? (
+                                                            <span className="text-zinc-400 dark:text-zinc-500"><i className={`fa-solid ${hasResponded ? 'fa-reply' : 'fa-paper-plane'} mr-1`}></i> {hasResponded ? 'Responded' : 'Sent'}</span>
+                                                          ) : (
+                                                            <span className="text-emerald-500"><i className="fa-regular fa-envelope mr-1"></i> Ready to Send</span>
+                                                          )}
+                                                        </div>
+                                                      </button>
+                                                    );
                                                  })}
                                                </div>
                                              )}
@@ -917,7 +920,7 @@ export default function Team() {
                                        className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
                                      >
                                        {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                                       Send {emailSelectedPlayerIds.length > 0 ? `to ${emailSelectedPlayerIds.length} Player${emailSelectedPlayerIds.length !== 1 ? 's' : ''}` : 'Emails'}
+                                       Send Availability Emails {emailSelectedPlayerIds.length > 0 ? `to ${emailSelectedPlayerIds.length} Player${emailSelectedPlayerIds.length !== 1 ? 's' : ''}` : ''}
                                      </button>
                                    </div>
                                  )}
@@ -968,7 +971,7 @@ export default function Team() {
                                               const config = {
                                                 yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
                                                 maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                                                no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                                                no_reply: { label: "Pending", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
                                                 no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
                                               }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
 
@@ -1271,7 +1274,7 @@ export default function Team() {
                                           const config = {
                                             yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
                                             maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                                            no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                                            no_reply: { label: "Pending", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
                                             no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
                                           }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
 

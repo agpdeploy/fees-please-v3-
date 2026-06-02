@@ -225,8 +225,18 @@ export default function Home() {
         handleTabChange('setup'); 
       }
     };
+    const handleNavigateTab = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        handleTabChange(customEvent.detail); 
+      }
+    };
     window.addEventListener('navigate-setup', handleNavigateSetup);
-    return () => window.removeEventListener('navigate-setup', handleNavigateSetup);
+    window.addEventListener('navigate-tab', handleNavigateTab);
+    return () => {
+      window.removeEventListener('navigate-setup', handleNavigateSetup);
+      window.removeEventListener('navigate-tab', handleNavigateTab);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -262,7 +272,7 @@ export default function Home() {
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Account Admin' : 
-                      currentClubRole === 'team_admin' ? 'Team Manager' : 'Player';
+                      currentClubRole === 'team_admin' ? 'Team Admin' : 'Player';
 
   const userMeta = session?.user?.user_metadata || {};
   const avatarUrl = userMeta?.avatar_url;
@@ -389,7 +399,8 @@ export default function Home() {
       </main>
 
       {/* RESTORED BOTTOM NAVIGATION FOR PWA */}
-      <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pt-3 pb-2">
+      {!isDaiveOpen && (
+        <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pt-3 pb-2">
         <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
           <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
             <i className="fa-solid fa-stopwatch text-xl mb-1"></i><span>GameDay</span>
@@ -402,6 +413,7 @@ export default function Home() {
           </button>
         </div>
       </nav>
+      )}
 
       {/* SIDEBAR FOR MANAGEMENT */}
       {isSidebarOpen && (
@@ -437,7 +449,7 @@ export default function Home() {
             </div>
 
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
-              {canManage && (
+              {isAdmin && (
                 <div>
                   {/* APP MANAGEMENT SECTION */}
                   <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">App Management</div>
@@ -466,7 +478,7 @@ export default function Home() {
                   )}
 
                   {/* TEAM MANAGEMENT SECTION */}
-                  {canManage && (
+                  {isAdmin && (
                     <div className="px-6 py-2 mt-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Team Management</div>
                   )}
 
@@ -475,7 +487,7 @@ export default function Home() {
                       <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
                     </button>
                   )}
-                  {canManage && (
+                  {isAdmin && (
                     <>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
@@ -486,15 +498,9 @@ export default function Home() {
                     </>
                   )}
 
-                  {/* BOTTOM SECTION */}
-                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-800 pt-2">
-                    <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                      <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
-                    </button>
-                  </div>
                   
                   {/* MANUAL FORCE REFRESH FOR ADMINS (Bypass Cache) */}
-                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-4">
                     <button onClick={applyUpdate} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
                       <i className="fa-solid fa-arrows-rotate w-5 text-center"></i> Force Update App
                     </button>
@@ -502,6 +508,14 @@ export default function Home() {
                       Version: {APP_VERSION}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {canManage && (
+                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                  <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                    <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
+                  </button>
                 </div>
               )}
             </div>

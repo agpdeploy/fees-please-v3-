@@ -1,6 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
+
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+});
 
 /**
  * Fallback generator for native @google/generative-ai SDK.

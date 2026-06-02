@@ -35,7 +35,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Fixture not found' }, { status: 404 });
     }
     
-    if (fixture.reminder_sent && action === 'send') {
+    if (fixture.reminder_sent && action === 'send' && (!selectedPlayerIds || selectedPlayerIds.length === 0)) {
+      // Allow sending to specifically selected players even if a reminder was already sent
       return NextResponse.json({ error: 'A reminder has already been sent for this game.' }, { status: 400 });
     }
 
@@ -110,9 +111,9 @@ export async function POST(req: Request) {
     const isTestingEnv = process.env.NODE_ENV !== 'production';
     
     // In testing mode, strictly limit the blast to only 2 players max
-    if (isTestingEnv) {
-      pendingPlayers = pendingPlayers.slice(0, 2);
-    }
+    // if (isTestingEnv) {
+    //   pendingPlayers = pendingPlayers.slice(0, 2);
+    // }
 
     if (pendingPlayers.length === 0) {
       return NextResponse.json({ 
@@ -302,6 +303,7 @@ export async function POST(req: Request) {
 
       return {
         from: `${teamName} Availability Hub <reminders@mail.feesplease.app>`,
+        reply_to: 'noreply@mail.feesplease.app',
         to: targetEmail,
         subject: `${isTestingEnv ? '[TEST] ' : ''}Availability for upcoming match ${teamName} vs ${fixture.opponent || 'TBA'}`,
         html: htmlContent,
@@ -323,7 +325,8 @@ export async function POST(req: Request) {
           fixture_id: fixtureId,
           player_id: player.id,
           team_id: teamId,
-          status: 'sent'
+          status: 'sent',
+          email_type: 'availability_reminder'
         })).filter(log => log.resend_id);
         
         if (emailLogs.length > 0) {

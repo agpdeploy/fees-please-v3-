@@ -1041,7 +1041,7 @@ export default function Setup({ activeTab }: SetupProps) {
                   onClick={() => setInviteRole('team_admin')} 
                   className={`flex-1 py-3 text-[10px] font-black uppercase rounded-lg transition-all ${inviteRole === 'team_admin' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                 >
-                  Team Manager
+                  Team Admin
                 </button>
               </div>
 
@@ -1099,7 +1099,7 @@ export default function Setup({ activeTab }: SetupProps) {
                         <div key={user.id} className="flex flex-col bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-100 dark:border-zinc-700/50">
                           <div className="flex justify-between items-center">
                             <div className={`text-[9px] font-black uppercase tracking-widest ${user.role === 'club_admin' ? 'text-blue-500 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
-                              {user.role === 'club_admin' ? 'Account Admin' : 'Team Manager'}
+                              {user.role === 'club_admin' ? 'Account Admin' : 'Team Admin'}
                               {user.role === 'team_admin' && user.teams?.name && ` • ${user.teams.name}`}
                             </div>
                             <div className="flex gap-2">
@@ -1125,7 +1125,7 @@ export default function Setup({ activeTab }: SetupProps) {
                                   className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500"
                                 >
                                   <option value="club_admin">Account Admin</option>
-                                  <option value="team_admin">Team Manager</option>
+                                  <option value="team_admin">Team Admin</option>
                                 </select>
                                 
                                 {editRoleAssigned === 'team_admin' && (

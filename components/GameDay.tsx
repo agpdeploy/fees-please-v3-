@@ -227,7 +227,9 @@ export default function GameDay() {
               season_end: data.season_end,
               default_umpire_fee: data.default_umpire_fee,
               accepts_cash: data.accepts_cash,
-              accepts_card: data.accepts_card
+              accepts_card: data.accepts_card,
+              square_access_token: data.square_access_token,
+              square_location_id: data.square_location_id
             });
             setIsSquareEnabled(!!data.square_access_token);
           }
@@ -374,7 +376,7 @@ export default function GameDay() {
       setSquad([]);
     }
     
-    const { data: availData } = await supabase.from('player_availability').select('*').eq('fixture_id', activeFixture.id);
+    const { data: availData } = await supabase.from('availability').select('*').eq('fixture_id', activeFixture.id);
     if (availData) setFixtureAvailability(availData);
     
     setIsSquadLoading(false);
@@ -1093,7 +1095,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
+      {profile && profile.onboarding_completed !== true && profile.role === 'club_admin' && (
           <SetupChecklist 
             user={profile}
             activeClubId={activeClubId} 
@@ -1113,9 +1115,9 @@ export default function GameDay() {
           />
       )}
 
-      {(profile?.onboarding_completed === true || profile?.role === 'super_admin') && (
+      {(profile?.onboarding_completed === true || profile?.role !== 'club_admin') && (
         <>
-          {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 0 && (
+          {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 1 && (
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Manager View</label>
           <select value={selectedTeamId || ""} onChange={(e) => { setSelectedTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
@@ -1200,7 +1202,7 @@ export default function GameDay() {
             </>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-              Waiting for your Team Manager to add the schedule.
+              Waiting for your Team Admin to add the schedule.
             </p>
           )}
         </div>
@@ -1291,7 +1293,6 @@ export default function GameDay() {
                      </div>
                    </div>
                 )}
-                
                 {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
                   const sectionPlayers = clubPlayers.filter(p => {
                     const avail = fixtureAvailability.find(a => a.player_id === p.id);
@@ -1309,11 +1310,11 @@ export default function GameDay() {
                   const config = {
                     yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
                     maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+                    no_reply: { label: fixtureAvailability.length > 0 ? "No Reply" : "Squad Players", color: "text-zinc-400 dark:text-zinc-500", icon: fixtureAvailability.length > 0 ? "fa-circle" : "fa-users" },
                     no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
                   }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
 
-                  const isSecExpanded = expandedPoolSections[section] || playerSearch.trim().length > 0;
+                  const isSecExpanded = expandedPoolSections[section] || playerSearch.trim().length > 0 || (fixtureAvailability.length === 0 && section === 'no_reply');
                   const toggleSec = () => setExpandedPoolSections(prev => ({...prev, [section]: !prev[section]}));
 
                   return (
@@ -1352,6 +1353,18 @@ export default function GameDay() {
                      All players are in the squad!
                    </div>
                 )}
+                
+                {fixtureAvailability.length === 0 && (
+                   <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 rounded-xl p-4 mt-6 mb-2 text-center">
+                     <p className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-2"><i className="fa-solid fa-lightbulb text-amber-500 mr-1.5"></i> Did you know?</p>
+                     <p className="text-[10px] text-zinc-600 dark:text-zinc-400 mb-3 font-bold leading-relaxed">You can share your own Availability Hub with your team so players can RSVP for upcoming matches!</p>
+                     <button onClick={() => {
+                        window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'team' }));
+                     }} className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 text-emerald-700 dark:text-emerald-400 px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95">
+                        Go to Team Hub <i className="fa-solid fa-arrow-right ml-1"></i>
+                     </button>
+                   </div>
+                )}
               </div>
             </div>
           )}
@@ -1362,30 +1375,32 @@ export default function GameDay() {
                  <i className="fa-solid fa-circle-notch fa-spin text-emerald-500 text-2xl"></i>
                </div>
             ) : squad.length === 0 ? (
-               <div className="w-full text-center py-8 px-6 border-2 border-dashed border-emerald-500/50 dark:border-emerald-900/50 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10 transition-colors flex flex-col items-center">
-                 <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-3 text-emerald-600 dark:text-emerald-500">
-                   <i className="fa-solid fa-clipboard-user text-xl"></i>
+               !isManageSquadExpanded ? (
+                 <div className="w-full text-center py-8 px-6 border-2 border-dashed border-emerald-500/50 dark:border-emerald-900/50 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10 transition-colors flex flex-col items-center">
+                   <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-3 text-emerald-600 dark:text-emerald-500">
+                     <i className="fa-solid fa-clipboard-user text-xl"></i>
+                   </div>
+                   <h3 className="font-black uppercase tracking-widest text-xs text-emerald-800 dark:text-emerald-400 mb-1">Who's Available?</h3>
+                   
+                   {canManage ? (
+                     <>
+                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 leading-relaxed">
+                         Select the players for this match so you can collect fees.
+                       </p>
+                       <button 
+                         onClick={() => toggleManageSquad(true)}
+                         className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+                       >
+                         <i className="fa-solid fa-user-plus"></i> Select Squad
+                       </button>
+                     </>
+                   ) : (
+                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 leading-relaxed">
+                        Waiting for your Team Admin to assign the match players.
+                      </p>
+                   )}
                  </div>
-                 <h3 className="font-black uppercase tracking-widest text-xs text-emerald-800 dark:text-emerald-400 mb-1">Who's Available?</h3>
-                 
-                 {canManage ? (
-                   <>
-                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 leading-relaxed">
-                       Select the players for this match so you can collect fees.
-                     </p>
-                     <button 
-                       onClick={() => toggleManageSquad(true)}
-                       className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
-                     >
-                       <i className="fa-solid fa-user-plus"></i> Select Team
-                     </button>
-                   </>
-                 ) : (
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 leading-relaxed">
-                      Waiting for your Team Manager to assign the match players.
-                    </p>
-                 )}
-               </div>
+               ) : null
             ) : squadToPay.length === 0 && squadPaid.length > 0 ? (
               <div className="w-full text-center py-6 border border-dashed border-emerald-500/30 dark:border-emerald-900/50 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 transition-colors animate-in zoom-in-95">
                 <i className="fa-solid fa-check-double text-2xl text-emerald-500 mb-2"></i>

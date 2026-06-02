@@ -281,10 +281,12 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
           </h2>
         </div>
         
-        <select value={addTeamId || ""} onChange={(e) => { setAddTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
-          {teams.length > 1 && <option value="">-- View All Club Players --</option>}
-          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        {teams.length > 1 && (
+          <select value={addTeamId || ""} onChange={(e) => { setAddTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
+            <option value="">-- View All Club Players --</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
 
         {addTeamId && (
           <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-5 transition-colors">
@@ -597,7 +599,7 @@ function PlayerRow({
           )}
           {!hasClubAdmin && hasTeamAdmin && (
             <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-              Team Manager
+              Team Admin
             </span>
           )}
           

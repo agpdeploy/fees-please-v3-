@@ -19,13 +19,37 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY 
     );
 
+    let userRole = "Member";
+    if (userId !== "Unknown") {
+      const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
+      if (profile?.role === 'super_admin') {
+        userRole = "Super Admin";
+      } else if (activeClub) {
+        const { data: roleData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', userId).eq('club_id', activeClub).single();
+        if (roleData) {
+          userRole = roleData.role === 'club_admin' ? 'Club Admin' : (roleData.role === 'team_admin' ? 'Team Admin' : 'Member');
+        }
+      }
+    }
+
     const modelParams = {
       maxSteps: 10,
       system: `You are dAIve, the legendary, smart assistant for "Fees Please". 
       
-      CORE IDENTITY:
+      CORE IDENTITY & TONE:
       - You are a helpful, direct club mate. No robotic filler.
-      - If the user is frustrated, stay calm, be helpful, and find the data.
+      - CONCISENESS IS MANDATORY: Keep responses under 3 sentences whenever possible. Never output large walls of text. 
+      - The user speaking to you has the role: ${userRole}. Tailor your advice to what this role can do (e.g. Club Admins manage global settings and all teams; Team Admins manage only their assigned teams).
+      
+      SETUP & PROACTIVE HELP:
+      - If the user asks for setup help, or asks general questions like "what's next?" or "getting started", ALWAYS use 'get_club_setup_status' to check their progress.
+      - After checking status, proactively point out ONE missing step and ask if they'd like help with it. Do NOT list everything at once. Keep a conversation flowing.
+      
+      SECURITY & GUARDRAILS (STRICT):
+      - You are strictly an assistant for the Fees Please application.
+      - NEVER share, explain, or discuss internal database schemas, source code, API keys, infrastructure, or technical admin links.
+      - If asked about these, politely decline and steer the conversation back to managing the club.
+      - Do not output raw JSON or SQL.
       
       KNOWLEDGE & TOOLS:
       - "What is Fees Please?": Payment/roster app for grassroots clubs.
@@ -37,6 +61,26 @@ export async function POST(req: Request) {
       CRITICAL: If a tool returns "No data", explain that it might be a scoping issue (e.g., no club selected). Do NOT just go silent.`,
       messages,
       tools: {
+        get_club_setup_status: tool({
+          description: 'Check the database to see what setup steps the club has completed.',
+          parameters: z.object({}),
+          execute: async () => {
+            if (!activeClub) return "ERROR: No club selected.";
+            const { count: teams } = await supabaseAdmin.from('teams').select('*', { count: 'exact', head: true }).eq('club_id', activeClub);
+            const { count: players } = await supabaseAdmin.from('players').select('*', { count: 'exact', head: true }).eq('club_id', activeClub);
+            const { count: fixtures } = await supabaseAdmin.from('fixtures').select('*', { count: 'exact', head: true }).eq('club_id', activeClub);
+            const { data: club } = await supabaseAdmin.from('clubs').select('stripe_account_id, square_access_token').eq('id', activeClub).single();
+            
+            const hasPayments = !!(club?.stripe_account_id || club?.square_access_token);
+            
+            return JSON.stringify({
+               teams_created: teams && teams > 0,
+               players_added: players && players > 0,
+               fixtures_added: fixtures && fixtures > 0,
+               payments_configured: hasPayments
+            });
+          }
+        }),
         searchKnowledgeBase: tool({
           description: 'Search the wiki for technical guides like "permissions" or "setup".',
           parameters: z.object({ query: z.string() }),
@@ -116,9 +160,23 @@ export async function POST(req: Request) {
         }
     }
 
-    return NextResponse.json({ text: finalText });
+    let logId = undefined;
+    try {
+        const { data: logData } = await supabaseAdmin.from('ai_logs').insert({
+            user_id: userId !== "Unknown" ? userId : null,
+            prompt: lastUserMessage,
+            response: finalText,
+            session_id: activeClub || 'general',
+            metadata: { feature: 'daive_chat', club_id: activeClub }
+        }).select('id').single();
+        logId = logData?.id;
+    } catch (logErr) {
+        console.error("Failed to log to ai_logs", logErr);
+    }
+
+    return NextResponse.json({ text: finalText, logId });
   } catch (error) {
     console.error("CRITICAL ERROR:", error);
-    return NextResponse.json({ text: "Total stitch-up on the server, mate." }, { status: 500 });
+    return NextResponse.json({ text: "Total stitch-up on the server, mate.", error: String(error) }, { status: 500 });
   }
 }

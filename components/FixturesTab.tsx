@@ -310,10 +310,12 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
           </h2>
         </div>
         
-        <select value={fixtureTeamId || ""} onChange={(e) => setFixtureTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
-          <option value="">-- Select Team to Add Matches --</option>
-          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        {teams.length > 1 && (
+          <select value={fixtureTeamId || ""} onChange={(e) => setFixtureTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
+            <option value="">-- Select Team to Add Matches --</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
 
         <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-5 transition-colors">
           <button
@@ -744,7 +746,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
                   const config = {
                     yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check", dot: "text-emerald-400" },
                     maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question", dot: "text-amber-400" },
-                    no_reply: { label: "No Reply", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle", dot: "text-zinc-400" },
+                    no_reply: { label: availabilityData.length > 0 ? "No Reply" : "Squad Players", color: "text-zinc-400 dark:text-zinc-500", icon: availabilityData.length > 0 ? "fa-circle" : "fa-users", dot: "text-zinc-400" },
                     no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark", dot: "text-red-400" }
                   }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
 
@@ -788,6 +790,18 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
                     </div>
                   );
                 })}
+                
+                {availabilityData.length === 0 && (
+                   <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 rounded-xl p-4 mt-6 mb-2 text-center">
+                     <p className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-2"><i className="fa-solid fa-lightbulb text-amber-500 mr-1.5"></i> Did you know?</p>
+                     <p className="text-[10px] text-zinc-600 dark:text-zinc-400 mb-3 font-bold leading-relaxed">You can share your own Availability Hub with your team so players can RSVP for upcoming matches!</p>
+                     <button onClick={() => {
+                        window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'team' }));
+                     }} className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 text-emerald-700 dark:text-emerald-400 px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95">
+                        Go to Team Hub <i className="fa-solid fa-arrow-right ml-1"></i>
+                     </button>
+                   </div>
+                )}
               </div>
 
               <div className="mt-8 flex gap-3">

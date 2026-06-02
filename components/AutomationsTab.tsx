@@ -81,10 +81,10 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
   };
 
   useEffect(() => {
-    if (clubId && clubId !== 'new') {
+    if (clubId && clubId !== 'new' && roles !== undefined) {
       fetchReports();
     }
-  }, [clubId]);
+  }, [clubId, isClubAdmin]);
 
   const upsertReport = async (payload: any) => {
     const cleanPayload = { ...payload };

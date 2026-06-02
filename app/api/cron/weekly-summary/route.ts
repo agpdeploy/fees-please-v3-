@@ -272,6 +272,38 @@ export async function GET(req: Request) {
       const entityName = report.report_type === 'club_summary' ? clubName : `${clubName} - ${teamName}`;
       const subjectDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
+      // Fetch team profile for logo and sponsors
+      let tpQuery = supabaseAdmin.from('public_team_profiles').select('club_logo_url, sponsor_1_logo, sponsor_1_url, sponsor_2_logo, sponsor_2_url, sponsor_3_logo, sponsor_3_url').eq('club_id', clubId);
+      if (teamId) {
+        tpQuery = tpQuery.eq('team_id', teamId);
+      }
+      tpQuery = tpQuery.limit(1).maybeSingle();
+      const { data: tpData } = await tpQuery;
+
+      let sponsorsHtml = '';
+      if (tpData && (tpData.sponsor_1_logo || tpData.sponsor_2_logo || tpData.sponsor_3_logo)) {
+        const sponsors = [
+          { logo: tpData.sponsor_1_logo, url: tpData.sponsor_1_url },
+          { logo: tpData.sponsor_2_logo, url: tpData.sponsor_2_url },
+          { logo: tpData.sponsor_3_logo, url: tpData.sponsor_3_url }
+        ].filter(s => s.logo);
+        
+        if (sponsors.length > 0) {
+          sponsorsHtml = `
+            <div style="margin-top: 32px; margin-bottom: 8px; text-align: center;">
+              <p style="font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 0;">Supported By</p>
+              <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                <tr>
+                  ${sponsors.map(s => `<td align="center" style="padding: 0 8px;">${s.url ? `<a href="${s.url}" target="_blank">` : ''}<img src="${s.logo}" alt="Sponsor" height="32" style="max-height: 32px; width: auto; display: block;" />${s.url ? `</a>` : ''}</td>`).join('')}
+                </tr>
+              </table>
+            </div>
+          `;
+        }
+      }
+      
+      const teamLogoUrl = tpData?.club_logo_url || null;
+
       // --- FINAL EMAIL HTML (LIGHT THEME) ---
       const htmlContent = `
         <div style="background-color: #f4f4f5; padding: 32px 16px; text-align: center;">
@@ -279,7 +311,10 @@ export async function GET(req: Request) {
             
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
               <tr>
-                <td align="left">
+                ${teamLogoUrl ? `<td width="48" align="left" valign="middle" style="padding-right: 12px;">
+                  <img src="${teamLogoUrl}" width="48" height="48" style="display: block; border-radius: 8px; border: 1px solid #e4e4e7; background-color: #ffffff; object-fit: contain;" />
+                </td>` : ''}
+                <td align="left" valign="middle">
                   <h1 style="color: #10b981; font-size: 24px; font-style: italic; text-transform: uppercase; margin: 0 0 4px 0; font-weight: 900; letter-spacing: -0.5px;">Fees Please</h1>
                   <h2 style="font-size: 12px; color: #71717a; margin: 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Weekly Insights for ${entityName}</h2>
                 </td>
@@ -358,8 +393,15 @@ export async function GET(req: Request) {
             ${fixturesHtml}
 
             <!-- Footer -->
+            ${sponsorsHtml}
+            <div style="text-align: center; margin-top: 24px;">
+              <p style="color: #a1a1aa; font-size: 12px;">You received this email because you are an admin for ${entityName} on Fees Please.</p>
+            </div>
             <div style="text-align: center; margin-top: 32px;">
-              <p style="color: #a1a1aa; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">You received this email because you are an admin for ${entityName} on Fees Please.</p>
+              <a href="https://feesplease.app" target="_blank" style="text-decoration: none;">
+                <p style="font-size: 10px; font-weight: 700; color: #a1a1aa; margin-bottom: 8px; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">Powered By</p>
+                <img src="https://app.feesplease.app/branding/logo-green-1000x300.png" alt="Fees Please" height="32" style="height: 32px; width: auto;" />
+              </a>
             </div>
           </div>
         </div>

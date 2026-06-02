@@ -13,7 +13,7 @@ const INITIAL_MESSAGE: Message = {
   content: "I'm **dAIve**. I can help you search the manual, check the ledger, and pull fixture data.\n\nWhat do you need a hand with?"
 };
 
-const QUICK_PROMPTS = ["How do I set up my club?", "How much money have we collected?", "When is our next game?"];
+const QUICK_PROMPTS = ["Can you help me get started?", "How much money have we collected?", "When is our next game?"];
 const THINKING_STATES = ["Analyzing request...", "Searching the manual...", "Checking ledger...", "Formatting response..."];
 
 export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClose?: () => void }) {
@@ -26,6 +26,23 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
   const { profile } = useProfile();
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const key = `daive_chat_${activeClubId || 'default'}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        setMessages(JSON.parse(saved));
+      } catch (e) { }
+    }
+  }, [activeClubId]);
+
+  useEffect(() => {
+    const key = `daive_chat_${activeClubId || 'default'}`;
+    if (messages.length > 1) {
+      localStorage.setItem(key, JSON.stringify(messages));
+    }
+  }, [messages, activeClubId]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -89,11 +106,23 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
             <div className="text-[10px] text-emerald-100 font-medium uppercase tracking-widest mt-0.5">Tactical Support</div>
           </div>
         </div>
-        {onClose && (
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors">
-            <i className="fa-solid fa-chevron-down"></i>
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => {
+              setMessages([INITIAL_MESSAGE]);
+              localStorage.removeItem(`daive_chat_${activeClubId || 'default'}`);
+            }}
+            title="Reset Chat"
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors text-emerald-100"
+          >
+            <i className="fa-solid fa-rotate-right"></i>
           </button>
-        )}
+          {onClose && (
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors">
+              <i className="fa-solid fa-chevron-down"></i>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* CHAT AREA */}
@@ -143,6 +172,9 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
             <i className="fa-solid fa-paper-plane text-sm"></i>
           </button>
         </form>
+        <div className="text-center mt-2 text-[10px] text-zinc-500 dark:text-zinc-400">
+          dAIve is an AI assistant and may make mistakes.
+        </div>
       </div>
     </div>
   );

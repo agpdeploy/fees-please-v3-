@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     });
 
     const body = await req.json();
-    const { fixtureId, teamId, selectedPlayerIds, customMessage, senderName = "Your Team Manager" } = body;
+    const { fixtureId, teamId, selectedPlayerIds, customMessage, senderName = "Your Team Admin" } = body;
 
     if (!fixtureId || !teamId || !selectedPlayerIds || selectedPlayerIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -202,6 +202,7 @@ export async function POST(req: Request) {
       try {
         const { data: resendData, error: resendError } = await resend.emails.send({
           from: `${club.name} <reminders@mail.feesplease.app>`,
+          reply_to: 'noreply@mail.feesplease.app',
           to: isTestingEnv ? 'emailtesting@feesplease.app' : player.email,
           subject: `You're in! ${fixture.opponent} (${matchDate})`,
           html: htmlContent
