@@ -458,6 +458,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     const payload = draftPlayers.map(p => ({ 
       first_name: p.firstName || p.first_name,
       last_name: p.lastName || p.last_name || "",
+      nickname: p.nickname || null,
+      email: p.email || null,
+      mobile_number: p.mobile_number || null,
       is_member: true,
       club_id: activeClubId,
       default_team_id: targetTeamId, 
