@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
@@ -188,7 +188,11 @@ export default function Team() {
 
       let fixtures: any[] = [];
       if (rawFixtures && rawFixtures.length > 0) {
-        fixtures = rawFixtures.sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+        const upcoming = rawFixtures.filter(f => new Date(f.match_date) >= today)
+          .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+        const past = rawFixtures.filter(f => new Date(f.match_date) < today)
+          .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+        fixtures = [...upcoming, ...past];
       }
 
       if (fixtures && fixtures.length > 0) {
@@ -583,21 +587,36 @@ export default function Team() {
             <p className="text-xs font-bold text-zinc-500 text-center py-6">No upcoming fixtures found.</p>
          ) : (
             <>
-              {fixtureAvail.slice(0, visibleFixtureCount).map(f => {
+              {fixtureAvail.slice(0, visibleFixtureCount).map((f, i) => {
                  const date = new Date(f.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+                 
+                 const today = new Date();
+                 today.setHours(0,0,0,0);
+                 const isPast = new Date(f.match_date) < today;
+                 const prevIsPast = i > 0 ? new Date(fixtureAvail[i-1].match_date) < today : false;
+                 const showPastDivider = isPast && !prevIsPast;
+
                  const yesPct = f.total > 0 ? (f.lists.yes.length / f.total) * 100 : 0;
                  const maybePct = f.total > 0 ? (f.lists.maybe.length / f.total) * 100 : 0;
                  const noPct = f.total > 0 ? (f.lists.no.length / f.total) * 100 : 0;
                  const isExpanded = expandedFixtureId === f.id;
 
                  return (
-                    <div key={f.id} className="bg-zinc-50 dark:bg-[#1A1A1A] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
-                       <button 
-                          onClick={() => handleExpandFixture(f.id)}
-                          className="w-full text-left p-4 focus:outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
-                       >
-                          <div className="flex justify-between items-end mb-3">
-                             <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wide">VS {f.opponent}</span>
+                    <React.Fragment key={f.id}>
+                       {showPastDivider && (
+                         <div className="flex items-center gap-3 mt-8 mb-4">
+                            <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Past Matches</span>
+                            <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
+                         </div>
+                       )}
+                       <div className="bg-zinc-50 dark:bg-[#1A1A1A] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
+                          <button 
+                             onClick={() => handleExpandFixture(f.id)}
+                             className="w-full text-left p-4 focus:outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
+                          >
+                             <div className="flex justify-between items-end mb-3">
+                                <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wide">VS {f.opponent}</span>
                              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
                           </div>
                           
@@ -1361,6 +1380,7 @@ export default function Team() {
                            </div>
                         )}
                     </div>
+                 </React.Fragment>
                  );
               })}
               
