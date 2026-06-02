@@ -12,7 +12,6 @@ import Team from "../components/Team";
 import MyTeam from "../components/MyTeam"; 
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
-import OnboardingFlow from "../components/OnboardingFlow";
 import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
@@ -265,14 +264,6 @@ export default function Home() {
   }
 
   if (!session) return <Login />;
-
-  if (profile && !profile.has_onboarded && roles?.length === 0 && profile.role !== 'super_admin') {
-    return (
-      <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
-        <OnboardingFlow user={session.user} onComplete={() => window.location.reload()} />
-      </div>
-    );
-  }
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Account Admin' : 

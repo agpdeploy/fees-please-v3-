@@ -1095,7 +1095,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {profile && profile.onboarding_completed !== true && profile.role === 'club_admin' && (
+      {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
           <SetupChecklist 
             user={profile}
             activeClubId={activeClubId} 
