@@ -12,7 +12,6 @@ import Team from "../components/Team";
 import MyTeam from "../components/MyTeam"; 
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
-import InitialSetup from "../components/InitialSetup"; 
 import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
@@ -265,10 +264,6 @@ export default function Home() {
   }
 
   if (!session) return <Login />;
-
-  if (profile && !profile.has_onboarded && roles?.length === 0 && profile.role !== 'super_admin') {
-    return <InitialSetup user={session.user} onComplete={() => window.location.reload()} />;
-  }
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Account Admin' : 

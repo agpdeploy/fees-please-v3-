@@ -8,7 +8,7 @@ import { useActiveClub } from "@/contexts/ClubContext";
 import { calculateSquareOnlineGross } from '@/lib/fees';
 import { QRCodeSVG } from 'qrcode.react';
 import { Mark } from './Brand';
-import InitialSetup from './InitialSetup';
+
 import SetupChecklist from './SetupChecklist';
 export default function GameDay() {
   const { profile, roles } = useProfile();
