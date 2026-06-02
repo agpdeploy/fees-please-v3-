@@ -289,9 +289,17 @@ export default function GameDay() {
         .eq('team_id', selectedTeamId);
         
       if (allFix) {
-        const upcoming = allFix.filter(f => !['completed', 'forfeited', 'abandoned'].includes(f.status))
+        const isPastAndUploadedInPast = (f: any) => {
+           if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
+           const matchD = new Date(f.match_date);
+           const today = new Date();
+           const isPastMatch = matchD < new Date(today.setHours(0,0,0,0));
+           const uploadedAfterMatch = new Date(f.created_at) > matchD;
+           return isPastMatch && uploadedAfterMatch;
+        };
+        const upcoming = allFix.filter(f => !isPastAndUploadedInPast(f))
           .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-        const past = allFix.filter(f => ['completed', 'forfeited', 'abandoned'].includes(f.status))
+        const past = allFix.filter(f => isPastAndUploadedInPast(f))
           .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
         setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);

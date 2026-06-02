@@ -498,6 +498,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   const today = new Date();
   const isToday = matchDate.toDateString() === today.toDateString();
   const isPast = matchDate < new Date(today.setHours(0, 0, 0, 0));
+  const isUploadedInPast = new Date(fixture.created_at) > matchDate;
 
   let displayStatus = "";
   let statusClasses = "";
@@ -507,7 +508,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   } else if (fixture.status === 'abandoned') {
     displayStatus = "Abandoned";
     statusClasses = "bg-red-600 text-white shadow-sm";
-  } else if (fixture.status === 'completed' || (isPast && !isToday)) {
+  } else if (fixture.status === 'completed' || (isPast && isUploadedInPast && !isToday)) {
     displayStatus = "Completed";
     statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
   } else if (isToday) {

@@ -57,6 +57,8 @@ export default function Team() {
   
   const [expandedEmailSections, setExpandedEmailSections] = useState<Record<string, boolean>>({ yes: true, maybe: true, no_reply: true, no: true });
 
+  const [showPastFixtures, setShowPastFixtures] = useState(false);
+
   const [emailStats, setEmailStats] = useState<Record<string, number>>({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 });
   const [isHubVisible, setIsHubVisible] = useState(false);
   const [emailLogDetails, setEmailLogDetails] = useState<any[]>([]);
@@ -183,14 +185,23 @@ export default function Team() {
       today.setHours(0,0,0,0);
       const { data: rawFixtures } = await supabase
         .from("fixtures")
-        .select("id, opponent, match_date, team_id, status, reminder_sent")
+        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at")
         .eq("team_id", targetTeamId);
 
       let fixtures: any[] = [];
       if (rawFixtures && rawFixtures.length > 0) {
-        const upcoming = rawFixtures.filter(f => new Date(f.match_date) >= today)
+        const isPastFixture = (f: any) => {
+           if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
+           const matchD = new Date(f.match_date);
+           const today = new Date();
+           const isPastMatch = matchD < new Date(today.setHours(0,0,0,0));
+           const uploadedAfterMatch = new Date(f.created_at) > matchD;
+           return isPastMatch && uploadedAfterMatch;
+        };
+
+        const upcoming = rawFixtures.filter(f => !isPastFixture(f))
           .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-        const past = rawFixtures.filter(f => new Date(f.match_date) < today)
+        const past = rawFixtures.filter(f => isPastFixture(f))
           .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
         fixtures = [...upcoming, ...past];
       }
@@ -592,9 +603,19 @@ export default function Team() {
                  
                  const today = new Date();
                  today.setHours(0,0,0,0);
-                 const isPast = new Date(f.match_date) < today;
-                 const prevIsPast = i > 0 ? new Date(fixtureAvail[i-1].match_date) < today : false;
+                 const matchD = new Date(f.match_date);
+                 const isPastMatch = matchD < today;
+                 const uploadedAfterMatch = f.created_at ? new Date(f.created_at) > matchD : false;
+                 const isPast = ['completed', 'forfeited', 'abandoned'].includes(f.status) || (isPastMatch && uploadedAfterMatch);
+                 
+                 const prevMatchD = i > 0 ? new Date(fixtureAvail[i-1].match_date) : null;
+                 const prevIsPastMatch = prevMatchD ? prevMatchD < today : false;
+                 const prevUploadedAfterMatch = i > 0 && fixtureAvail[i-1].created_at ? new Date(fixtureAvail[i-1].created_at) > prevMatchD! : false;
+                 const prevIsPast = i > 0 ? ['completed', 'forfeited', 'abandoned'].includes(fixtureAvail[i-1].status) || (prevIsPastMatch && prevUploadedAfterMatch) : false;
+                 
                  const showPastDivider = isPast && !prevIsPast;
+
+                 if (isPast && !showPastFixtures && !showPastDivider) return null;
 
                  const yesPct = f.total > 0 ? (f.lists.yes.length / f.total) * 100 : 0;
                  const maybePct = f.total > 0 ? (f.lists.maybe.length / f.total) * 100 : 0;
@@ -604,12 +625,17 @@ export default function Team() {
                  return (
                     <React.Fragment key={f.id}>
                        {showPastDivider && (
-                         <div className="flex items-center gap-3 mt-8 mb-4">
-                            <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Past Matches</span>
-                            <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
+                         <div className="mt-4 mb-2">
+                           <button 
+                              onClick={() => setShowPastFixtures(!showPastFixtures)}
+                              className="w-full py-3 bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 flex items-center justify-between px-5 transition-colors hover:border-zinc-300 dark:hover:border-zinc-700"
+                           >
+                              <span>Past Matches</span>
+                              <i className={`fa-solid fa-chevron-${showPastFixtures ? 'up' : 'down'}`}></i>
+                           </button>
                          </div>
                        )}
+                       {(!isPast || showPastFixtures) && (
                        <div className="bg-zinc-50 dark:bg-[#1A1A1A] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
                           <button 
                              onClick={() => handleExpandFixture(f.id)}
@@ -1379,8 +1405,9 @@ export default function Team() {
 
                            </div>
                         )}
-                    </div>
-                 </React.Fragment>
+                       </div>
+                       )}
+                    </React.Fragment>
                  );
               })}
               
