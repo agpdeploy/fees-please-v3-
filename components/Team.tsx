@@ -188,11 +188,7 @@ export default function Team() {
 
       let fixtures: any[] = [];
       if (rawFixtures && rawFixtures.length > 0) {
-        const upcoming = rawFixtures.filter(f => new Date(f.match_date) >= today)
-          .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-        const past = rawFixtures.filter(f => new Date(f.match_date) < today)
-          .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
-        fixtures = [...upcoming, ...past];
+        fixtures = rawFixtures.sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
       }
 
       if (fixtures && fixtures.length > 0) {

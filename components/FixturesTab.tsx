@@ -507,10 +507,10 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   } else if (fixture.status === 'abandoned') {
     displayStatus = "Abandoned";
     statusClasses = "bg-red-600 text-white shadow-sm";
-  } else if (fixture.status === 'completed') {
+  } else if (fixture.status === 'completed' || (isPast && !isToday)) {
     displayStatus = "Completed";
     statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
-  } else if (isToday || isPast) {
+  } else if (isToday) {
     displayStatus = "Active";
     statusClasses = "bg-emerald-600 text-white shadow-sm";
   } else {
@@ -690,117 +690,6 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
           {fixture.notes}
         </div>
       )}
-
-      {/* Action Bar - GameDay Style */}
-      <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors">
-        <div className="flex bg-emerald-50 dark:bg-emerald-950/40 p-1 rounded-xl">
-          <button 
-            onClick={toggleSquadExpansion} 
-            className={`flex-1 py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${isSquadExpanded ? 'bg-emerald-700 text-white shadow-inner' : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-500'} disabled:opacity-50`}
-          >
-            <i className={`fa-solid ${isSquadExpanded ? 'fa-clipboard-check' : 'fa-clipboard-user'}`}></i> {isSquadExpanded ? 'Close Squad Selection' : 'Match Squad Selection'}
-          </button>
-        </div>
-      </div>
-
-      {/* Inline Squad Editor (Game Day Aesthetic) */}
-      {isSquadExpanded && (
-        <div className="p-5 border-t border-zinc-100 dark:border-zinc-800/50 bg-white dark:bg-[#111] animate-in slide-in-from-top-2">
-          {isLoadingSquad ? (
-            <div className="flex flex-col items-center justify-center py-8">
-              <i className="fa-solid fa-circle-notch fa-spin text-emerald-500 text-2xl mb-3"></i>
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/70">Loading Squad...</p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-1">Squad Selection</p>
-                 <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 leading-relaxed">Select players for match day from the club roster.</p>
-              </div>
-              
-              <input 
-                type="text" 
-                placeholder="Search players..." 
-                value={playerSearch || ""} 
-                onChange={(e) => setPlayerSearch(e.target.value)} 
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors mb-4 shadow-sm" 
-              />
-
-              <div className="space-y-4">
-                {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
-                  const sectionPlayers = clubPlayers.filter(p => {
-                    const avail = availabilityData.find(a => a.player_id === p.id);
-                    const status = avail ? avail.status : 'no_reply';
-                    const isRelevant = p.default_team_id === fixture.team_id || squadPlayerIds.includes(p.id) || avail !== undefined;
-                    const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
-
-                    if (playerSearch) {
-                      return status === section && matchesSearch;
-                    } else {
-                      return status === section && isRelevant;
-                    }
-                  });
-
-                  if (sectionPlayers.length === 0) return null;
-
-                  const config = {
-                    yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check", dot: "text-emerald-400" },
-                    maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question", dot: "text-amber-400" },
-                    no_reply: { label: availabilityData.length > 0 ? "No Reply" : "Squad Players", color: "text-zinc-400 dark:text-zinc-500", icon: availabilityData.length > 0 ? "fa-circle" : "fa-users", dot: "text-zinc-400" },
-                    no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark", dot: "text-red-400" }
-                  }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
-
-                  return (
-                    <div key={section} className="mb-4">
-                      <div className="flex items-center gap-2 mb-2 cursor-pointer group">
-                        <i className={`fa-solid fa-circle text-[8px] ${config.dot}`}></i>
-                        <h3 className={`text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors`}>
-                          {config.label} ({sectionPlayers.length})
-                        </h3>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2.5 pt-2 pb-1 animate-in fade-in">
-                        {sectionPlayers.map(p => {
-                          const isInSquad = squadPlayerIds.includes(p.id);
-                          const avail = availabilityData.find(a => a.player_id === p.id);
-                          const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
-                          const hasEmail = !!p.email;
-                          
-                          return (
-                            <button 
-                              key={p.id} 
-                              onClick={() => toggleSquadPlayer(p.id)}
-                              disabled={isSaving}
-                              className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex justify-center items-center gap-1.5 ${
-                                isInSquad 
-                                  ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' 
-                                  : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
-                              } disabled:opacity-50`}
-                            >
-                              {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
-                              {isInSquad ? (
-                                <i className="fa-solid fa-check text-[10px]"></i>
-                              ) : (
-                                <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {availabilityData.length === 0 && (
-                   <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 rounded-xl p-4 mt-6 mb-2 text-center">
-                     <p className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-2"><i className="fa-solid fa-lightbulb text-amber-500 mr-1.5"></i> Did you know?</p>
-                     <p className="text-[10px] text-zinc-600 dark:text-zinc-400 mb-3 font-bold leading-relaxed">You can share your own Availability Hub with your team so players can RSVP for upcoming matches!</p>
-                     <button onClick={() => {
-                        window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'team' }));
-                     }} className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 text-emerald-700 dark:text-emerald-400 px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95">
-                        Go to Team Hub <i className="fa-solid fa-arrow-right ml-1"></i>
-                     </button>
-                   </div>
                 )}
               </div>
 
