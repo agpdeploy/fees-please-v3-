@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const errorDescription = searchParams.get('error_description');
 
   if (error) {
-    return NextResponse.redirect(new URL(`/settings?error=${encodeURIComponent(errorDescription || 'OAuth Error')}`, request.url));
+    return NextResponse.redirect(new URL(`/?error=${encodeURIComponent(errorDescription || 'OAuth Error')}`, request.url));
   }
 
   if (!code || !clubId) {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
     if (!tokenRes.ok) {
       console.error("Square Token Error:", tokenData);
-      return NextResponse.redirect(new URL(`/settings?error=${encodeURIComponent('Failed to connect to Square')}`, request.url));
+      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to connect to Square')}`, request.url));
     }
 
     const { access_token, refresh_token, merchant_id } = tokenData;
@@ -87,14 +87,14 @@ export async function GET(request: Request) {
 
     if (updateError) {
       console.error("DB Update Error:", updateError);
-      return NextResponse.redirect(new URL(`/settings?error=${encodeURIComponent('Failed to save Square connection')}`, request.url));
+      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to save Square connection')}`, request.url));
     }
 
     // Success! Redirect back to settings
-    return NextResponse.redirect(new URL(`/settings?success=square_connected`, request.url));
+    return NextResponse.redirect(new URL(`/?success=square_connected`, request.url));
 
   } catch (err) {
     console.error("OAuth Callback Error:", err);
-    return NextResponse.redirect(new URL(`/settings?error=${encodeURIComponent('Internal server error during Square connection')}`, request.url));
+    return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Internal server error during Square connection')}`, request.url));
   }
 }
