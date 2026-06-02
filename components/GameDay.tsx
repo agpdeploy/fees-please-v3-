@@ -289,17 +289,22 @@ export default function GameDay() {
         .eq('team_id', selectedTeamId);
         
       if (allFix) {
-        const isPastAndUploadedInPast = (f: any) => {
+        const isPastFixture = (f: any) => {
            if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
            const matchD = new Date(f.match_date);
            const today = new Date();
-           const isPastMatch = matchD < new Date(today.setHours(0,0,0,0));
-           const uploadedAfterMatch = new Date(f.created_at) > matchD;
-           return isPastMatch && uploadedAfterMatch;
+           today.setHours(0,0,0,0);
+           
+           // Give a 1-day grace period so managers can finalise the match the day after.
+           const msPerDay = 24 * 60 * 60 * 1000;
+           const isGracePeriodExpired = (today.getTime() - matchD.getTime()) > msPerDay;
+           const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
+           
+           return isGracePeriodExpired || uploadedAfterMatch;
         };
-        const upcoming = allFix.filter(f => !isPastAndUploadedInPast(f))
+        const upcoming = allFix.filter(f => !isPastFixture(f))
           .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-        const past = allFix.filter(f => isPastAndUploadedInPast(f))
+        const past = allFix.filter(f => isPastFixture(f))
           .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
         setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);
