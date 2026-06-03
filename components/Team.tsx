@@ -234,7 +234,7 @@ export default function Team() {
           });
 
           teamRoster.forEach(p => {
-             if (!respondedPlayerIds.has(p.id)) {
+             if (p.is_active !== false && !respondedPlayerIds.has(p.id)) {
                 lists.pending.push(formatName(p));
              }
           });
