@@ -109,7 +109,7 @@ export default function Team() {
       if (!targetTeamId) { setIsLoading(false); return; }
 
       // Fetch all players for the club to allow cross-team causal adding
-      const { data: playersData } = await supabase.from("players").select("id, first_name, last_name, nickname, email, default_team_id, is_member").eq("club_id", activeClubId);
+      const { data: playersData } = await supabase.from("players").select("id, first_name, last_name, nickname, email, default_team_id, is_member, is_active").eq("club_id", activeClubId);
       const allPlayers = playersData || [];
       setClubPlayers(allPlayers);
 
@@ -126,6 +126,7 @@ export default function Team() {
             full_name: `${p.first_name} ${p.last_name}`,
             email: p.email,
             is_member: p.is_member,
+            is_active: p.is_active !== false,
             balance: 0,
             gamesPlayed: 0
           };
@@ -146,7 +147,7 @@ export default function Team() {
             if (!statsMap[tx.player_id]) {
                 const p = allPlayers.find(pl => pl.id === tx.player_id);
                 if (p) {
-                   statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, balance: 0, gamesPlayed: 0 };
+                   statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, is_active: p.is_active !== false, balance: 0, gamesPlayed: 0 };
                 }
             }
             if (statsMap[tx.player_id]) {
@@ -171,7 +172,7 @@ export default function Team() {
             } else {
                const p = allPlayers.find(pl => pl.id === s.player_id);
                if (p) {
-                 statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, balance: 0, gamesPlayed: 1 };
+                 statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, is_active: p.is_active !== false, balance: 0, gamesPlayed: 1 };
                }
             }
             totalGames++;
@@ -744,10 +745,12 @@ export default function Team() {
                                      <button 
                                        onClick={() => {
                                          const respondedIds = new Set(modalAvailData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
+                                         const pendingIds = Object.keys(statsMap).filter(id => statsMap[id].is_active && !yesIds.includes(id) && !maybeIds.includes(id) && !noIds.includes(id));
                                          const isSuperAdmin = profile?.role === 'super_admin';
                                          const pending = clubPlayers.filter(p => {
                                            const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
                                            return p.default_team_id === f.team_id && 
+                                                  p.is_active !== false &&
                                                   !respondedIds.has(p.id) && 
                                                   p.email && 
                                                   p.unsubscribed !== true && 
@@ -868,16 +871,20 @@ export default function Team() {
                                    <div className="space-y-4">
                                      <div className="flex items-center justify-between mb-4">
                                        <button onClick={() => setAvailabilityMode('menu')} className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 flex items-center gap-2">
-                                         <i className="fa-solid fa-arrow-left"></i> Back
+                                          <i className="fa-solid fa-arrow-left"></i> Back
                                        </button>
                                        <button 
                                          onClick={() => {
-                                           const isSuperAdmin = profile?.role === 'super_admin';
+                                           const respondedIds = new Set(modalAvailData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
                                            const eligible = clubPlayers.filter(p => {
                                              const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
-                                             const avail = modalAvailData.find(a => a.player_id === p.id);
-                                             const hasResponded = avail && ['yes', 'no', 'maybe'].includes(avail.status);
-                                             return p.default_team_id === f.team_id && p.email && p.email.trim() !== '' && p.unsubscribed !== true && !hasSent && !hasResponded;
+                                             return p.default_team_id === f.team_id && 
+                                                    p.is_active !== false && 
+                                                    !respondedIds.has(p.id) &&
+                                                    p.email && 
+                                                    p.email.trim() !== '' && 
+                                                    p.unsubscribed !== true && 
+                                                    !hasSent;
                                            });
                                            if (emailSelectedPlayerIds.length === eligible.length && eligible.length > 0) {
                                               setEmailSelectedPlayerIds([]);
@@ -904,7 +911,7 @@ export default function Team() {
                                          const sectionPlayers = clubPlayers.filter(p => {
                                            const avail = modalAvailData.find(a => a.player_id === p.id);
                                            const status = avail ? avail.status : 'no_reply';
-                                           return p.default_team_id === f.team_id && status === section;
+                                           return (p.default_team_id === f.team_id && p.is_active !== false || avail !== undefined) && status === section;
                                          });
 
                                          if (sectionPlayers.length === 0) return null;
@@ -1034,7 +1041,7 @@ export default function Team() {
                                               const sectionPlayers = clubPlayers.filter(p => {
                                                 const avail = modalAvailData.find(a => a.player_id === p.id);
                                                 const status = avail ? avail.status : 'no_reply';
-                                                const isRelevant = p.default_team_id === f.team_id || squadPlayerIds.includes(p.id) || avail !== undefined;
+                                                const isRelevant = (p.default_team_id === f.team_id && p.is_active !== false) || squadPlayerIds.includes(p.id) || avail !== undefined;
                                                 const matchesSearch = playerSearch ? `${p.first_name} ${p.last_name} ${p.nickname || ''}`.toLowerCase().includes(playerSearch.toLowerCase()) : true;
 
                                                 return playerSearch ? (status === section && matchesSearch) : (status === section && isRelevant);

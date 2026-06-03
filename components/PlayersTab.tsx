@@ -25,6 +25,7 @@ interface DraftPlayer {
 export default function PlayersTab({ clubId, teams, players, clubUsers = [], isSuperAdmin = false, loadClubData, showToast }: PlayersTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeactivated, setShowDeactivated] = useState(false);
 
   // Manual Entry State
   const [addTeamId, setAddTeamId] = useState("");
@@ -265,8 +266,9 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
   }
 
   // NEW LOGIC: If no team is selected, show everyone (unassigned first)
-  // If a team is selected, show that team's players.
   const teamPlayers = players.filter(p => {
+    if (p.is_active === false && !showDeactivated) return false;
+    
     if (!addTeamId) return true; // Show everyone if filter is empty
     if (teams.length === 1 && !p.default_team_id) return true; // Show unassigned if there's only 1 team
     return p.default_team_id === addTeamId;
@@ -287,6 +289,17 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )}
+        
+        <div className="flex justify-end mb-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <div className="relative inline-block w-8 h-4 select-none">
+              <input type="checkbox" className="sr-only" checked={showDeactivated} onChange={(e) => setShowDeactivated(e.target.checked)} />
+              <div className={`block h-4 w-8 rounded-full transition-colors ${showDeactivated ? 'bg-zinc-800' : 'bg-zinc-200'}`}></div>
+              <div className={`absolute left-1 top-0.5 bg-white w-3 h-3 rounded-full transition-transform ${showDeactivated ? 'translate-x-3.5' : ''}`}></div>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Show Deactivated</span>
+          </label>
+        </div>
 
         {addTeamId && (
           <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-5 transition-colors">
