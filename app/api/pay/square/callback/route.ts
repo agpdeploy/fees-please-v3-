@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing code or state" }, { status: 400 });
   }
 
-  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-  const appSecret = process.env.SQUARE_SECRET;
+  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID?.trim();
+  const appSecret = process.env.SQUARE_SECRET?.trim();
 
   if (!appId || !appSecret) {
     return NextResponse.json({ error: "Square credentials not configured on server" }, { status: 500 });
