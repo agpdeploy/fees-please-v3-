@@ -752,7 +752,7 @@ export default function Team() {
                                          const respondedIds = new Set(modalAvailData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
                                          const isSuperAdmin = profile?.role === 'super_admin';
                                          const pending = clubPlayers.filter(p => {
-                                           const hasSent = logs.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
+                                           const hasSent = logs.some(log => log.email_type === 'availability_reminder' && (log as any).players?.id === p.id);
                                            return p.default_team_id === f.team_id && 
                                                   p.is_active !== false &&
                                                   !respondedIds.has(p.id) && 
@@ -1088,7 +1088,7 @@ export default function Team() {
                                                  const eligible = f.lists.squadIds.filter((pid: string) => {
                                                    const p = clubPlayers.find(cp => cp.id === pid);
                                                    if (!p) return false;
-                                                   const hasSent = logs.some(log => log.email_type === 'squad_notification' && log.players?.id === p.id);
+                                                   const hasSent = logs.some(log => log.email_type === 'squad_notification' && (log as any).players?.id === p.id);
                                                    return p.email && p.email.trim() !== '' && p.unsubscribed !== true && (!hasSent || isSuperAdmin);
                                                  });
                                                  
