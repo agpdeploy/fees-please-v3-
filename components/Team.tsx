@@ -917,10 +917,10 @@ export default function Team() {
                                      <button 
                                        onClick={() => handleConfirmSendReminders(f)}
                                        disabled={emailSelectedPlayerIds.length === 0 || isSendingReminders}
-                                       className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+                                       className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50"
                                      >
                                        {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                                       Send Availability Emails {emailSelectedPlayerIds.length > 0 ? `to ${emailSelectedPlayerIds.length} Player${emailSelectedPlayerIds.length !== 1 ? 's' : ''}` : ''}
+                                       Send to {emailSelectedPlayerIds.length} Player{emailSelectedPlayerIds.length !== 1 ? 's' : ''}
                                      </button>
                                    </div>
                                  )}
@@ -1208,32 +1208,36 @@ export default function Team() {
                                                             }
                                                           }}
                                                           disabled={isDisabled}
-                                                          className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all flex flex-col items-center gap-1.5 ${
-                                                            isSelected 
-                                                              ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' 
-                                                              : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
-                                                          } ${isDisabled ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                                                          className={`relative flex flex-col p-3 rounded-xl border transition-all text-left min-w-[140px] flex-1 sm:flex-none ${
+                                                            isSelected ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-400 dark:border-emerald-500/50 shadow-sm' : 
+                                                            isDisabled ? 'bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-60' : 
+                                                            'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-700'
+                                                          }`}
                                                         >
-                                                          <div className="flex items-center gap-2">
-                                                            {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                                          <div className="flex justify-between items-start mb-2 gap-4 w-full">
+                                                            <span className={`text-[11px] font-black uppercase tracking-widest ${isDisabled ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                                                              {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                                                            </span>
                                                             {isSelected ? (
-                                                              <i className="fa-solid fa-check text-[10px]"></i>
-                                                            ) : (
-                                                              <i className="fa-solid fa-plus text-[10px] opacity-50"></i>
+                                                              <div className="w-5 h-5 rounded bg-emerald-500 text-white flex items-center justify-center shadow-sm shrink-0">
+                                                                <i className="fa-solid fa-check text-[10px]"></i>
+                                                              </div>
+                                                            ) : isDisabled ? null : (
+                                                              <div className="text-zinc-300 dark:text-zinc-700 text-xs font-black">+</div>
                                                             )}
                                                           </div>
                                                           
-                                                          <div className={`text-[8px] font-black tracking-widest mt-0.5 flex items-center gap-1 ${isSelected ? 'text-emerald-100' : 'text-zinc-500'}`}>
+                                                          <div className="text-[8px] font-bold tracking-widest uppercase flex items-center gap-1 mt-auto">
                                                             {!hasEmail ? (
-                                                              <><i className="fa-solid fa-envelope-circle-xmark text-red-500"></i> No Email</>
+                                                              <span className="text-red-500"><i className="fa-solid fa-envelope-circle-xmark mr-1"></i> No Email</span>
                                                             ) : p.unsubscribed ? (
-                                                              <><i className="fa-solid fa-ban text-amber-500"></i> Unsub</>
+                                                              <span className="text-amber-500"><i className="fa-solid fa-ban mr-1"></i> Unsub</span>
                                                             ) : isLocked ? (
-                                                              <><i className="fa-solid fa-paper-plane text-blue-500"></i> Sent</>
+                                                              <span className="text-zinc-400 dark:text-zinc-500"><i className="fa-solid fa-paper-plane mr-1"></i> Sent</span>
                                                             ) : hasSent ? (
-                                                              <><i className="fa-solid fa-paper-plane text-blue-500"></i> Sent (Resend)</>
+                                                              <span className="text-emerald-500"><i className="fa-solid fa-paper-plane mr-1"></i> Sent (Resend)</span>
                                                             ) : (
-                                                              <><i className="fa-regular fa-envelope"></i> Sendable</>
+                                                              <span className="text-emerald-500"><i className="fa-regular fa-envelope mr-1"></i> Ready to Send</span>
                                                             )}
                                                           </div>
                                                         </button>
