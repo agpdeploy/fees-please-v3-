@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     });
 
     const body = await req.json();
-    const { fixtureId, teamId, action = 'send', senderName = "Your Captain", selectedPlayerIds } = body;
+    const { fixtureId, teamId, action = 'send', senderName = "Your Captain", selectedPlayerIds, customMessage } = body;
 
     if (!fixtureId || !teamId) {
       return NextResponse.json({ error: 'Missing fixtureId or teamId' }, { status: 400 });
@@ -79,7 +79,8 @@ export async function POST(req: Request) {
     const { data: allTeamPlayers } = await supabaseAdmin
       .from('players')
       .select('id')
-      .eq('default_team_id', teamId);
+      .eq('default_team_id', teamId)
+      .eq('is_active', true);
 
     const totalSquadSize = allTeamPlayers ? allTeamPlayers.length : players.length;
 
@@ -142,7 +143,7 @@ export async function POST(req: Request) {
     // We can use resend.batch.send to send up to 100 emails at once
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isTestingEnv ? 'http://localhost:3000' : 'https://app.feesplease.app');
 
-    const tp = fixture.teams?.public_team_profiles;
+    const tp = Array.isArray(fixture.teams?.public_team_profiles) ? fixture.teams?.public_team_profiles[0] : fixture.teams?.public_team_profiles;
     let sponsorsHtml = '';
     if (tp && (tp.sponsor_1_logo || tp.sponsor_2_logo || tp.sponsor_3_logo)) {
       const sponsors = [
@@ -173,10 +174,7 @@ export async function POST(req: Request) {
       const urlMaybe = `${publicHubUrl}&player=${player.id}&status=maybe`;
       const urlNo = `${publicHubUrl}&player=${player.id}&status=no`;
 
-      const team = fixture.teams;
-      const teamLogoUrl = Array.isArray(team.public_team_profiles) 
-        ? team.public_team_profiles[0]?.club_logo_url 
-        : team.public_team_profiles?.club_logo_url;
+      const teamLogoUrl = tp?.club_logo_url;
 
       const htmlContent = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f4f5; padding: 20px; border-radius: 12px;">
@@ -195,6 +193,10 @@ export async function POST(req: Request) {
           <div style="background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 24px;">
             <div style="padding: 24px;">
               <p style="color: #18181b; font-size: 15px; margin-top: 0; margin-bottom: 16px;">Hi ${player.nickname || player.first_name},</p>
+              ${customMessage ? `<div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; margin-bottom: 24px; border-left: 4px solid #10b981;">
+                <p style="color: #18181b; font-size: 13px; font-weight: 700; margin-top: 0; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">Message from ${senderName}:</p>
+                <p style="color: #52525b; font-size: 15px; margin: 0; line-height: 1.5; white-space: pre-wrap;">${customMessage}</p>
+              </div>` : ''}
               <p style="color: #52525b; font-size: 15px; margin-top: 0; margin-bottom: 24px; line-height: 1.5;">${teamName} needs to confirm your availability for the upcoming match. Please indicate via the buttons below.</p>
             </div>
           </div>

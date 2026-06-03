@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     let emailsSent = 0;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (isTestingEnv ? 'http://localhost:3000' : 'https://app.feesplease.app');
 
-    const tp = fixture.teams?.public_team_profiles;
+    const tp = Array.isArray(fixture.teams?.public_team_profiles) ? fixture.teams?.public_team_profiles[0] : fixture.teams?.public_team_profiles;
     let sponsorsHtml = '';
     if (tp && (tp.sponsor_1_logo || tp.sponsor_2_logo || tp.sponsor_3_logo)) {
       const sponsors = [
@@ -87,9 +87,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const teamLogoUrl = Array.isArray(tp) 
-      ? tp[0]?.club_logo_url 
-      : tp?.club_logo_url;
+    const teamLogoUrl = tp?.club_logo_url;
 
     for (const player of players) {
       if (!player.email || player.email.trim() === '') continue;
@@ -202,7 +200,7 @@ export async function POST(req: Request) {
       try {
         const { data: resendData, error: resendError } = await resend.emails.send({
           from: `${club.name} <reminders@mail.feesplease.app>`,
-          reply_to: 'noreply@mail.feesplease.app',
+          replyTo: 'noreply@mail.feesplease.app',
           to: isTestingEnv ? 'emailtesting@feesplease.app' : player.email,
           subject: `You're in! ${fixture.opponent} (${matchDate})`,
           html: htmlContent

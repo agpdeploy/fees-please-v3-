@@ -277,8 +277,8 @@ export async function GET(req: Request) {
       if (teamId) {
         tpQuery = tpQuery.eq('team_id', teamId);
       }
-      tpQuery = tpQuery.limit(1).maybeSingle();
-      const { data: tpData } = await tpQuery;
+      const finalTpQuery = tpQuery.limit(1).maybeSingle();
+      const { data: tpData } = await finalTpQuery;
 
       let sponsorsHtml = '';
       if (tpData && (tpData.sponsor_1_logo || tpData.sponsor_2_logo || tpData.sponsor_3_logo)) {
