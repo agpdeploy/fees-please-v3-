@@ -106,6 +106,21 @@ export default function Setup({ activeTab }: SetupProps) {
   const [clubId, setClubId] = useState<string | null>(null);
 
   useEffect(() => {
+    // If the url has ?success=square_connected or ?error, show a toast
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'square_connected') {
+      showToast("Connected to Square successfully!");
+      // clean up url
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.has('error')) {
+      const errorMsg = urlParams.get('error');
+      showToast(`Square Connection Error: ${errorMsg}`, "error");
+      // clean up url
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'teams') {
       resetTeamForm();
     }
