@@ -1146,9 +1146,26 @@ export default function GameDay() {
           <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800" ref={manageTeamRef}>
             <div className="flex items-center justify-between">
               <div className="flex items-center flex-wrap gap-2">
-                <span className="text-[10px] font-black uppercase px-2 py-1 rounded text-white tracking-widest bg-emerald-600 dark:bg-emerald-500 leading-none shadow-sm">
-                  {new Date(activeFixture.match_date).toDateString() === new Date().toDateString() ? 'Active' : 'Upcoming'}
-                </span>
+                {(() => {
+                  const matchD = new Date(activeFixture.match_date);
+                  const today = new Date();
+                  const isToday = matchD.toDateString() === today.toDateString();
+                  const isPast = matchD < new Date(today.setHours(0,0,0,0));
+                  
+                  let text = "Upcoming";
+                  let bg = "bg-emerald-600 dark:bg-emerald-500";
+                  if (isToday) {
+                    text = "Active";
+                  } else if (isPast) {
+                    text = "Action Required";
+                    bg = "bg-amber-500 dark:bg-amber-600";
+                  }
+                  return (
+                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded text-white tracking-widest ${bg} leading-none shadow-sm`}>
+                      {text}
+                    </span>
+                  );
+                })()}
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                   {new Date(activeFixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                   {(activeFixture.start_time || activeFixture.location) && (
