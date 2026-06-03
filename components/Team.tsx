@@ -124,6 +124,7 @@ export default function Team() {
             id: p.id,
             name: formatName(p),
             full_name: `${p.first_name} ${p.last_name}`,
+            email: p.email,
             is_member: p.is_member,
             balance: 0,
             gamesPlayed: 0
@@ -145,7 +146,7 @@ export default function Team() {
             if (!statsMap[tx.player_id]) {
                 const p = allPlayers.find(pl => pl.id === tx.player_id);
                 if (p) {
-                   statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, is_member: p.is_member, balance: 0, gamesPlayed: 0 };
+                   statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, balance: 0, gamesPlayed: 0 };
                 }
             }
             if (statsMap[tx.player_id]) {
@@ -170,7 +171,7 @@ export default function Team() {
             } else {
                const p = allPlayers.find(pl => pl.id === s.player_id);
                if (p) {
-                 statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, is_member: p.is_member, balance: 0, gamesPlayed: 1 };
+                 statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, balance: 0, gamesPlayed: 1 };
                }
             }
             totalGames++;
