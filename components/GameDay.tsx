@@ -340,9 +340,9 @@ export default function GameDay() {
           txData.forEach((tx: any) => {
             if (tx.transaction_type === 'fee') {
               debts[tx.player_id] = (debts[tx.player_id] || 0) + Number(tx.amount);
-              // Any fee for today's match means they've been processed
+              // Any POSITIVE fee for today's match means they've been processed
               // EXCEPT if it's a pending/unpaid fee created for online checkout
-              if (tx.fixture_id === activeFixture.id && tx.status !== 'unpaid' && !paidToday.includes(tx.player_id)) {
+              if (Number(tx.amount) > 0 && tx.fixture_id === activeFixture.id && tx.status !== 'unpaid' && !paidToday.includes(tx.player_id)) {
                 paidToday.push(tx.player_id);
               }
             }
