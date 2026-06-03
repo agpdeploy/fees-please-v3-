@@ -604,7 +604,8 @@ export default function GameDay() {
                   fixture_id: activeFixture.id,
                   club_id: resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
-                  transaction_type: 'fee'
+                  transaction_type: 'fee',
+                  status: 'unpaid'
                 });
               }
             } else if (action === 'paid') {
@@ -615,7 +616,8 @@ export default function GameDay() {
                   fixture_id: activeFixture.id,
                   club_id: resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
-                  transaction_type: 'fee'
+                  transaction_type: 'fee',
+                  status: 'paid'
                 });
               }
               batchTxPayload.push({
@@ -626,7 +628,8 @@ export default function GameDay() {
                 amount: player.is_member ? teamFees.member : teamFees.casual,
                 transaction_type: 'payment',
                 payment_method: 'cash',
-                description: 'Match Fees'
+                description: 'Match Fees',
+                status: 'completed'
               });
             } else if (action === 'remove') {
               playersToRemove.push(player.id);

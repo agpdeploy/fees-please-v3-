@@ -59,7 +59,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
       if (tx.transaction_type === 'payment') hasPaidForThisFixture = true;
     }
 
-    if (tx.status === 'completed' && tx.transaction_type === 'payment') {
+    if (tx.transaction_type === 'payment' && tx.status !== 'failed' && tx.status !== 'pending') {
       balance -= tx.amount;
     } else if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') {
       balance += tx.amount;

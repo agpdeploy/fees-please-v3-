@@ -55,7 +55,7 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
 
   let balance = 0;
   allTxs?.forEach(tx => {
-    if (tx.status === 'completed' && tx.transaction_type === 'payment') {
+    if (tx.transaction_type === 'payment' && tx.status !== 'failed' && tx.status !== 'pending') {
       balance -= tx.amount;
     } else if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') {
       balance += tx.amount;
