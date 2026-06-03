@@ -23,35 +23,19 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
     return <div className="p-8 text-center text-red-500 font-bold">Transaction not found.</div>;
   }
 
-  const { data: club } = await supabase
-    .from('clubs')
-    .select('*')
-    .eq('id', transaction.club_id)
-    .single();
-
-  const { data: team } = await supabase
-    .from('teams')
-    .select('*')
-    .eq('id', transaction.team_id)
-    .single();
-
-  const { data: publicProfile } = await supabase
-    .from('public_team_profiles')
-    .select('*')
-    .eq('team_id', transaction.team_id)
-    .maybeSingle();
-
-  const { data: fixture } = await supabase
-    .from('fixtures')
-    .select('*')
-    .eq('id', transaction.fixture_id)
-    .maybeSingle();
-
-  const { data: allTxs } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('player_id', transaction.player_id)
-    .eq('club_id', transaction.club_id);
+  const [
+    { data: club },
+    { data: team },
+    { data: publicProfile },
+    { data: fixture },
+    { data: allTxs }
+  ] = await Promise.all([
+    supabase.from('clubs').select('*').eq('id', transaction.club_id).single(),
+    supabase.from('teams').select('*').eq('id', transaction.team_id).single(),
+    supabase.from('public_team_profiles').select('*').eq('team_id', transaction.team_id).maybeSingle(),
+    transaction.fixture_id ? supabase.from('fixtures').select('*').eq('id', transaction.fixture_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('transactions').select('*').eq('player_id', transaction.player_id).eq('club_id', transaction.club_id)
+  ]);
 
   let balance = 0;
   allTxs?.forEach(tx => {
