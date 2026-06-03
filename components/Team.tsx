@@ -610,7 +610,30 @@ export default function Team() {
                  
                  const todayMidnight = new Date();
                  todayMidnight.setHours(0,0,0,0);
+                 const isToday = matchD.toDateString() === todayMidnight.toDateString();
                  const isToFinalise = !isPast && matchD < todayMidnight;
+                 
+                 let badgeText = "";
+                 let badgeColor = "";
+                 if (!f.is_active) {
+                    badgeText = "DEACTIVATED";
+                    badgeColor = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+                 } else if (f.status === 'forfeited') {
+                    badgeText = "FORFEIT";
+                    badgeColor = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+                 } else if (f.status === 'abandoned') {
+                    badgeText = "ABANDONED";
+                    badgeColor = "bg-red-600 text-white";
+                 } else if (f.status === 'completed' || uploadedAfterMatch) {
+                    badgeText = "COMPLETED";
+                    badgeColor = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+                 } else if (isToday) {
+                    badgeText = "ACTIVE";
+                    badgeColor = "bg-emerald-600 text-white";
+                 } else if (isToFinalise) {
+                    badgeText = "TO FINALISE";
+                    badgeColor = "bg-amber-500 text-white";
+                 }
                  
                  const prevMatchD = i > 0 ? new Date(fixtureAvail[i-1].match_date) : null;
                  const prevUploadedAfterMatch = i > 0 && fixtureAvail[i-1].created_at ? new Date(fixtureAvail[i-1].created_at).getTime() > (prevMatchD!.getTime() + msPerDay) : false;
@@ -647,7 +670,7 @@ export default function Team() {
                              <div className="flex justify-between items-end mb-3">
                                 <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wide">VS {f.opponent}</span>
                                 <div className="flex items-center gap-2">
-                                  {isToFinalise && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white tracking-widest bg-amber-500 leading-none">TO FINALISE</span>}
+                                  {badgeText && <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest leading-none ${badgeColor}`}>{badgeText}</span>}
                                   <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
                                 </div>
                              </div>
