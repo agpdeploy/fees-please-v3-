@@ -1157,7 +1157,7 @@ export default function GameDay() {
                   if (isToday) {
                     text = "Active";
                   } else if (isPast) {
-                    text = "Action Required";
+                    text = "To Finalise";
                     bg = "bg-amber-500 dark:bg-amber-600";
                   }
                   return (
