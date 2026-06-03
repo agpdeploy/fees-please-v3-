@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     // Fetch transaction details
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
-      .select('*')
+      .select('*, players(first_name, last_name)')
       .eq('id', txId)
       .single();
 
@@ -58,10 +58,13 @@ export async function POST(request: Request) {
     // Generate idempotency key
     const idempotencyKey = crypto.randomUUID();
 
+    const playerName = transaction.players ? `${transaction.players.first_name} ${transaction.players.last_name}` : 'Unknown Player';
+    const noteStr = `${transaction.description || 'Match Fees'} - ${playerName}`;
+
     const squarePayload: any = {
       source_id: sourceId,
       idempotency_key: idempotencyKey,
-      note: transaction.description || 'Match Fees',
+      note: noteStr,
       amount_money: {
         amount: amountCents,
         currency: 'AUD'
