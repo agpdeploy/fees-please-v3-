@@ -168,7 +168,6 @@ export async function POST(req: Request) {
 
     const emailPayloads = pendingPlayers.map(player => {
       const publicHubUrl = `${baseUrl}/t/${teamSlug}?fixture=${fixture.id}`;
-      const unsubscribeUrl = `${baseUrl}/t/${teamSlug}/unsubscribe?player=${player.id}`;
 
       const urlYes = `${publicHubUrl}&player=${player.id}&status=yes`;
       const urlMaybe = `${publicHubUrl}&player=${player.id}&status=maybe`;
@@ -290,7 +289,6 @@ export async function POST(req: Request) {
           ${sponsorsHtml}
           <div style="text-align: center; margin-top: 24px;">
             <p style="color: #a1a1aa; font-size: 12px;">You received this email because you are a member of ${teamName} on Fees Please.</p>
-            <p style="color: #a1a1aa; font-size: 12px;"><a href="${unsubscribeUrl}" style="color: #71717a; text-decoration: underline;">Unsubscribe from availability reminders</a></p>
           </div>
           <div style="text-align: center; margin-top: 32px;">
             <a href="https://feesplease.app" target="_blank" style="text-decoration: none;">
