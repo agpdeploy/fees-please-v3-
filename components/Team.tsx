@@ -193,15 +193,12 @@ export default function Team() {
         const isPastFixture = (f: any) => {
            if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
            const matchD = new Date(f.match_date);
-           const today = new Date();
-           today.setHours(0,0,0,0);
-           
-           // Give a 1-day grace period so managers can finalise the match the day after.
            const msPerDay = 24 * 60 * 60 * 1000;
-           const isGracePeriodExpired = (today.getTime() - matchD.getTime()) > msPerDay;
+           
+           // Option A (Blocker): Unfinalised matches stay active forever, UNLESS they are a historical backfill
            const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
            
-           return isGracePeriodExpired || uploadedAfterMatch;
+           return uploadedAfterMatch;
         };
 
         const upcoming = rawFixtures.filter(f => !isPastFixture(f))
@@ -606,18 +603,14 @@ export default function Team() {
               {fixtureAvail.slice(0, visibleFixtureCount).map((f, i) => {
                  const date = new Date(f.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
                  
-                 const today = new Date();
-                 today.setHours(0,0,0,0);
                  const matchD = new Date(f.match_date);
                  const msPerDay = 24 * 60 * 60 * 1000;
-                 const isGracePeriodExpired = (today.getTime() - matchD.getTime()) > msPerDay;
                  const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
-                 const isPast = ['completed', 'forfeited', 'abandoned'].includes(f.status) || isGracePeriodExpired || uploadedAfterMatch;
+                 const isPast = ['completed', 'forfeited', 'abandoned'].includes(f.status) || uploadedAfterMatch;
                  
                  const prevMatchD = i > 0 ? new Date(fixtureAvail[i-1].match_date) : null;
-                 const prevIsGracePeriodExpired = prevMatchD ? (today.getTime() - prevMatchD.getTime()) > msPerDay : false;
                  const prevUploadedAfterMatch = i > 0 && fixtureAvail[i-1].created_at ? new Date(fixtureAvail[i-1].created_at).getTime() > (prevMatchD!.getTime() + msPerDay) : false;
-                 const prevIsPast = i > 0 ? ['completed', 'forfeited', 'abandoned'].includes(fixtureAvail[i-1].status) || prevIsGracePeriodExpired || prevUploadedAfterMatch : false;
+                 const prevIsPast = i > 0 ? ['completed', 'forfeited', 'abandoned'].includes(fixtureAvail[i-1].status) || prevUploadedAfterMatch : false;
                  
                  const showPastDivider = isPast && !prevIsPast;
 

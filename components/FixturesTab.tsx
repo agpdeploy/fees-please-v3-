@@ -497,9 +497,8 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   const matchDate = new Date(fixture.match_date);
   const today = new Date();
   const isToday = matchDate.toDateString() === today.toDateString();
-  today.setHours(0, 0, 0, 0);
   const msPerDay = 24 * 60 * 60 * 1000;
-  const isGracePeriodExpired = (today.getTime() - matchDate.getTime()) > msPerDay;
+  
   const isUploadedInPast = fixture.created_at ? new Date(fixture.created_at).getTime() > (matchDate.getTime() + msPerDay) : false;
 
   let displayStatus = "";
@@ -507,10 +506,13 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   if (!fixture.is_active) {
     displayStatus = "Deactivated";
     statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+  } else if (fixture.status === 'forfeited') {
+    displayStatus = "Forfeited";
+    statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
   } else if (fixture.status === 'abandoned') {
     displayStatus = "Abandoned";
     statusClasses = "bg-red-600 text-white shadow-sm";
-  } else if (fixture.status === 'completed' || isGracePeriodExpired || isUploadedInPast) {
+  } else if (fixture.status === 'completed' || isUploadedInPast) {
     displayStatus = "Completed";
     statusClasses = "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
   } else if (isToday) {

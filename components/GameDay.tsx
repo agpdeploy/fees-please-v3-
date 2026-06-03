@@ -292,15 +292,12 @@ export default function GameDay() {
         const isPastFixture = (f: any) => {
            if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
            const matchD = new Date(f.match_date);
-           const today = new Date();
-           today.setHours(0,0,0,0);
-           
-           // Give a 1-day grace period so managers can finalise the match the day after.
            const msPerDay = 24 * 60 * 60 * 1000;
-           const isGracePeriodExpired = (today.getTime() - matchD.getTime()) > msPerDay;
+           
+           // Option A (Blocker): Unfinalised matches stay active forever, UNLESS they are a historical backfill
            const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
            
-           return isGracePeriodExpired || uploadedAfterMatch;
+           return uploadedAfterMatch;
         };
         const upcoming = allFix.filter(f => !isPastFixture(f))
           .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
