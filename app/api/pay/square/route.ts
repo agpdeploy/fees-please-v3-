@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     
     if (markPaidError) {
        console.error("Failed to mark tx as paid:", markPaidError);
+       throw new Error(`markPaidError: ${markPaidError.message} / ${markPaidError.details || ''} / ${markPaidError.hint || ''}`);
     }
 
     // 1.5. Ledger Reconciliation: Mark old unpaid fees as paid until the payment amount is consumed
@@ -150,6 +151,7 @@ export async function POST(request: Request) {
     
     if (insertPaymentError) {
       console.error("Failed to insert payment tx:", insertPaymentError);
+      throw new Error(`insertPaymentError: ${insertPaymentError.message} / ${insertPaymentError.details || ''} / ${insertPaymentError.hint || ''}`);
     }
 
     return NextResponse.json({ success: true, paymentId: data.payment.id });
