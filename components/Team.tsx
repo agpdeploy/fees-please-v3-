@@ -633,6 +633,9 @@ export default function Team() {
                  } else if (isToFinalise) {
                     badgeText = "TO FINALISE";
                     badgeColor = "bg-amber-500 text-white";
+                 } else {
+                    badgeText = "UPCOMING";
+                    badgeColor = "bg-emerald-600 text-white";
                  }
                  
                  const prevMatchD = i > 0 ? new Date(fixtureAvail[i-1].match_date) : null;
