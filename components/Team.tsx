@@ -281,6 +281,16 @@ export default function Team() {
 
 
   // --- INLINE SQUAD LOGIC ---
+  const nextUpcomingFixtureId = fixtureAvail.find(fx => {
+    const mD = new Date(fx.match_date);
+    const tM = new Date();
+    tM.setHours(0,0,0,0);
+    const isP = ['completed', 'forfeited', 'abandoned'].includes(fx.status) || (fx.created_at ? new Date(fx.created_at).getTime() > (mD.getTime() + 24*60*60*1000) : false);
+    const isT = mD.toDateString() === tM.toDateString();
+    const isTF = !isP && mD < tM;
+    return !isP && !isT && !isTF;
+  })?.id;
+
   async function loadModalAvailData(fixtureId: string) { 
     setIsProcessing(true);
     const { data: squadData } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixtureId); 
@@ -298,7 +308,8 @@ export default function Team() {
       setSquadMode('squad');
     } else {
       setExpandedFixtureId(fId);
-      setActiveTab('availability');
+      const showAvailabilityTab = fId === nextUpcomingFixtureId;
+      setActiveTab(showAvailabilityTab ? 'availability' : 'squad');
       setAvailabilityMode('menu');
       setSquadMode('squad');
       loadModalAvailData(fId);
@@ -704,7 +715,7 @@ export default function Team() {
                        {isExpanded && (
                           <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111] animate-in slide-in-from-top-2 fade-in duration-200">
                              
-                             {canManageTeam(f.team_id) && (
+                             {canManageTeam(f.team_id) && f.id === nextUpcomingFixtureId && (
                                 <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors mb-4 rounded-t-2xl">
                                   <div className="relative flex bg-emerald-50 dark:bg-emerald-950/40 p-1 rounded-xl">
                                     <div 
@@ -731,7 +742,7 @@ export default function Team() {
                              )}
 
                              {/* --- AVAILABILITY TAB --- */}
-                             {activeTab === 'availability' && canManageTeam(f.team_id) && (
+                             {activeTab === 'availability' && canManageTeam(f.team_id) && f.id === nextUpcomingFixtureId && (
                                <div className="animate-in fade-in slide-in-from-left-4 duration-300">
                                  {availabilityMode === 'menu' ? (
                                    <div className="flex flex-col gap-3">
