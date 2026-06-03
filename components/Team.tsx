@@ -327,10 +327,13 @@ export default function Team() {
          setEmailStats(stats);
          setEmailLogDetails(data);
          setActiveStatFilter(null);
+         return data;
       }
+      return [];
     } catch (err) {
       console.error(err);
       showToast("Error loading analytics", "error");
+      return [];
     } finally {
       setIsStatsLoading(false);
     }
@@ -743,11 +746,13 @@ export default function Team() {
                                      </button>
                                      
                                      <button 
-                                       onClick={() => {
+                                       onClick={async () => {
+                                         setIsStatsLoading(true);
+                                         const logs = await fetchEmailLogs(f.id);
                                          const respondedIds = new Set(modalAvailData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
                                          const isSuperAdmin = profile?.role === 'super_admin';
                                          const pending = clubPlayers.filter(p => {
-                                           const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
+                                           const hasSent = logs.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
                                            return p.default_team_id === f.team_id && 
                                                   p.is_active !== false &&
                                                   !respondedIds.has(p.id) && 
@@ -1076,12 +1081,14 @@ export default function Team() {
                                          {canManageTeam(f.team_id) && (
                                            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
                                              <button 
-                                               onClick={() => {
+                                               onClick={async () => {
+                                                 setIsStatsLoading(true);
+                                                 const logs = await fetchEmailLogs(f.id);
                                                  const isSuperAdmin = profile?.role === 'super_admin';
                                                  const eligible = f.lists.squadIds.filter((pid: string) => {
                                                    const p = clubPlayers.find(cp => cp.id === pid);
                                                    if (!p) return false;
-                                                   const hasSent = emailLogDetails.some(log => log.email_type === 'squad_notification' && log.players?.id === p.id);
+                                                   const hasSent = logs.some(log => log.email_type === 'squad_notification' && log.players?.id === p.id);
                                                    return p.email && p.email.trim() !== '' && p.unsubscribed !== true && (!hasSent || isSuperAdmin);
                                                  });
                                                  
