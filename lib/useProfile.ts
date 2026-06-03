@@ -58,7 +58,7 @@ export function useProfile() {
           }
         }
 
-        const isSuper: boolean = Boolean(rolesData.some((r: any) => r.role === 'super_admin'));
+        const isSuper: boolean = Boolean(rolesData.some((r: any) => r.role === 'super_admin')) || profileData?.role === 'super_admin';
         const adminRole = rolesData.find((r: any) => r.role === 'club_admin');
         const teamRole = rolesData.find((r: any) => r.role === 'team_admin');
 
@@ -124,7 +124,7 @@ export function useProfile() {
         id: userId,
         email: baseProfileData?.email || email, 
         ...(baseProfileData || {}), 
-        role: isSuper ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
+        role: isSuper || baseProfileData?.role === 'super_admin' ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
         club_id: adminRole?.club_id || teamRole?.club_id || null,
         team_id: teamRole?.team_id || null
       };
