@@ -744,9 +744,9 @@ export default function GameDay() {
       setQrModalPlayer(player);
       setQrTxAmount(calculateSquareOnlineGross(netAmount, clubInfo));
       setIsQrModalOpen(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast("Failed to generate payment link", "error");
+      showToast(`Failed to generate payment link: ${err.message || 'Unknown error'}`, "error");
     } finally {
       setIsProcessing(false);
     }
