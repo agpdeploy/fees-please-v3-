@@ -8,6 +8,11 @@
 export const calculateSquareOnlineGross = (netAmount: number, club?: any): number => {
   if (netAmount <= 0) return 0;
   
+  // If the club is not passing fees to the payer, the gross amount is just the net amount.
+  if (club && club.pass_processing_fees === false) {
+    return netAmount;
+  }
+  
   const isFreeTier = club?.plan_tier === 'free';
   const hasOverride = club?.override_platform_fee === true;
   

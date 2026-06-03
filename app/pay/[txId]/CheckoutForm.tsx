@@ -8,6 +8,7 @@ import { calculateSquareOnlineGross } from '@/lib/fees';
 export default function CheckoutForm({ transaction, club, player, team, fixture, balance, outstandingList, appId, locationId }: any) {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const totalToCollect = transaction.amount;
@@ -28,6 +29,7 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Payment failed');
       
+      setIsSuccess(true);
       router.refresh();
     } catch (err: any) {
       setError(err.message);
@@ -149,10 +151,10 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
           )}
 
           <div className="square-payment-wrapper relative min-h-[150px]">
-            {isProcessing && (
+            {(isProcessing || isSuccess) && (
               <div className="absolute inset-0 bg-white/80 dark:bg-[#111]/80 z-10 flex items-center justify-center rounded-xl backdrop-blur-sm">
                 <div className="font-bold text-emerald-600 animate-pulse flex items-center gap-2 uppercase tracking-widest text-xs">
-                  <i className="fa-solid fa-spinner fa-spin"></i> Processing...
+                  {isSuccess ? <><i className="fa-solid fa-circle-check"></i> Success! Reloading...</> : <><i className="fa-solid fa-spinner fa-spin"></i> Processing...</>}
                 </div>
               </div>
             )}
