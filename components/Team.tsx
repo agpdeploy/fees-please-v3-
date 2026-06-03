@@ -608,6 +608,10 @@ export default function Team() {
                  const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
                  const isPast = ['completed', 'forfeited', 'abandoned'].includes(f.status) || uploadedAfterMatch;
                  
+                 const todayMidnight = new Date();
+                 todayMidnight.setHours(0,0,0,0);
+                 const isToFinalise = !isPast && matchD < todayMidnight;
+                 
                  const prevMatchD = i > 0 ? new Date(fixtureAvail[i-1].match_date) : null;
                  const prevUploadedAfterMatch = i > 0 && fixtureAvail[i-1].created_at ? new Date(fixtureAvail[i-1].created_at).getTime() > (prevMatchD!.getTime() + msPerDay) : false;
                  const prevIsPast = i > 0 ? ['completed', 'forfeited', 'abandoned'].includes(fixtureAvail[i-1].status) || prevUploadedAfterMatch : false;
@@ -642,8 +646,11 @@ export default function Team() {
                           >
                              <div className="flex justify-between items-end mb-3">
                                 <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wide">VS {f.opponent}</span>
-                             <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
-                          </div>
+                                <div className="flex items-center gap-2">
+                                  {isToFinalise && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white tracking-widest bg-amber-500 leading-none">TO FINALISE</span>}
+                                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
+                                </div>
+                             </div>
                           
                           <div className="w-full h-3.5 bg-zinc-200 dark:bg-zinc-900 rounded-full overflow-hidden flex shadow-inner">
                              <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 h-full transition-all"></div>

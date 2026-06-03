@@ -501,6 +501,8 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   
   const isUploadedInPast = fixture.created_at ? new Date(fixture.created_at).getTime() > (matchDate.getTime() + msPerDay) : false;
 
+  const isPastMatch = matchDate < new Date(today.setHours(0,0,0,0));
+
   let displayStatus = "";
   let statusClasses = "";
   if (!fixture.is_active) {
@@ -518,6 +520,9 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
   } else if (isToday) {
     displayStatus = "Active";
     statusClasses = "bg-emerald-600 text-white shadow-sm";
+  } else if (isPastMatch) {
+    displayStatus = "To Finalise";
+    statusClasses = "bg-amber-500 dark:bg-amber-600 text-white shadow-sm";
   } else {
     displayStatus = "Upcoming";
     statusClasses = "bg-emerald-600 text-white shadow-sm";
