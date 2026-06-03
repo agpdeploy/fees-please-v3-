@@ -49,7 +49,8 @@ export async function GET(request: Request) {
 
     if (!tokenRes.ok) {
       console.error("Square Token Error:", tokenData);
-      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to connect to Square')}`, request.url));
+      const errorDetail = tokenData.message || tokenData.error_description || JSON.stringify(tokenData);
+      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to connect to Square: ' + errorDetail)}`, request.url));
     }
 
     const { access_token, refresh_token, merchant_id } = tokenData;
