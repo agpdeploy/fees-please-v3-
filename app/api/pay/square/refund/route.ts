@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
@@ -14,8 +15,14 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } }
+    );
+    
+    // Create a service role client for bypassing RLS during DB updates
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     // Get current user to verify permissions
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch the club's Square Access Token
-    const { data: club } = await supabase
+    const { data: club } = await serviceRoleClient
       .from('clubs')
       .select('square_access_token')
       .eq('id', clubId)
@@ -90,7 +97,7 @@ export async function POST(request: Request) {
 
     // Refund succeeded at Square. We must now delete the payment and the original fee from the ledger.
     // By deleting everything matching this square_payment_id, we restore the ledger balance.
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await serviceRoleClient
       .from('transactions')
       .delete()
       .eq('square_payment_id', squarePaymentId);

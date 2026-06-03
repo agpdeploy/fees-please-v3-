@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { calculateSquareOnlineGross } from '@/lib/fees';
 
@@ -12,11 +11,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing sourceId or txId" }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } }
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     // Fetch transaction details

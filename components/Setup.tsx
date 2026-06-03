@@ -171,7 +171,6 @@ export default function Setup({ activeTab }: SetupProps) {
       setPayIdValue(clubData.pay_id_value || '');
       setOverridePlatformFee(clubData.override_platform_fee || false);
       setAcceptsCash(clubData.accepts_cash ?? true);
-      setAcceptsCard(clubData.accepts_card ?? true);
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
@@ -338,8 +337,7 @@ export default function Setup({ activeTab }: SetupProps) {
       pay_id_type: payIdValue ? payIdType : null,
       pay_id_value: payIdValue || null,
       override_platform_fee: overridePlatformFee,
-      accepts_cash: acceptsCash,
-      accepts_card: acceptsCard
+      accepts_cash: acceptsCash
     };
     
     if (clubId && clubId !== 'new') {

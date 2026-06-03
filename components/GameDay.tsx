@@ -227,7 +227,7 @@ export default function GameDay() {
               season_end: data.season_end,
               default_umpire_fee: data.default_umpire_fee,
               accepts_cash: data.accepts_cash,
-              accepts_card: data.accepts_card,
+              
               square_access_token: data.square_access_token,
               square_location_id: data.square_location_id
             });
@@ -1490,7 +1490,7 @@ export default function GameDay() {
                     </div>
                   </div>
                   
-                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.accepts_card !== false)) && (
+                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.is_square_enabled !== false)) && (
                     <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
                       <button 
                         onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
@@ -1519,13 +1519,13 @@ export default function GameDay() {
                     </div>
                   )}
 
-                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.accepts_card === false)) && (
+                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.is_square_enabled === false)) && (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-[9px] uppercase tracking-widest px-3 py-2 rounded-lg flex items-center gap-2">
                        <i className="fa-solid fa-money-bill-wave"></i> Cash Only
                     </div>
                   )}
 
-                  {((clubInfo?.accepts_cash === false) && (clubInfo?.accepts_card !== false)) && (
+                  {((clubInfo?.accepts_cash === false) && (clubInfo?.is_square_enabled !== false)) && (
                     <button 
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
