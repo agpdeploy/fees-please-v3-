@@ -745,7 +745,6 @@ export default function Team() {
                                      <button 
                                        onClick={() => {
                                          const respondedIds = new Set(modalAvailData.filter(a => ['yes', 'no', 'maybe'].includes(a.status)).map(a => a.player_id));
-                                         const pendingIds = Object.keys(statsMap).filter(id => statsMap[id].is_active && !yesIds.includes(id) && !maybeIds.includes(id) && !noIds.includes(id));
                                          const isSuperAdmin = profile?.role === 'super_admin';
                                          const pending = clubPlayers.filter(p => {
                                            const hasSent = emailLogDetails.some(log => log.email_type === 'availability_reminder' && log.players?.id === p.id);
