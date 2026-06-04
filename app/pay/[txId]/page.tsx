@@ -103,7 +103,7 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center pt-8 pb-32 px-4 relative">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center pt-8 pb-12 px-4">
       <CheckoutForm 
         transaction={transaction}
         club={club}
@@ -116,8 +116,8 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
         locationId={club.square_location_id}
       />
       
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800/80 pt-3 pb-6 sm:pb-4 z-50">
-        <div className="max-w-md mx-auto px-4 flex flex-col items-center">
+      <div className="w-full max-w-md mx-auto mt-8 pt-8 border-t border-zinc-200 dark:border-zinc-800/50">
+        <div className="flex flex-col items-center">
           {sponsors.length > 0 && (
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
