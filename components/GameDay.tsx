@@ -1849,13 +1849,13 @@ export default function GameDay() {
       )}
       {isQrModalOpen && qrModalPlayer && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 max-w-sm w-full text-center shadow-2xl relative max-h-[95vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
             
-            <Mark className="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-sm" />
+            <Mark className="w-10 h-10 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 rounded-2xl shadow-sm" />
             
-            <h2 className="text-xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">Scan to Pay</h2>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
+            <h2 className="text-xl font-black text-zinc-900 dark:text-white mb-1 md:mb-2 tracking-tight">Scan to Pay</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4 md:mb-6 leading-relaxed">
               Have <span className="font-bold text-zinc-900 dark:text-white">{qrModalPlayer.first_name}</span> scan this code to securely pay <span className="font-black text-emerald-600 dark:text-emerald-400">${qrTxAmount.toFixed(2)}</span> on their phone.
             </p>
             
@@ -1865,7 +1865,7 @@ export default function GameDay() {
               </div>
               <QRCodeSVG 
                 value={`${window.location.origin}/pay/${qrTxId}`} 
-                size={220}
+                size={180}
                 bgColor={"#ffffff"}
                 fgColor={"#000000"}
                 level={"Q"}
@@ -1873,7 +1873,7 @@ export default function GameDay() {
               />
             </div>
             
-            <div className="flex justify-center gap-2 mb-6">
+            <div className="flex justify-center gap-2 mb-4">
               <button 
                 onClick={() => {
                   const url = `${window.location.origin}/pay/${qrTxId}`;
