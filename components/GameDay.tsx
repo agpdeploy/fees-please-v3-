@@ -585,7 +585,8 @@ export default function GameDay() {
           .from('transactions')
           .select('player_id')
           .eq('fixture_id', activeFixture.id)
-          .eq('transaction_type', 'fee');
+          .eq('transaction_type', 'fee')
+          .gt('amount', 0);
           
         const playersWithExistingFees = existingFees?.map(tx => tx.player_id) || [];
         
@@ -824,6 +825,7 @@ export default function GameDay() {
       .select('player_id')
       .eq('fixture_id', activeFixture.id)
       .eq('transaction_type', 'fee')
+      .gt('amount', 0)
       .in('player_id', newlyPaidIds);
       
     const playersWithExistingFees = existingFees?.map(tx => tx.player_id) || [];
@@ -1203,8 +1205,12 @@ export default function GameDay() {
               <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
                 {activeFixture.opponent}
               </span>
-              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
+              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                {activeFixture.opponent_logo_url ? (
+                  <img src={activeFixture.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
+                )}
               </div>
             </div>
           </div>
