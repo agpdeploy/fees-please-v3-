@@ -106,12 +106,7 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
                   <span className="text-xs font-black text-zinc-500">${item.amount.toFixed(2)}</span>
                 </div>
               ))}
-              {outstandingList.reduce((acc: number, curr: any) => acc + curr.amount, 0) !== balance && (
-                <div className="flex justify-between items-center pt-2 border-t border-zinc-100 dark:border-zinc-800 border-dashed">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Partial Payments / Adjustments</span>
-                  <span className="text-xs font-black text-emerald-500">-${(outstandingList.reduce((acc: number, curr: any) => acc + curr.amount, 0) - balance).toFixed(2)}</span>
-                </div>
-              )}
+
             </div>
           </div>
         )}

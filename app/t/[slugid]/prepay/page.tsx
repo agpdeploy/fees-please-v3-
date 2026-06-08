@@ -120,11 +120,28 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
       ? team.public_team_profiles[0]?.club_logo_url 
       : team.public_team_profiles?.club_logo_url;
 
-  const unpaidPastTxs = transactions?.filter(tx => 
+  let pastFees = transactions?.filter(tx => 
     (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') && 
-    tx.status !== 'paid' && 
     tx.fixture_id !== fixtureId
-  ) || [];
+  ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || [];
+
+  let totalPayments = transactions?.filter(tx => 
+    tx.transaction_type === 'payment' && 
+    tx.status !== 'failed' && 
+    tx.status !== 'pending'
+  ).reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+
+  let unpaidPastTxs: any[] = [];
+  for (const fee of pastFees) {
+    if (totalPayments >= fee.amount) {
+      totalPayments -= fee.amount;
+    } else if (totalPayments > 0) {
+      unpaidPastTxs.push({ ...fee, amount: fee.amount - totalPayments });
+      totalPayments = 0;
+    } else {
+      unpaidPastTxs.push(fee);
+    }
+  }
 
   const pastFixtureIds = unpaidPastTxs.map(tx => tx.fixture_id).filter(Boolean);
   let pastFixturesMap = new Map();
@@ -208,12 +225,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
                     <span className="text-xs font-black text-zinc-500">${item.amount.toFixed(2)}</span>
                   </div>
                 ))}
-                {outstandingList.reduce((acc, curr) => acc + curr.amount, 0) !== balance && (
-                  <div className="flex justify-between items-center pt-2 border-t border-zinc-100 dark:border-zinc-800 border-dashed">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Partial Payments / Adjustments</span>
-                    <span className="text-xs font-black text-emerald-500">-${(outstandingList.reduce((acc, curr) => acc + curr.amount, 0) - balance).toFixed(2)}</span>
-                  </div>
-                )}
+
               </div>
             </div>
           )}
