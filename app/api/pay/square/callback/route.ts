@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing code or state" }, { status: 400 });
   }
 
-  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-  const appSecret = process.env.SQUARE_SECRET;
+  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID?.trim();
+  const appSecret = process.env.SQUARE_SECRET?.trim();
 
   if (!appId || !appSecret) {
     return NextResponse.json({ error: "Square credentials not configured on server" }, { status: 500 });
@@ -49,7 +49,8 @@ export async function GET(request: Request) {
 
     if (!tokenRes.ok) {
       console.error("Square Token Error:", tokenData);
-      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to connect to Square')}`, request.url));
+      const errorDetail = tokenData.message || tokenData.error_description || JSON.stringify(tokenData);
+      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to connect to Square: ' + errorDetail)}`, request.url));
     }
 
     const { access_token, refresh_token, merchant_id } = tokenData;
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
     const activeLocation = locations.find((l: any) => l.status === 'ACTIVE') || locations[0];
     const locationId = activeLocation?.id || null;
 
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from('clubs')
       .update({
         square_access_token: access_token,
@@ -86,11 +87,17 @@ export async function GET(request: Request) {
         square_location_id: locationId,
         is_square_enabled: true
       })
-      .eq('id', clubId);
+      .eq('id', clubId)
+      .select('id');
 
     if (updateError) {
       console.error("DB Update Error:", updateError);
       return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Failed to save Square connection')}`, request.url));
+    }
+
+    if (!data || data.length === 0) {
+      console.error("DB Update Error: 0 rows updated. Missing SUPABASE_SERVICE_ROLE_KEY or RLS blocked the update.");
+      return NextResponse.redirect(new URL(`/?error=${encodeURIComponent('Database update failed. Ensure SUPABASE_SERVICE_ROLE_KEY is set in Vercel.')}`, request.url));
     }
 
     // Success! Redirect back to settings

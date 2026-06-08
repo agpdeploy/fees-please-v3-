@@ -8,6 +8,7 @@ import { calculateSquareOnlineGross } from '@/lib/fees';
 export default function CheckoutForm({ transaction, club, player, team, fixture, balance, outstandingList, appId, locationId }: any) {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const totalToCollect = transaction.amount;
@@ -28,6 +29,7 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Payment failed');
       
+      setIsSuccess(true);
       router.refresh();
     } catch (err: any) {
       setError(err.message);
@@ -43,21 +45,17 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
       {/* Header matching Game Day */}
-      <div className="flex flex-col items-center gap-2 mb-8">
+      <div className="flex flex-col items-center gap-2 mb-6">
         <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center overflow-hidden">
           {teamLogoUrl || club?.logo_url ? <img src={teamLogoUrl || club.logo_url} className="w-full h-full object-contain p-1" /> : <i className="fa-solid fa-shield-halved text-zinc-300 dark:text-zinc-700 text-2xl"></i>}
         </div>
         <div className="text-center">
           <h1 className="text-2xl font-black uppercase italic tracking-tighter leading-none">{team?.name || club?.name}</h1>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mt-1">Digital Checkout</p>
-        </div>
-      </div>
-
-      {/* Player Block */}
-      <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-4">
-        <div className="pl-2">
-          <p className="text-[9px] text-zinc-500 font-black uppercase mb-0.5">Paying For</p>
-          <p className="font-bold uppercase text-sm">{player.nickname || `${player.first_name} ${player.last_name?.charAt(0) || ''}.`}</p>
+          <div className="mt-4 inline-flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-300 px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700/50">
+            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Paying For</span>
+            <span className="text-xs font-bold uppercase">{player.nickname || `${player.first_name} ${player.last_name?.charAt(0) || ''}.`}</span>
+          </div>
         </div>
       </div>
 
@@ -127,13 +125,13 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500">${totalToCollect.toFixed(2)}</p>
            </div>
            
-           {club?.is_square_enabled && club?.pass_processing_fees && totalToCollect > 0 && (
+           {club?.is_square_enabled && totalToCollect > 0 && (
              <div className="flex justify-between items-center pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 mt-1">
                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Card Processing Fee</p>
                <p className="text-xs font-bold text-zinc-500">${(grossAmount - totalToCollect).toFixed(2)}</p>
              </div>
            )}
-           {club?.is_square_enabled && club?.pass_processing_fees && totalToCollect > 0 && (
+           {club?.is_square_enabled && totalToCollect > 0 && (
              <div className="flex justify-between items-center pt-1">
                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Total Charge</p>
                <p className="text-sm font-black text-emerald-600 dark:text-emerald-500">${grossAmount.toFixed(2)}</p>
@@ -149,10 +147,10 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
           )}
 
           <div className="square-payment-wrapper relative min-h-[150px]">
-            {isProcessing && (
+            {(isProcessing || isSuccess) && (
               <div className="absolute inset-0 bg-white/80 dark:bg-[#111]/80 z-10 flex items-center justify-center rounded-xl backdrop-blur-sm">
                 <div className="font-bold text-emerald-600 animate-pulse flex items-center gap-2 uppercase tracking-widest text-xs">
-                  <i className="fa-solid fa-spinner fa-spin"></i> Processing...
+                  {isSuccess ? <><i className="fa-solid fa-circle-check"></i> Success! Reloading...</> : <><i className="fa-solid fa-spinner fa-spin"></i> Processing...</>}
                 </div>
               </div>
             )}

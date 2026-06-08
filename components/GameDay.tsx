@@ -227,7 +227,7 @@ export default function GameDay() {
               season_end: data.season_end,
               default_umpire_fee: data.default_umpire_fee,
               accepts_cash: data.accepts_cash,
-              accepts_card: data.accepts_card,
+              
               square_access_token: data.square_access_token,
               square_location_id: data.square_location_id
             });
@@ -340,9 +340,9 @@ export default function GameDay() {
           txData.forEach((tx: any) => {
             if (tx.transaction_type === 'fee') {
               debts[tx.player_id] = (debts[tx.player_id] || 0) + Number(tx.amount);
-              // Any fee for today's match means they've been processed
+              // Any POSITIVE fee for today's match means they've been processed
               // EXCEPT if it's a pending/unpaid fee created for online checkout
-              if (tx.fixture_id === activeFixture.id && tx.status !== 'unpaid' && !paidToday.includes(tx.player_id)) {
+              if (Number(tx.amount) > 0 && tx.fixture_id === activeFixture.id && tx.status !== 'unpaid' && !paidToday.includes(tx.player_id)) {
                 paidToday.push(tx.player_id);
               }
             }
@@ -585,7 +585,8 @@ export default function GameDay() {
           .from('transactions')
           .select('player_id')
           .eq('fixture_id', activeFixture.id)
-          .eq('transaction_type', 'fee');
+          .eq('transaction_type', 'fee')
+          .gt('amount', 0);
           
         const playersWithExistingFees = existingFees?.map(tx => tx.player_id) || [];
         
@@ -604,7 +605,8 @@ export default function GameDay() {
                   fixture_id: activeFixture.id,
                   club_id: resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
-                  transaction_type: 'fee'
+                  transaction_type: 'fee',
+                  status: 'unpaid'
                 });
               }
             } else if (action === 'paid') {
@@ -615,7 +617,8 @@ export default function GameDay() {
                   fixture_id: activeFixture.id,
                   club_id: resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
-                  transaction_type: 'fee'
+                  transaction_type: 'fee',
+                  status: 'paid'
                 });
               }
               batchTxPayload.push({
@@ -626,7 +629,8 @@ export default function GameDay() {
                 amount: player.is_member ? teamFees.member : teamFees.casual,
                 transaction_type: 'payment',
                 payment_method: 'cash',
-                description: 'Match Fees'
+                description: 'Match Fees',
+                status: 'completed'
               });
             } else if (action === 'remove') {
               playersToRemove.push(player.id);
@@ -744,9 +748,9 @@ export default function GameDay() {
       setQrModalPlayer(player);
       setQrTxAmount(calculateSquareOnlineGross(netAmount, clubInfo));
       setIsQrModalOpen(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast("Failed to generate payment link", "error");
+      showToast(`Failed to generate payment link: ${err.message || 'Unknown error'}`, "error");
     } finally {
       setIsProcessing(false);
     }
@@ -821,6 +825,7 @@ export default function GameDay() {
       .select('player_id')
       .eq('fixture_id', activeFixture.id)
       .eq('transaction_type', 'fee')
+      .gt('amount', 0)
       .in('player_id', newlyPaidIds);
       
     const playersWithExistingFees = existingFees?.map(tx => tx.player_id) || [];
@@ -1200,8 +1205,12 @@ export default function GameDay() {
               <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
                 {activeFixture.opponent}
               </span>
-              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
+              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                {activeFixture.opponent_logo_url ? (
+                  <img src={activeFixture.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
+                )}
               </div>
             </div>
           </div>
@@ -1487,7 +1496,7 @@ export default function GameDay() {
                     </div>
                   </div>
                   
-                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.accepts_card !== false)) && (
+                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.is_square_enabled !== false)) && (
                     <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 transition-colors">
                       <button 
                         onClick={() => setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'cash'}}))} 
@@ -1516,13 +1525,13 @@ export default function GameDay() {
                     </div>
                   )}
 
-                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.accepts_card === false)) && (
+                  {((clubInfo?.accepts_cash !== false) && (clubInfo?.is_square_enabled === false)) && (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-[9px] uppercase tracking-widest px-3 py-2 rounded-lg flex items-center gap-2">
                        <i className="fa-solid fa-money-bill-wave"></i> Cash Only
                     </div>
                   )}
 
-                  {((clubInfo?.accepts_cash === false) && (clubInfo?.accepts_card !== false)) && (
+                  {((clubInfo?.accepts_cash === false) && (clubInfo?.is_square_enabled !== false)) && (
                     <button 
                       onClick={() => {
                         setPaymentData(prev => ({...prev, [player.id]: {...prev[player.id], method: 'card'}}));
@@ -1846,13 +1855,13 @@ export default function GameDay() {
       )}
       {isQrModalOpen && qrModalPlayer && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 max-w-sm w-full text-center shadow-2xl relative max-h-[95vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
             
-            <Mark className="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-sm" />
+            <Mark className="w-10 h-10 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 rounded-2xl shadow-sm" />
             
-            <h2 className="text-xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">Scan to Pay</h2>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
+            <h2 className="text-xl font-black text-zinc-900 dark:text-white mb-1 md:mb-2 tracking-tight">Scan to Pay</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4 md:mb-6 leading-relaxed">
               Have <span className="font-bold text-zinc-900 dark:text-white">{qrModalPlayer.first_name}</span> scan this code to securely pay <span className="font-black text-emerald-600 dark:text-emerald-400">${qrTxAmount.toFixed(2)}</span> on their phone.
             </p>
             
@@ -1862,7 +1871,7 @@ export default function GameDay() {
               </div>
               <QRCodeSVG 
                 value={`${window.location.origin}/pay/${qrTxId}`} 
-                size={220}
+                size={180}
                 bgColor={"#ffffff"}
                 fgColor={"#000000"}
                 level={"Q"}
@@ -1870,7 +1879,7 @@ export default function GameDay() {
               />
             </div>
             
-            <div className="flex justify-center gap-2 mb-6">
+            <div className="flex justify-center gap-2 mb-4">
               <button 
                 onClick={() => {
                   const url = `${window.location.origin}/pay/${qrTxId}`;

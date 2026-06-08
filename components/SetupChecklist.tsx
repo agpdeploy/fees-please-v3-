@@ -71,7 +71,6 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [acceptsCash, setAcceptsCash] = useState(clubInfo?.accepts_cash ?? true);
-  const [acceptsCard, setAcceptsCard] = useState(clubInfo?.accepts_card ?? true);
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(clubInfo?.default_umpire_fee || "");
 
@@ -88,7 +87,6 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       setPayIdType(clubInfo.pay_id_type || 'mobile');
       setPayId(clubInfo.pay_id_value || "");
       setAcceptsCash(clubInfo.accepts_cash ?? true);
-      setAcceptsCard(clubInfo.accepts_card ?? true);
       setExpenseLabel(clubInfo.expense_label || "");
       setDefaultUmpireFee(clubInfo.default_umpire_fee != null ? clubInfo.default_umpire_fee : "");
       setSquareToken(clubInfo.square_access_token || "");
@@ -713,7 +711,6 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       pay_id_type: payIdType,
       pay_id_value: payId || null,
       accepts_cash: acceptsCash,
-      accepts_card: acceptsCard,
       square_access_token: squareToken || null,
       square_location_id: squareLocationId || null
     }).eq('id', activeClubId).select();
@@ -741,9 +738,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         square_location_id: squareLocationId || null
       });
     } else {
+      clubInfo.pay_id_type = payIdType;
       clubInfo.pay_id_value = payId || null;
       clubInfo.accepts_cash = acceptsCash;
-      clubInfo.accepts_card = acceptsCard;
     }
     
     setIsSavingFinancials(false);

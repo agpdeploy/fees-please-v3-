@@ -42,7 +42,7 @@ export default function Ledger() {
   const [globalSelectedPlayerId, setGlobalSelectedPlayerId] = useState("team");
   
   // Form States
-  const [manualType, setManualType] = useState<'payment' | 'fee'>('payment');
+  const [manualType, setManualType] = useState<'payment' | 'fee' | 'credit'>('payment');
   const [manualFixtureId, setManualFixtureId] = useState("");
   const [manualAmount, setManualAmount] = useState<number | "">("");
   const [manualNote, setManualNote] = useState("");
@@ -150,9 +150,9 @@ export default function Ledger() {
     txData.forEach(tx => {
       // Global Tracking for Season Wallet Math (Filtered strictly to current team)
       if (tx.team_id === activeTeamId) {
-        if (tx.transaction_type === 'payment') {
-          if (tx.payment_method === 'card') totalCardIn += Number(tx.amount);
-          else totalCashIn += Number(tx.amount);
+          if (tx.transaction_type === 'payment') {
+            if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
+            else totalCashIn += Number(tx.amount);
         }
         if (tx.transaction_type === 'expense') {
           totalExpenses += Number(tx.amount);
@@ -161,10 +161,10 @@ export default function Ledger() {
 
       // Match Specific Math
       if (tx.fixture_id && auditMap[tx.fixture_id]) {
-        if (tx.transaction_type === 'payment') {
-          if (tx.payment_method === 'cash') auditMap[tx.fixture_id].cash += Number(tx.amount);
-          if (tx.payment_method === 'card') auditMap[tx.fixture_id].card += Number(tx.amount);
-        }
+          if (tx.transaction_type === 'payment') {
+            if (tx.payment_method?.toLowerCase().includes('cash')) auditMap[tx.fixture_id].cash += Number(tx.amount);
+            if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) auditMap[tx.fixture_id].card += Number(tx.amount);
+          }
         if (tx.transaction_type === 'expense') auditMap[tx.fixture_id].fee += Number(tx.amount);
       }
 
@@ -309,18 +309,30 @@ export default function Ledger() {
     setIsSaving(true);
 
     const pId = targetPlayerId === 'team' || !targetPlayerId ? null : targetPlayerId;
-    const txType = !pId && manualType === 'fee' ? 'expense' : manualType;
+    
+    if (manualType === 'credit' && !pId) {
+      showToast("Please select a player to apply credit.", "error");
+      setIsSaving(false);
+      return;
+    }
 
-    const payload = {
+    const txType = manualType === 'credit' ? 'fee' : (!pId && manualType === 'fee' ? 'expense' : manualType);
+    const amount = manualType === 'credit' ? -Math.abs(Number(manualAmount)) : Number(manualAmount);
+
+    const payload: any = {
       player_id: pId,
       team_id: activeTeamId,
       club_id: activeClubId,
       fixture_id: manualFixtureId || null,
-      amount: Number(manualAmount),
+      amount: amount,
       transaction_type: txType,
-      payment_method: txType === 'payment' ? (manualNote.toLowerCase().includes('card') ? 'card' : 'cash') : null,
-      description: manualNote || `Manual ${txType}`
+      payment_method: manualType === 'credit' ? 'credit' : (txType === 'payment' ? (manualNote.toLowerCase().includes('card') ? 'card' : 'cash') : null),
+      description: manualNote || (manualType === 'credit' ? 'Credit Applied' : `Manual ${txType}`)
     };
+
+    if (manualType === 'credit') {
+      payload.status = 'paid';
+    }
 
     const { error } = await supabase.from("transactions").insert([payload]);
     
@@ -718,6 +730,7 @@ export default function Ledger() {
                             <form onSubmit={(e) => handleManualSave(e, player.id, false)} className="space-y-4 animate-in slide-in-from-right-4">
                               <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                                 <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Payment (+)</button>
+                                <button type="button" onClick={() => setManualType('credit')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'credit' ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-sm' : 'text-zinc-500'}`}>Credit</button>
                                 <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Charge (-)</button>
                               </div>
 
@@ -852,6 +865,7 @@ export default function Ledger() {
                 <form onSubmit={(e) => handleManualSave(e, globalSelectedPlayerId, true)} className="space-y-4">
                    <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                      <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Money In (+)</button>
+                     <button type="button" onClick={() => setManualType('credit')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'credit' ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-sm' : 'text-zinc-500'}`}>Credit</button>
                      <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Money Out (-)</button>
                    </div>
 

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { calculateSquareOnlineGross } from '@/lib/fees';
 
@@ -12,17 +11,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing sourceId or txId" }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } }
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     // Fetch transaction details
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
-      .select('*')
+      .select('*, players(first_name, last_name)')
       .eq('id', txId)
       .single();
 
@@ -58,10 +55,13 @@ export async function POST(request: Request) {
     // Generate idempotency key
     const idempotencyKey = crypto.randomUUID();
 
+    const playerName = transaction.players ? `${transaction.players.first_name} ${transaction.players.last_name}` : 'Unknown Player';
+    const noteStr = `${transaction.description || 'Match Fees'} - ${playerName}`;
+
     const squarePayload: any = {
       source_id: sourceId,
       idempotency_key: idempotencyKey,
-      note: transaction.description || 'Match Fees',
+      note: noteStr,
       amount_money: {
         amount: amountCents,
         currency: 'AUD'
@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     
     if (markPaidError) {
        console.error("Failed to mark tx as paid:", markPaidError);
+       throw new Error(`markPaidError: ${markPaidError.message} / ${markPaidError.details || ''} / ${markPaidError.hint || ''}`);
     }
 
     // 1.5. Ledger Reconciliation: Mark old unpaid fees as paid until the payment amount is consumed
@@ -150,6 +151,7 @@ export async function POST(request: Request) {
     
     if (insertPaymentError) {
       console.error("Failed to insert payment tx:", insertPaymentError);
+      throw new Error(`insertPaymentError: ${insertPaymentError.message} / ${insertPaymentError.details || ''} / ${insertPaymentError.hint || ''}`);
     }
 
     return NextResponse.json({ success: true, paymentId: data.payment.id });

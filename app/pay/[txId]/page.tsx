@@ -23,39 +23,23 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
     return <div className="p-8 text-center text-red-500 font-bold">Transaction not found.</div>;
   }
 
-  const { data: club } = await supabase
-    .from('clubs')
-    .select('*')
-    .eq('id', transaction.club_id)
-    .single();
-
-  const { data: team } = await supabase
-    .from('teams')
-    .select('*')
-    .eq('id', transaction.team_id)
-    .single();
-
-  const { data: publicProfile } = await supabase
-    .from('public_team_profiles')
-    .select('*')
-    .eq('team_id', transaction.team_id)
-    .maybeSingle();
-
-  const { data: fixture } = await supabase
-    .from('fixtures')
-    .select('*')
-    .eq('id', transaction.fixture_id)
-    .maybeSingle();
-
-  const { data: allTxs } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('player_id', transaction.player_id)
-    .eq('club_id', transaction.club_id);
+  const [
+    { data: club },
+    { data: team },
+    { data: publicProfile },
+    { data: fixture },
+    { data: allTxs }
+  ] = await Promise.all([
+    supabase.from('clubs').select('*').eq('id', transaction.club_id).single(),
+    supabase.from('teams').select('*').eq('id', transaction.team_id).single(),
+    supabase.from('public_team_profiles').select('*').eq('team_id', transaction.team_id).maybeSingle(),
+    transaction.fixture_id ? supabase.from('fixtures').select('*').eq('id', transaction.fixture_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('transactions').select('*').eq('player_id', transaction.player_id).eq('club_id', transaction.club_id)
+  ]);
 
   let balance = 0;
   allTxs?.forEach(tx => {
-    if (tx.status === 'completed' && tx.transaction_type === 'payment') {
+    if (tx.transaction_type === 'payment' && tx.status !== 'failed' && tx.status !== 'pending') {
       balance -= tx.amount;
     } else if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') {
       balance += tx.amount;
@@ -119,7 +103,7 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center pt-8 pb-32 px-4 relative">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center pt-8 pb-12 px-4">
       <CheckoutForm 
         transaction={transaction}
         club={club}
@@ -132,8 +116,8 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
         locationId={club.square_location_id}
       />
       
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800/80 pt-3 pb-6 sm:pb-4 z-50">
-        <div className="max-w-md mx-auto px-4 flex flex-col items-center">
+      <div className="w-full max-w-md mx-auto mt-8 pt-8 border-t border-zinc-200 dark:border-zinc-800/50">
+        <div className="flex flex-col items-center">
           {sponsors.length > 0 && (
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>

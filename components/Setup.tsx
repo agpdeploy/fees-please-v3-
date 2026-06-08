@@ -106,6 +106,21 @@ export default function Setup({ activeTab }: SetupProps) {
   const [clubId, setClubId] = useState<string | null>(null);
 
   useEffect(() => {
+    // If the url has ?success=square_connected or ?error, show a toast
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'square_connected') {
+      showToast("Connected to Square successfully!");
+      // clean up url
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.has('error')) {
+      const errorMsg = urlParams.get('error');
+      showToast(`Square Connection Error: ${errorMsg}`, "error");
+      // clean up url
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'teams') {
       resetTeamForm();
     }
@@ -156,7 +171,6 @@ export default function Setup({ activeTab }: SetupProps) {
       setPayIdValue(clubData.pay_id_value || '');
       setOverridePlatformFee(clubData.override_platform_fee || false);
       setAcceptsCash(clubData.accepts_cash ?? true);
-      setAcceptsCard(clubData.accepts_card ?? true);
     }
 
     const { data: usersData } = await supabase.from("user_roles").select("*, teams(name)").eq("club_id", clubId);
@@ -323,8 +337,7 @@ export default function Setup({ activeTab }: SetupProps) {
       pay_id_type: payIdValue ? payIdType : null,
       pay_id_value: payIdValue || null,
       override_platform_fee: overridePlatformFee,
-      accepts_cash: acceptsCash,
-      accepts_card: acceptsCard
+      accepts_cash: acceptsCash
     };
     
     if (clubId && clubId !== 'new') {

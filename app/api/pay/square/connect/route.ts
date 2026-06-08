@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
+  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID?.trim();
   if (!appId) {
     return NextResponse.json({ error: "Square App ID not configured" }, { status: 500 });
   }
