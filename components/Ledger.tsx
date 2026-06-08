@@ -117,7 +117,7 @@ export default function Ledger() {
     ]);
 
     const fixData = fixRes.data || [];
-    const txData = (txRes.data || []).filter(tx => tx.status !== 'unpaid');
+    const txData = (txRes.data || []).filter(tx => tx.status !== 'unpaid' || tx.transaction_type === 'fee');
     const teamPlayersData = playersRes.data || [];
 
     setFixtures(fixData);
