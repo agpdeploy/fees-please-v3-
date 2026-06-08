@@ -46,11 +46,28 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
     }
   });
 
-  const unpaidPastTxs = allTxs?.filter(tx => 
+  let pastFees = allTxs?.filter(tx => 
     (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') && 
-    tx.status !== 'paid' && 
     tx.fixture_id !== transaction.fixture_id
-  ) || [];
+  ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || [];
+
+  let totalPayments = allTxs?.filter(tx => 
+    tx.transaction_type === 'payment' && 
+    tx.status !== 'failed' && 
+    tx.status !== 'pending'
+  ).reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+
+  let unpaidPastTxs: any[] = [];
+  for (const fee of pastFees) {
+    if (totalPayments >= fee.amount) {
+      totalPayments -= fee.amount;
+    } else if (totalPayments > 0) {
+      unpaidPastTxs.push({ ...fee, amount: fee.amount - totalPayments });
+      totalPayments = 0;
+    } else {
+      unpaidPastTxs.push(fee);
+    }
+  }
 
   const pastFixtureIds = unpaidPastTxs.map(tx => tx.fixture_id).filter(Boolean);
   let pastFixturesMap = new Map();
