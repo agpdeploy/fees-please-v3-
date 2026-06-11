@@ -1,7 +1,7 @@
 // app/dashboard/gameday/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
@@ -10,6 +10,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Mark } from './Brand';
 
 import SetupChecklist from './SetupChecklist';
+import PlayHQSeasonAlert from './PlayHQSeasonAlert';
 export default function GameDay() {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
@@ -18,6 +19,7 @@ export default function GameDay() {
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [newSeasons, setNewSeasons] = useState<any[]>([]);
   
   const [activeFixture, setActiveFixture] = useState<any>(null);
   const [pastFixtures, setPastFixtures] = useState<any[]>([]);
@@ -187,12 +189,12 @@ export default function GameDay() {
         supabase.from("transactions").insert([{ 
           player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
           fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
-          amount: pendingTx.fee_amount, transaction_type: 'fee' 
+          amount: pendingTx.fee_amount, transaction_type: 'fee', season_name: pendingTx.season_name || null
         }]).then(() => {
           supabase.from("transactions").insert([{ 
             player_id: pendingTx.player_id, team_id: pendingTx.team_id, 
             fixture_id: pendingTx.fixture_id, club_id: pendingTx.club_id,
-            amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card' 
+            amount: pendingTx.amount, transaction_type: 'payment', payment_method: 'card', season_name: pendingTx.season_name || null 
           }]).then(() => {
             localStorage.removeItem('square_pending_tx');
             showToast("Payment Successful!");
@@ -277,42 +279,45 @@ export default function GameDay() {
     fetchTeams();
   }, [profile, roles, activeClubId]);
 
-  useEffect(() => {
+  const loadTeamData = useCallback(async () => {
     if (!selectedTeamId) return;
-    async function loadTeamData() {
-      const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
-      if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
+    const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
+    if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
+    
+    const { data: allFix } = await supabase
+      .from('fixtures')
+      .select('*')
+      .eq('team_id', selectedTeamId);
       
-      const { data: allFix } = await supabase
-        .from('fixtures')
-        .select('*')
-        .eq('team_id', selectedTeamId);
-        
-      if (allFix) {
-        const isPastFixture = (f: any) => {
-           if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
-           const matchD = new Date(f.match_date);
-           const msPerDay = 24 * 60 * 60 * 1000;
-           
-           // Option A (Blocker): Unfinalised matches stay active forever, UNLESS they are a historical backfill
-           const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
-           
-           return uploadedAfterMatch;
-        };
-        const upcoming = allFix.filter(f => !isPastFixture(f))
-          .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-        const past = allFix.filter(f => isPastFixture(f))
-          .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+    if (allFix) {
+      const isPastFixture = (f: any) => {
+         if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
+         const matchD = new Date(f.match_date);
+         const msPerDay = 24 * 60 * 60 * 1000;
+         
+         // Option A (Blocker): Unfinalised matches stay active forever, UNLESS they are a historical backfill
+         const uploadedAfterMatch = f.created_at ? new Date(f.created_at).getTime() > (matchD.getTime() + msPerDay) : false;
+         
+         return uploadedAfterMatch;
+      };
+      const activeSeasonFixtures = allFix.filter(f => clubInfo?.season_name ? f.season_name === clubInfo.season_name : !f.season_name);
 
-        setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);
-        setPastFixtures(past);
-      } else {
-        setActiveFixture(null);
-        setPastFixtures([]);
-      }
+      const upcoming = activeSeasonFixtures.filter(f => !isPastFixture(f))
+        .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+      const past = activeSeasonFixtures.filter(f => isPastFixture(f))
+        .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+
+      setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);
+      setPastFixtures(past);
+    } else {
+      setActiveFixture(null);
+      setPastFixtures([]);
     }
+  }, [selectedTeamId, clubInfo.season_name]);
+
+  useEffect(() => {
     loadTeamData();
-  }, [selectedTeamId]);
+  }, [loadTeamData]);
 
   async function loadSquadData() {
     if (!activeFixture) { setSquad([]); return; }
@@ -392,6 +397,24 @@ export default function GameDay() {
     setIsSquadLoading(false);
   }
   
+  useEffect(() => {
+    async function fetchNewSeasons() {
+      if (!activeClubId || (profile?.role !== 'club_admin' && profile?.role !== 'team_admin' && profile?.role !== 'super_admin')) return;
+      try {
+        const res = await fetch(`/api/cron/playhq-check?clubId=${activeClubId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success') {
+            setNewSeasons(data.unmappedSeasons || []);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to check for new PlayHQ seasons:", e);
+      }
+    }
+    fetchNewSeasons();
+  }, [activeClubId, profile?.role]);
+
   useEffect(() => { loadSquadData(); }, [activeFixture]);
 
   // --- AI REPORTER LOADING EFFECT ---
@@ -606,7 +629,8 @@ export default function GameDay() {
                   club_id: resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
                   transaction_type: 'fee',
-                  status: 'unpaid'
+                  status: 'unpaid',
+                  season_name: clubInfo.season_name || null
                 });
               }
             } else if (action === 'paid') {
@@ -618,7 +642,8 @@ export default function GameDay() {
                   club_id: resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
                   transaction_type: 'fee',
-                  status: 'paid'
+                  status: 'paid',
+                  season_name: clubInfo.season_name || null
                 });
               }
               batchTxPayload.push({
@@ -630,7 +655,8 @@ export default function GameDay() {
                 transaction_type: 'payment',
                 payment_method: 'cash',
                 description: 'Match Fees',
-                status: 'completed'
+                status: 'completed',
+                season_name: clubInfo.season_name || null
               });
             } else if (action === 'remove') {
               playersToRemove.push(player.id);
@@ -640,15 +666,16 @@ export default function GameDay() {
       }
 
       // 2. Process Umpire Fee (if toggled and unpaid)
-      if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
+      if (payUmpire && (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0) > 0 && !isUmpirePaid) {
         batchTxPayload.push({
           team_id: selectedTeamId, 
           fixture_id: activeFixture.id, 
           club_id: resolvedClubId, 
-          amount: activeFixture.umpire_fee, 
+          amount: (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0), 
           transaction_type: 'expense', 
           payment_method: 'cash', 
-          description: clubInfo.expense_label || 'Match Expense' 
+          description: clubInfo.expense_label || 'Match Expense',
+          season_name: clubInfo.season_name || null
         });
       }
 
@@ -688,24 +715,7 @@ export default function GameDay() {
         
       showToast(successMsg);
       
-      const { data: allFix } = await supabase
-        .from('fixtures')
-        .select('*')
-        .eq('team_id', selectedTeamId);
-        
-      if (allFix) {
-        const safeFixList = allFix.map(f => f.id === activeFixture.id ? { ...f, status: finaliseStatus } : f);
-
-        const upcoming = safeFixList.filter(f => !['completed', 'forfeited', 'abandoned'].includes(f.status))
-          .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-        const past = safeFixList.filter(f => ['completed', 'forfeited', 'abandoned'].includes(f.status))
-          .sort((a,b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
-
-        setActiveFixture(upcoming.length > 0 ? upcoming[0] : null);
-        setPastFixtures(past);
-      } else {
-        setActiveFixture(null);
-      }
+      await loadTeamData();
 
       setIsFinaliseModalOpen(false);
 
@@ -739,7 +749,8 @@ export default function GameDay() {
         amount: netAmount,
         transaction_type: 'checkout_link',
         status: 'unpaid',
-        description: matchNotes
+        description: matchNotes,
+        season_name: clubInfo.season_name || null
       }).select().single();
       
       if (txError) throw txError;
@@ -807,7 +818,7 @@ export default function GameDay() {
     setSelectedPlayerIds([]); 
     
     let umpirePaidNow = false;
-    if (payUmpire && activeFixture.umpire_fee > 0 && !isUmpirePaid) {
+    if (payUmpire && (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0) > 0 && !isUmpirePaid) {
       setIsUmpirePaid(true); 
       setPayUmpire(false);
       umpirePaidNow = true;
@@ -843,20 +854,21 @@ export default function GameDay() {
 
       // Only charge the match fee if it hasn't already been charged (e.g. during Match Finalization)
       if (!playersWithExistingFees.includes(player.id)) {
-        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: fee, transaction_type: 'fee' });
+        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: fee, transaction_type: 'fee', season_name: clubInfo.season_name || null });
       }
       
       // Only log a payment if they actually handed over cash/card today
       if (amount > 0) {
-        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method });
+        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method, season_name: clubInfo.season_name || null });
       }
     }
     
     if (umpirePaidNow) {
       offlinePayload.push({ 
         team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, 
-        amount: activeFixture.umpire_fee, transaction_type: 'expense', 
-        payment_method: 'cash', description: clubInfo.expense_label || 'Match Expense' 
+        amount: (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0), transaction_type: 'expense', 
+        payment_method: 'cash', description: clubInfo.expense_label || 'Match Expense',
+        season_name: clubInfo.season_name || null 
       });
     }
 
@@ -970,7 +982,7 @@ export default function GameDay() {
   const selectedPlayers = squad.filter(p => selectedPlayerIds.includes(p.id));
   const squadToPay = squad.filter(p => !paidPlayerIds.includes(p.id));
   const squadPaid = squad.filter(p => paidPlayerIds.includes(p.id));
-  const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? (activeFixture?.umpire_fee || 0) : 0);
+  const netTotal = selectedPlayerIds.reduce((sum, id) => sum + (paymentData[id]?.amount || 0), 0) - (payUmpire ? ((activeFixture?.umpire_fee || clubInfo?.default_umpire_fee || 0) || 0) : 0);
 
   const processableCount = selectedPlayers.filter(p => {
     const method = paymentData[p.id]?.method || 'cash';
@@ -1025,10 +1037,13 @@ export default function GameDay() {
                   </div>
                 )}
 
-                {finaliseStatus === 'completed' && activeFixture?.umpire_fee > 0 && (
-                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                {finaliseStatus === 'completed' && (activeFixture?.umpire_fee || clubInfo?.default_umpire_fee || 0) > 0 && (
+                  <div className="mt-6 bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-200 dark:border-orange-500/30 p-4 rounded-xl shadow-sm">
                      <div className="flex items-center justify-between mb-3">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Record {clubInfo.expense_label || 'Expenses'}? (${activeFixture.umpire_fee})</span>
+                       <div className="flex items-center gap-2">
+                         <i className="fa-solid fa-receipt text-orange-500 text-lg"></i>
+                         <span className="text-xs font-black uppercase tracking-widest text-orange-800 dark:text-orange-400">Record {clubInfo.expense_label || 'Expenses'}? (${(activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0)})</span>
+                       </div>
                        {isUmpirePaid ? (
                          <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md">Paid</span>
                        ) : (
@@ -1054,6 +1069,7 @@ export default function GameDay() {
                            <div key={p.id} className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-2.5 rounded-xl">
                               <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase truncate pr-2">
                                  {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                                 <span className="text-[10px] text-zinc-400 font-medium ml-2">(${p.is_member ? teamFees.member : teamFees.casual})</span>
                               </span>
                               <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
                                  <button
@@ -1084,6 +1100,10 @@ export default function GameDay() {
                 {finaliseStatus === 'completed' && (
                    <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed mt-4">
                      Review unpaid players above. Marking as 'Owe Fees' rolls the fee to their account. 'Paid' logs their fee as settled. 'Did Not Play' removes them from the match.
+                     <br /><br />
+                     <span className="text-[10px] uppercase text-zinc-400 font-black">
+                        Match fees (${teamFees.member} Member / ${teamFees.casual} Casual) are automatically pulled from your Team Settings.
+                     </span>
                    </p>
                 )}
               </div>
@@ -1110,7 +1130,16 @@ export default function GameDay() {
         </div>
       )}
 
-      {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (
+      {(profile?.role === 'club_admin' || profile?.role === 'team_admin' || profile?.role === 'super_admin') && !clubInfo?.season_name && (
+        <PlayHQSeasonAlert
+          clubRecord={{ id: activeClubId, settings: clubInfo?.settings }}
+          teams={teams}
+          newSeasons={newSeasons}
+          isRedirectOnly={true}
+        />
+      )}
+
+      {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (!roles || roles.length === 0 || isClubAdmin) && (
           <SetupChecklist 
             user={profile}
             activeClubId={activeClubId} 
@@ -1130,7 +1159,7 @@ export default function GameDay() {
           />
       )}
 
-      {(profile?.onboarding_completed === true || profile?.role !== 'club_admin') && (
+      {(!profile || profile.onboarding_completed === true || profile.role === 'super_admin' || (roles && roles.length > 0 && !isClubAdmin)) && (
         <>
           {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 1 && (
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
@@ -1142,7 +1171,32 @@ export default function GameDay() {
         </div>
       )}
 
-      {selectedTeamId && activeFixture ? (
+      {!clubInfo?.season_name ? (
+        <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-zinc-500/30 dark:border-zinc-500/20 transition-colors flex flex-col items-center shadow-sm mt-2 animate-in fade-in">
+          <div className="w-16 h-16 bg-zinc-50 dark:bg-zinc-900/20 rounded-full flex items-center justify-center mb-4 text-zinc-600 dark:text-zinc-500 shadow-inner">
+            <i className="fa-solid fa-moon text-3xl opacity-80"></i>
+          </div>
+          <h3 className="font-black uppercase tracking-widest text-sm text-zinc-800 dark:text-zinc-400 mb-2">Season Closed</h3>
+          
+          {canManage ? (
+            <>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[250px] leading-relaxed">
+                The season has been finalized. Start a new season in the Setup tab.
+              </p>
+              <button 
+                 onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'teams' }))}
+                 className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+              >
+                 <i className="fa-solid fa-calendar-plus"></i> New Season
+              </button>
+            </>
+          ) : (
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
+              Waiting for your Club Admin to start a new season.
+            </p>
+          )}
+        </div>
+      ) : selectedTeamId && activeFixture ? (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-colors">
           
           <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800" ref={manageTeamRef}>
@@ -1156,7 +1210,16 @@ export default function GameDay() {
                   
                   let text = "Upcoming";
                   let bg = "bg-emerald-600 dark:bg-emerald-500";
-                  if (isToday) {
+                  if (activeFixture.status === 'completed') {
+                    text = "Completed";
+                    bg = "bg-zinc-500 dark:bg-zinc-600";
+                  } else if (activeFixture.status === 'abandoned') {
+                    text = "Abandoned";
+                    bg = "bg-red-500 dark:bg-red-600";
+                  } else if (activeFixture.status === 'forfeited') {
+                    text = "Forfeited";
+                    bg = "bg-orange-500 dark:bg-orange-600";
+                  } else if (isToday) {
                     text = "Active";
                   } else if (isPast) {
                     text = "To Finalise";
@@ -1217,7 +1280,7 @@ export default function GameDay() {
 
           {/* INLINE TABS COMPONENT (Migrated to Team Hub) */}
         </div>
-      ) : selectedTeamId && profile?.onboarding_completed ? (
+      ) : selectedTeamId ? (
         <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-2 animate-in fade-in">
           <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-500 shadow-inner">
             <i className="fa-solid fa-calendar-xmark text-3xl opacity-80"></i>
@@ -1226,15 +1289,23 @@ export default function GameDay() {
           
           {canManage ? (
             <>
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[250px] leading-relaxed">
-                Your GameDay is empty. Let dAIve build your schedule instantly.
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[300px] leading-relaxed">
+                You've reached the end of your scheduled games. Would you like to add more matches or wrap up the season?
               </p>
-              <button 
-                 onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'fixtures' }))}
-                 className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
-              >
-                 <i className="fa-solid fa-wand-magic-sparkles"></i> Upload Draw
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[320px]">
+                <button 
+                   onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'fixtures' }))}
+                   className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                >
+                   <i className="fa-solid fa-calendar-plus"></i> Add Matches
+                </button>
+                <button 
+                   onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'teams' }))}
+                   className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                >
+                   <i className="fa-solid fa-flag-checkered"></i> Wrap Up
+                </button>
+              </div>
             </>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
@@ -1242,7 +1313,7 @@ export default function GameDay() {
             </p>
           )}
         </div>
-      ) : profile?.onboarding_completed ? (
+      ) : (
         <div className="text-center py-12 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-emerald-500/30 dark:border-emerald-500/20 transition-colors flex flex-col items-center shadow-sm mt-6 animate-in fade-in">
           <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-500 shadow-inner">
             <i className="fa-solid fa-users-slash text-3xl opacity-80"></i>
@@ -1267,11 +1338,11 @@ export default function GameDay() {
             </p>
           )}
         </div>
-      ) : null}
+      )}
 
 
       {/* --- PAYMENT & COLLECTION AREA --- */}
-      {activeFixture && (
+      {clubInfo?.season_name && activeFixture && (
         <div className="mb-4 mt-8 border-t border-zinc-200 dark:border-zinc-800/50 pt-6 transition-colors">
           
           <div className="flex justify-between items-center mb-4 px-1">
@@ -1574,7 +1645,7 @@ export default function GameDay() {
       )}
 
       {/* --- MATCH COMPLETION ACTIONS --- */}
-      {activeFixture && selectedPlayerIds.length === 0 && (
+      {activeFixture && !['completed', 'abandoned', 'forfeited'].includes(activeFixture.status) && selectedPlayerIds.length === 0 && (
         <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 space-y-6">
           
           {/* --- MOVED: UMPIRE / EXPENSE TOGGLE INTO FINALISE MODAL --- */}
@@ -1603,7 +1674,7 @@ export default function GameDay() {
       )}
 
       {/* --- PAST MATCHES TOGGLE (WITH INLINE REPORTER) --- */}
-      {pastFixtures.length > 0 && (
+      {clubInfo?.season_name && pastFixtures.length > 0 && (
         <div className="mt-6">
            <button 
               onClick={() => setShowPastFixtures(!showPastFixtures)}

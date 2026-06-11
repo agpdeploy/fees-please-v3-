@@ -35,8 +35,8 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
       let i = 0;
       setLoadingText(messages[0]);
       interval = setInterval(() => {
-        i++;
-        if (i < messages.length) setLoadingText(messages[i]);
+        i = (i + 1) % messages.length;
+        setLoadingText(messages[i]);
       }, 2500); 
     }
     return () => clearInterval(interval);
@@ -231,7 +231,7 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-500">
-          <i className="fa-solid fa-microchip text-5xl text-emerald-500 animate-pulse mb-6"></i>
+          <i className="fa-solid fa-wand-magic-sparkles text-5xl text-emerald-500 animate-pulse mb-6"></i>
           <p className="font-black uppercase tracking-widest text-zinc-600 animate-pulse text-sm text-center">{loadingText}</p>
         </div>
       )}

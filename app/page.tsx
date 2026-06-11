@@ -10,6 +10,7 @@ import Ledger from "../components/Ledger";
 import Setup from "../components/Setup";
 import Team from "../components/Team"; 
 import MyTeam from "../components/MyTeam"; 
+import SeasonHistory from "../components/SeasonHistory";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
 import { APP_VERSION } from "../lib/version";
@@ -26,7 +27,18 @@ export default function Home() {
     return 'gameday';
   });
 
-  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments'>('config');
+  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments'>(() => {
+    if (typeof window !== 'undefined') {
+      return (sessionStorage.getItem('setupTab') as any) || 'config';
+    }
+    return 'config';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('setupTab', setupTab);
+    }
+  }, [setupTab]);
 
   const [session, setSession] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -383,6 +395,7 @@ export default function Home() {
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
           {activeTab === "team" && <div className="p-4"><Team /></div>}
           {activeTab === "my-team" && <div className="p-4"><MyTeam /></div>}
+          {activeTab === "history" && <div className="p-4"><SeasonHistory /></div>}
           {activeTab === "setup" && isAdmin && <div className="p-4"><Setup activeTab={setupTab} /></div>}
         </div>
 
@@ -490,10 +503,20 @@ export default function Home() {
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
                       </button>
+                      <button onClick={() => { handleTabChange('history'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'history' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-clock-rotate-left w-5 text-center"></i> Season History
+                      </button>
                     </>
                   )}
+                </div>
+              )}
 
-                  
+              {canManage && (
+                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                  <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                    <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
+                  </button>
+
                   {/* MANUAL FORCE REFRESH FOR ADMINS (Bypass Cache) */}
                   <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-4">
                     <button onClick={applyUpdate} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
@@ -503,14 +526,6 @@ export default function Home() {
                       Version: {APP_VERSION}
                     </div>
                   </div>
-                </div>
-              )}
-
-              {canManage && (
-                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
-                  <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                    <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
-                  </button>
                 </div>
               )}
             </div>

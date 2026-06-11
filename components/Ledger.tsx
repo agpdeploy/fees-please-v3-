@@ -23,6 +23,9 @@ export default function Ledger() {
   const [financialHealth, setFinancialHealth] = useState({ collected: 0, cashIn: 0, cardIn: 0, outstanding: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
+  // Season States
+  const [activeSeasonName, setActiveSeasonName] = useState<string | null>(null);
+
   // Player Accounts & Feed States
   const [viewMode, setViewMode] = useState<'debts' | 'all'>('debts');
   const [isListExpanded, setIsListExpanded] = useState(false);
@@ -110,15 +113,45 @@ export default function Ledger() {
     setIsLoading(true);
     
     // 🔥 FIX: Fetch transactions and players at the CLUB level so balances track across multiple teams
-    const [fixRes, txRes, playersRes] = await Promise.all([
+    const [fixRes, txRes, playersRes, clubRes] = await Promise.all([
       supabase.from("fixtures").select("*").eq("team_id", activeTeamId).order("match_date", { ascending: false }),
       supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname, is_active ), fixtures ( opponent )`).eq("club_id", activeClubId).order("created_at", { ascending: false }),
-      supabase.from("players").select('id, first_name, last_name, nickname, is_active').eq("club_id", activeClubId)
+      supabase.from("players").select('id, first_name, last_name, nickname, is_active').eq("club_id", activeClubId),
+      supabase.from("clubs").select("season_name").eq("id", activeClubId).single()
     ]);
 
-    const fixData = fixRes.data || [];
-    const txData = (txRes.data || []).filter(tx => tx.status !== 'unpaid' || tx.transaction_type === 'fee');
+    const clubSeason = clubRes.data?.season_name || null;
+    setActiveSeasonName(clubSeason);
+
+    let allFixtures = fixRes.data || [];
+    let allTx = (txRes.data || []).filter(tx => tx.status !== 'unpaid' || tx.transaction_type === 'fee');
     const teamPlayersData = playersRes.data || [];
+
+    if (clubSeason) {
+      let hasUntagged = false;
+      allFixtures = allFixtures.map(f => {
+        if (!f.season_name) {
+          hasUntagged = true;
+          return { ...f, season_name: clubSeason };
+        }
+        return f;
+      });
+      allTx = allTx.map(t => {
+        if (!t.season_name) {
+          hasUntagged = true;
+          return { ...t, season_name: clubSeason };
+        }
+        return t;
+      });
+
+      if (hasUntagged) {
+        supabase.from('fixtures').update({ season_name: clubSeason }).eq('club_id', activeClubId).is('season_name', null).then();
+        supabase.from('transactions').update({ season_name: clubSeason }).eq('club_id', activeClubId).is('season_name', null).then();
+      }
+    }
+
+    const fixData = allFixtures.filter(f => !clubSeason || f.season_name === clubSeason);
+    const txData = allTx.filter(t => !clubSeason || t.season_name === clubSeason);
 
     setFixtures(fixData);
     
@@ -327,7 +360,8 @@ export default function Ledger() {
       amount: amount,
       transaction_type: txType,
       payment_method: manualType === 'credit' ? 'credit' : (txType === 'payment' ? (manualNote.toLowerCase().includes('card') ? 'card' : 'cash') : null),
-      description: manualNote || (manualType === 'credit' ? 'Credit Applied' : `Manual ${txType}`)
+      description: manualNote || (manualType === 'credit' ? 'Credit Applied' : `Manual ${txType}`),
+      season_name: activeSeasonName || null
     };
 
     if (manualType === 'credit') {
@@ -421,13 +455,15 @@ export default function Ledger() {
         </div>
       )}
 
-      {teams.length > 1 && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
-          <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Viewing Ledger As</label>
-          <select value={activeTeamId} onChange={(e) => { setActiveTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
-            <option value="" disabled>-- Select a Team --</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_active === false ? ' (Deactivated)' : ''}</option>)}
-          </select>
+      {(teams.length > 1) && (
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors flex gap-4">
+          <div className="flex-1">
+            <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Viewing Ledger As</label>
+            <select value={activeTeamId} onChange={(e) => { setActiveTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+              <option value="" disabled>-- Select a Team --</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_active === false ? ' (Deactivated)' : ''}</option>)}
+            </select>
+          </div>
         </div>
       )}
 

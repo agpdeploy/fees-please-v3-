@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig: any = {
   allowedDevOrigins: ["192.168.1.107", "192.168.1.107:3000", "localhost:3000"],
   turbopack: {},
   env: {

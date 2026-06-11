@@ -14,6 +14,7 @@ interface FixturesTabProps {
   clubPlayers: any[];
   profile: any;
   clubLogoUrl?: string;
+  activeSeasonName?: string | null;
 }
 
 interface DraftFixture {
@@ -24,7 +25,7 @@ interface DraftFixture {
   notes: string;
 }
 
-export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl }: FixturesTabProps) {
+export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl, activeSeasonName }: FixturesTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -83,7 +84,8 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
       notes: fixtureNotes, 
       umpire_fee: umpireFee === "" ? 0 : umpireFee,
       status: isPast ? 'completed' : 'upcoming',
-      is_active: true
+      is_active: true,
+      season_name: activeSeasonName || null
     };
 
     const { error } = await supabase.from("fixtures").insert([payload]);
@@ -268,7 +270,8 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
         team_id: fixtureTeamId, 
         umpire_fee: defaultUmpireFee || 0,
         status: isPast ? 'completed' : 'upcoming',
-        is_active: true
+        is_active: true,
+        season_name: activeSeasonName || null
       };
     });
 
@@ -535,7 +538,8 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
     start_time: fixture.start_time || "",
     location: fixture.location || "",
     notes: fixture.notes || "",
-    umpire_fee: fixture.umpire_fee !== undefined ? fixture.umpire_fee : ""
+    umpire_fee: fixture.umpire_fee !== undefined ? fixture.umpire_fee : "",
+    status: fixture.status || "upcoming"
   });
 
   async function handleUpdate() {
@@ -629,6 +633,15 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
            </div>
         </div>
 
+        <div className="flex gap-3">
+          <select value={editForm.status || "upcoming"} onChange={(e) => setEditForm({...editForm, status: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
+            <option value="upcoming">Upcoming</option>
+            <option value="completed">Completed</option>
+            <option value="forfeited">Forfeited</option>
+            <option value="abandoned">Abandoned</option>
+          </select>
+        </div>
+
         <div className="flex gap-3 mt-2">
           <button onClick={() => setIsEditing(false)} className="flex-1 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Cancel</button>
           <button onClick={handleUpdate} disabled={isSaving} className="flex-[2] py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">Save Changes</button>
@@ -688,8 +701,12 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
           <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
             {fixture.opponent}
           </span>
-          <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-            <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-[10px]"></i>
+          <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+            {fixture.opponent_logo_url ? (
+              <img src={fixture.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
+            ) : (
+              <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-[10px]"></i>
+            )}
           </div>
         </div>
       </div>

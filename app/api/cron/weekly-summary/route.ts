@@ -92,7 +92,7 @@ export async function GET(req: Request) {
         const amt = Number(tx.amount);
         if (tx.transaction_type === 'payment') {
           collectedToDate += amt;
-          if (tx.payment_method === 'card') card += amt;
+          if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) card += amt;
           else cash += amt;
           
           if (new Date(tx.created_at) >= oneWeekAgo) {

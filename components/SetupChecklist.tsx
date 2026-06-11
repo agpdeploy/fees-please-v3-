@@ -37,6 +37,16 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     "Hockey", "Netball", "Rugby League", "Rugby Union", "Tennis", "Touch Football", "Volleyball"
   ];
 
+  // PlayHQ state
+  const [playhqUrl, setPlayhqUrl] = useState("");
+  const [isImportingPlayhq, setIsImportingPlayhq] = useState(false);
+  const [playhqImportError, setPlayhqImportError] = useState("");
+  const [isPlayhqImported, setIsPlayhqImported] = useState(false);
+  const [setupPath, setSetupPath] = useState<'playhq' | 'manual' | null>(null);
+  
+  const isPlayhq = clubInfo?.club_cat === 'PlayHQ' || clubInfo?.sport_type === 'Other' || clubInfo?.season_name;
+  const [showPlayhqBox, setShowPlayhqBox] = useState(!isPlayhq);
+
   // Logo state
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
@@ -66,13 +76,17 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [fixtureCachedUpload, setFixtureCachedUpload] = useState<any>(null);
 
   // Financials state
-  const initialMemberFee = (teams && teams.length > 0 && teams[0].member_fee != null) ? teams[0].member_fee : "";
+  const initialMemberFeeRaw = (teams && teams.length > 0 && teams[0].member_fee != null) ? teams[0].member_fee : "";
+  const initialMemberFee = initialMemberFeeRaw === 0 ? "" : initialMemberFeeRaw;
   const [memberFee, setMemberFee] = useState<number | "">(initialMemberFee);
   const [payIdType, setPayIdType] = useState<'mobile'|'email'|'bank_account'>(clubInfo?.pay_id_type || 'mobile');
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [acceptsCash, setAcceptsCash] = useState(clubInfo?.accepts_cash ?? true);
+  const [acceptsCard, setAcceptsCard] = useState(clubInfo?.accepts_card ?? true);
   const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
-  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(clubInfo?.default_umpire_fee || "");
+  const initialUmpireFeeRaw = clubInfo?.default_umpire_fee;
+  const initialUmpireFee = (initialUmpireFeeRaw == null || initialUmpireFeeRaw === 0) ? "" : initialUmpireFeeRaw;
+  const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(initialUmpireFee);
 
   const [squareToken, setSquareToken] = useState(clubInfo?.square_access_token || "");
   const [squareLocationId, setSquareLocationId] = useState(clubInfo?.square_location_id || "");
@@ -87,15 +101,24 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       setPayIdType(clubInfo.pay_id_type || 'mobile');
       setPayId(clubInfo.pay_id_value || "");
       setAcceptsCash(clubInfo.accepts_cash ?? true);
+      setAcceptsCard(clubInfo.accepts_card ?? true);
       setExpenseLabel(clubInfo.expense_label || "");
-      setDefaultUmpireFee(clubInfo.default_umpire_fee != null ? clubInfo.default_umpire_fee : "");
+      setDefaultUmpireFee((clubInfo.default_umpire_fee == null || clubInfo.default_umpire_fee === 0) ? "" : clubInfo.default_umpire_fee);
       setSquareToken(clubInfo.square_access_token || "");
       setSquareLocationId(clubInfo.square_location_id || "");
       setSeasonName(clubInfo.season_name || "");
       setSeasonStart(clubInfo.season_start || "");
       setSeasonEnd(clubInfo.season_end || "");
+
+      if (activeClubId && setupPath === null) {
+        if (isPlayhq) {
+          setSetupPath('playhq');
+        } else {
+          setSetupPath('manual');
+        }
+      }
     }
-  }, [clubInfo]);
+  }, [clubInfo, activeClubId, setupPath, isPlayhq]);
 
   const teamId = teams && teams.length > 0 ? teams[0].id : null;
 
@@ -107,7 +130,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       const messages = ["Reading terrible handwriting...", "Crunching the data...", "Formatting names...", "Almost ready..."];
       let i = 0;
       setLoadingText(messages[0]);
-      interval = setInterval(() => { i++; if (i < messages.length) setLoadingText(messages[i]); }, 2500); 
+      interval = setInterval(() => { 
+        i = (i + 1) % messages.length;
+        setLoadingText(messages[i]); 
+      }, 2500); 
     }
     return () => clearInterval(interval);
   }, [isExtracting, isExtractingFixture]);
@@ -128,10 +154,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     checkStatus();
   }, [activeClubId]);
 
-  const hasSeason = !!clubInfo.season_name;
-  const hasLogo = !!clubInfo.logo;
+  const hasSeason = !!clubInfo?.season_name && !!clubInfo?.season_start && !!clubInfo?.season_end && clubInfo?.default_umpire_fee != null && teamsCount > 0 && teams[0].member_fee != null;
+  const hasLogo = !!clubInfo?.logo;
   const hasTeams = teamsCount > 0;
-  const hasFinancials = !!clubInfo.pay_id_value || !!clubInfo.square_access_token;
+  const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
 
   const steps = [
     { id: 'club', title: 'Create Your Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
@@ -142,15 +168,166 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     { id: 'financials', title: 'Financials', icon: 'fa-sack-dollar', completed: hasFinancials, required: true }
   ];
 
+  const allRequiredCompleted = steps.filter(s => s.required).every(s => s.completed);
+
+  useEffect(() => {
+    if (allRequiredCompleted) {
+      const timer = setTimeout(() => {
+        onDismiss();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [allRequiredCompleted, onDismiss]);
+
   const visibleSteps = steps.filter(s => {
-    if (!activeClubId && s.id !== 'club') return false;
-    if (s.id === 'logo' && dismissedSteps['logo']) return false;
-    if (s.id === 'fixtures' && dismissedSteps['fixtures']) return false;
-    return true;
+    if (setupPath === 'playhq') {
+       if (!['players', 'season', 'financials'].includes(s.id)) return false;
+       return true;
+    } else {
+       if (!activeClubId && s.id !== 'club') return false;
+       if (s.id === 'logo' && dismissedSteps['logo']) return false;
+       if (s.id === 'fixtures' && dismissedSteps['fixtures']) return false;
+       if (isPlayhqImported && ['club', 'logo', 'fixtures'].includes(s.id)) return false;
+       return true;
+    }
   });
   const allCompleted = visibleSteps.every(s => s.completed) && visibleSteps.length > 0;
 
   // Removed automatic onDismiss to prevent unexpected reloads
+
+  const handlePlayhqImport = async () => {
+    if (!playhqUrl) return;
+    setIsImportingPlayhq(true);
+    setPlayhqImportError("");
+    try {
+      const res = await fetch("/api/playhq-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: playhqUrl }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to import from PlayHQ");
+      }
+      const data = await res.json();
+      
+      let currentClubId = activeClubId;
+      let currentTeamId = teamId;
+
+      if (!currentClubId) {
+        if (!user) throw new Error("Not logged in");
+        await supabase.from('profiles').update({ has_onboarded: true }).eq('id', user.id);
+
+        const baseSlug = data.clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        const clubSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+        
+        let playhqTenant = null;
+        let playhqOrgId = null;
+        try {
+          const urlObj = new URL(playhqUrl);
+          const parts = urlObj.pathname.split('/').filter(Boolean);
+          playhqTenant = parts[0];
+          playhqOrgId = parts[3];
+        } catch(e) {}
+
+        const { data: clubData, error: clubError } = await supabase
+          .from('clubs').insert([{ 
+            name: data.clubName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "PlayHQ", entity_type: "Team", sport_type: "Other",
+            logo_url: data.logoUrl || null,
+            season_name: data.seasonName || null,
+            season_start: data.seasonStart || null,
+            season_end: data.seasonEnd || null,
+            default_umpire_fee: null,
+            settings: { playhq_tenant: playhqTenant, playhq_org_id: playhqOrgId }
+          }]).select().single();
+        if (clubError) throw clubError;
+        currentClubId = clubData.id;
+
+        const { data: teamData, error: teamError } = await supabase
+          .from('teams').insert([{ 
+            name: data.clubName, club_id: clubData.id, owner_id: user.id, slug: `${clubSlug}-team`,
+            settings: { playhq_url: playhqUrl }
+          }]).select().single();
+        if (teamError) throw teamError;
+        currentTeamId = teamData.id;
+
+        const { error: rolesError } = await supabase.from('user_roles').insert([
+            { user_id: user.id, email: user.email, club_id: clubData.id, role: 'club_admin' },
+            { user_id: user.id, email: user.email, club_id: clubData.id, team_id: teamData.id, role: 'team_admin' }
+        ]);
+        if (rolesError) throw rolesError;
+
+        if (onClubCreated) onClubCreated(clubData.id);
+      } else {
+        if (data.logoUrl && !clubInfo?.logo_url) {
+           await supabase.from('clubs').update({ logo_url: data.logoUrl }).eq('id', currentClubId);
+           if (onUpdateClubInfo) {
+             onUpdateClubInfo({ ...clubInfo, logo: data.logoUrl });
+           } else if (clubInfo) {
+             clubInfo.logo = data.logoUrl;
+           }
+        }
+      }
+
+      if (data.seasonName || data.seasonStart || data.seasonEnd) {
+        const updatePayload: any = {};
+        if (data.seasonName) updatePayload.season_name = data.seasonName;
+        if (data.seasonStart) updatePayload.season_start = data.seasonStart;
+        if (data.seasonEnd) updatePayload.season_end = data.seasonEnd;
+        // Ensure default umpire fee is wiped if we are syncing PlayHQ
+        updatePayload.default_umpire_fee = null;
+
+        await supabase.from('clubs').update(updatePayload).eq('id', currentClubId);
+        
+        if (onUpdateClubInfo) {
+          onUpdateClubInfo({ 
+            ...clubInfo, 
+            ...updatePayload
+          });
+        }
+        if (data.seasonName) setSeasonName(data.seasonName);
+        if (data.seasonStart) setSeasonStart(data.seasonStart);
+        if (data.seasonEnd) setSeasonEnd(data.seasonEnd);
+        setDefaultUmpireFee("");
+      }
+
+      if (data.fixtures && data.fixtures.length > 0) {
+        if (!currentTeamId) {
+          const { data: tData } = await supabase.from('teams').select('id').eq('club_id', currentClubId).limit(1);
+          if (tData && tData.length > 0) currentTeamId = tData[0].id;
+        }
+
+        if (currentTeamId) {
+            const payload = data.fixtures.map((f: any) => ({
+              club_id: currentClubId,
+              team_id: currentTeamId,
+              opponent: f.opponent,
+              opponent_logo_url: f.opponent_logo_url || null,
+              match_date: f.match_date,
+              start_time: f.start_time,
+              location: f.location,
+              status: 'scheduled',
+              umpire_fee: clubInfo?.default_umpire_fee || 0,
+              season_name: clubInfo?.season_name || seasonName || null
+            }));
+            await supabase.from('fixtures').insert(payload);
+           setHasFixtures(true);
+        }
+      }
+
+      setIsPlayhqImported(true);
+      setSetupPath('playhq');
+      setShowPlayhqBox(false);
+      setExpandedStep('season');
+      setPlayhqUrl("");
+
+    } catch (err: any) {
+      console.error(err);
+      setPlayhqImportError(err.message || "An error occurred.");
+    } finally {
+      setIsImportingPlayhq(false);
+    }
+  };
 
   const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -638,7 +815,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       match_date: matchDate,
       start_time: startTime,
       location: location,
-      status: 'scheduled'
+      status: 'scheduled',
+      season_name: clubInfo?.season_name || seasonName || null
     }]);
     setIsSavingFixture(false);
     if (!error) {
@@ -682,6 +860,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       alert("Error: Database rejected the season update. Permission denied or club not found.");
       return;
     }
+
+    if (seasonName) {
+      // Run background update queries to backfill any existing untagged fixtures/transactions
+      await Promise.all([
+        supabase.from('fixtures').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null),
+        supabase.from('transactions').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null)
+      ]);
+    }
     
     if (onUpdateClubInfo) {
       onUpdateClubInfo({ 
@@ -711,6 +897,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       pay_id_type: payIdType,
       pay_id_value: payId || null,
       accepts_cash: acceptsCash,
+      accepts_card: acceptsCard,
       square_access_token: squareToken || null,
       square_location_id: squareLocationId || null
     }).eq('id', activeClubId).select();
@@ -741,6 +928,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       clubInfo.pay_id_type = payIdType;
       clubInfo.pay_id_value = payId || null;
       clubInfo.accepts_cash = acceptsCash;
+      clubInfo.accepts_card = acceptsCard;
     }
     
     setIsSavingFinancials(false);
@@ -756,9 +944,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="font-black uppercase tracking-widest text-zinc-900 dark:text-white text-lg mb-1 flex items-center gap-2">
-            <i className="fa-solid fa-rocket text-emerald-500"></i> Setup Checklist
+            <i className="fa-solid fa-rocket text-emerald-500"></i> Get Started
           </h3>
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Complete these steps to finish setting up.</p>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Set up your account with teams, fixtures, players and payment methods.</p>
         </div>
         <button 
           onClick={onDismiss}
@@ -768,17 +956,69 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         </button>
       </div>
 
-      {/* Video Placeholder */}
-      <div className="mb-6 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 flex flex-col items-center justify-center py-12 px-4 text-zinc-400 dark:text-zinc-500 transition-colors cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 group">
-        <div className="w-16 h-16 bg-white dark:bg-zinc-800 rounded-full flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
-          <i className="fa-brands fa-youtube text-2xl text-red-500"></i>
+      {!setupPath ? (
+        <div className="flex flex-col gap-4 mb-6">
+          <button onClick={() => setSetupPath('playhq')} className="p-6 bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md transition-all text-left group">
+            <div className="h-12 w-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <img src="/branding/playhq_Logo.svg" alt="PlayHQ" className="w-8 h-8" />
+            </div>
+            <h3 className="font-black uppercase tracking-widest text-emerald-800 dark:text-emerald-400 text-sm mb-2">PlayHQ Setup</h3>
+            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Fetch your team, logo and fixtures from a PlayHQ URL.</p>
+          </button>
+          <button onClick={() => setSetupPath('manual')} className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md transition-all text-left group">
+            <div className="h-12 w-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <i className="fa-solid fa-keyboard text-xl text-zinc-400"></i>
+            </div>
+            <h3 className="font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200 text-sm mb-2">Standard Setup</h3>
+            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Create your team, logo and fixtures manually or via dAIve.</p>
+          </button>
         </div>
-        <span className="text-xs font-black uppercase tracking-widest">How to use Fees Please (1:30)</span>
-      </div>
+      ) : (
+        <>
+          {!isPlayhq && !activeClubId && (
+            <div className="flex items-center justify-between mb-4">
+               <button onClick={() => setSetupPath(null)} className="text-[10px] font-bold text-zinc-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center">
+                 <i className="fa-solid fa-arrow-left mr-1"></i> Back to Options
+               </button>
+               {setupPath === 'playhq' && !showPlayhqBox && (
+                 <button onClick={() => setShowPlayhqBox(true)} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest transition-colors flex items-center">
+                   <i className="fa-solid fa-rotate-right mr-1"></i> Resync PlayHQ
+                 </button>
+               )}
+            </div>
+          )}
+          
+          {setupPath === 'playhq' && showPlayhqBox && (
+            <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-3 shadow-sm transition-colors">
+               <div className="flex justify-between items-center">
+                 <h4 className="text-[10px] text-emerald-800 dark:text-emerald-400 uppercase font-black tracking-widest flex items-center gap-2">
+                   <img src="/branding/playhq_Logo.svg" alt="PlayHQ" className="h-4" /> Magic Import
+                 </h4>
+                 {activeClubId && (
+                   <button onClick={() => setShowPlayhqBox(false)} className="text-zinc-400 hover:text-zinc-600 transition-colors">
+                     <i className="fa-solid fa-xmark"></i>
+                   </button>
+                 )}
+               </div>
+               <p className="text-[9px] text-emerald-700 dark:text-emerald-500 font-bold leading-tight">Got a PlayHQ Team URL? Paste it below to instantly fetch your team name, logo, and fixtures.</p>
+               <div className="flex flex-col gap-2">
+                 <input type="url" value={playhqUrl} onChange={e => setPlayhqUrl(e.target.value)} placeholder="https://www.playhq.com/..." className="w-full bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                 <button onClick={handlePlayhqImport} disabled={!playhqUrl || isImportingPlayhq} className="relative overflow-hidden w-full py-3 bg-[#0051e5] hover:bg-[#0041b5] text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50">
+                   {isImportingPlayhq ? (
+                     <div className="absolute inset-0 flex items-center justify-center bg-[#0051e5]">
+                       <img src="/branding/playhq_Logow.png" alt="PlayHQ" className="h-5 w-auto animate-pulse" />
+                     </div>
+                   ) : "Sync from PlayHQ"}
+                 </button>
+               </div>
+               {playhqImportError && <p className="text-red-500 text-[10px] font-bold">{playhqImportError}</p>}
+            </div>
+          )}
 
-      <div className="space-y-3">
-        {visibleSteps.map(step => (
-          <div key={step.id} className={`flex flex-col p-3.5 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
+      {(setupPath !== 'playhq' || isPlayhqImported || activeClubId) && (
+        <div className="space-y-3">
+          {visibleSteps.map(step => (
+            <div key={step.id} className={`flex flex-col p-3.5 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${step.completed ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-400'}`}>
@@ -894,7 +1134,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                       draftPlayers.length === 0 ? (
                         isExtracting ? (
                           <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
-                            <i className="fa-solid fa-microchip text-4xl text-emerald-500 animate-pulse mb-4"></i>
+                            <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-500 animate-pulse mb-4"></i>
                             <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-[10px] text-center">{loadingText}</p>
                           </div>
                         ) : (
@@ -1034,7 +1274,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         !fixtureNeedsAlias ? (
                           isExtractingFixture ? (
                             <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
-                              <i className="fa-solid fa-microchip text-4xl text-emerald-500 animate-pulse mb-4"></i>
+                              <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-500 animate-pulse mb-4"></i>
                               <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-[10px] text-center">{loadingText}</p>
                             </div>
                           ) : (
@@ -1292,6 +1532,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           </div>
         ))}
       </div>
+      )}
+      </>
+      )}
 
       {allCompleted && activeClubId && (
         <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-bottom-4">

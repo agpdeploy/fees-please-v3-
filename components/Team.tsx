@@ -7,9 +7,10 @@ import { useActiveClub } from "@/contexts/ClubContext";
 
 export default function Team() {
   const { profile, roles } = useProfile();
-  const { activeClubId } = useActiveClub();
+  const { activeClubId, clubInfo } = useActiveClub();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [activeSeasonName, setActiveSeasonName] = useState<string | null | undefined>(undefined);
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [clubPlayers, setClubPlayers] = useState<any[]>([]);
@@ -21,7 +22,6 @@ export default function Team() {
 
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
   // UI States
   const [visibleFixtureCount, setVisibleFixtureCount] = useState(5);
   const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
@@ -83,6 +83,12 @@ export default function Team() {
       if (!profile || !activeClubId) return;
       if (refreshTrigger === 0) setIsLoading(true);
 
+      
+      // Fetch club info to get season_name for filtering
+      const { data: clubData } = await supabase.from('clubs').select('season_name').eq('id', activeClubId).single();
+      const clubSeasonName = clubData?.season_name || null;
+      setActiveSeasonName(clubSeasonName);
+
       // 1. Determine Teams
       let teamQuery = supabase.from("teams").select("id, name, slug").eq("club_id", activeClubId);
       if (!isClubAdmin) {
@@ -112,85 +118,15 @@ export default function Team() {
       const { data: playersData } = await supabase.from("players").select("id, first_name, last_name, nickname, email, default_team_id, is_member, is_active").eq("club_id", activeClubId);
       const allPlayers = playersData || [];
       setClubPlayers(allPlayers);
-
-      // Initialize Player Stats for those assigned to the current team
-      const statsMap: Record<string, any> = {};
-      let membersCount = 0;
-      let casualsCount = 0;
-
-      allPlayers.forEach(p => {
-        if (p.default_team_id === targetTeamId) {
-          statsMap[p.id] = {
-            id: p.id,
-            name: formatName(p),
-            full_name: `${p.first_name} ${p.last_name}`,
-            email: p.email,
-            is_member: p.is_member,
-            is_active: p.is_active !== false,
-            balance: 0,
-            gamesPlayed: 0
-          };
-          if (p.is_member) membersCount++; else casualsCount++;
-        }
-      });
-
-      // 2. Fetch Transactions to calculate balances
-      const { data: txData } = await supabase
-        .from("transactions")
-        .select("amount, transaction_type, player_id")
-        .eq("club_id", activeClubId);
-
-      if (txData) {
-        txData.forEach(tx => {
-          if (tx.player_id) {
-            // We only track balance if they exist in our statsMap, otherwise we add them if they played for this team
-            if (!statsMap[tx.player_id]) {
-                const p = allPlayers.find(pl => pl.id === tx.player_id);
-                if (p) {
-                   statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, is_active: p.is_active !== false, balance: 0, gamesPlayed: 0 };
-                }
-            }
-            if (statsMap[tx.player_id]) {
-               if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') statsMap[tx.player_id].balance += Number(tx.amount);
-               if (tx.transaction_type === 'payment') statsMap[tx.player_id].balance -= Number(tx.amount);
-            }
-          }
-        });
-      }
-
-      // 3. Fetch Matches and Squads for gamesPlayed
-      const { data: allFixtures } = await supabase.from("fixtures").select("id, match_date").eq("team_id", targetTeamId);
-      let totalGames = 0;
-      if (allFixtures && allFixtures.length > 0) {
-        const fixIds = allFixtures.map(f => f.id);
-        const { data: allSquads } = await supabase.from("match_squads").select("player_id").in("fixture_id", fixIds);
-        
-        if (allSquads) {
-          allSquads.forEach(s => {
-            if (statsMap[s.player_id]) {
-              statsMap[s.player_id].gamesPlayed += 1;
-            } else {
-               const p = allPlayers.find(pl => pl.id === s.player_id);
-               if (p) {
-                 statsMap[p.id] = { id: p.id, name: formatName(p), full_name: `${p.first_name} ${p.last_name}`, email: p.email, is_member: p.is_member, is_active: p.is_active !== false, balance: 0, gamesPlayed: 1 };
-               }
-            }
-            totalGames++;
-          });
-        }
-      }
-
-      setPlayerStats(statsMap);
-
-      // 4. Fetch Availability for Upcoming Matches
       const today = new Date();
       today.setHours(0,0,0,0);
-      const { data: rawFixtures } = await supabase
+      const { data: dbFixtures } = await supabase
         .from("fixtures")
-        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at, is_active")
+        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at, is_active, season_name")
         .eq("team_id", targetTeamId);
 
       let fixtures: any[] = [];
+      const rawFixtures = dbFixtures?.filter((f: any) => clubSeasonName ? f.season_name === clubSeasonName : !f.season_name) || [];
       if (rawFixtures && rawFixtures.length > 0) {
         const isPastFixture = (f: any) => {
            if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
@@ -539,6 +475,20 @@ export default function Team() {
       <div className="flex flex-col items-center justify-center p-20 space-y-4">
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
         <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">Loading Team Data...</p>
+      </div>
+    );
+  }
+
+  if (activeSeasonName === null && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6 bg-white dark:bg-zinc-900 rounded-3xl border-2 border-dashed border-zinc-500/30 dark:border-zinc-500/20 shadow-sm mt-2">
+         <div className="w-16 h-16 bg-zinc-50 dark:bg-zinc-900/20 rounded-full flex items-center justify-center mb-4 text-zinc-600 dark:text-zinc-500 shadow-inner">
+            <i className="fa-solid fa-moon text-3xl opacity-80"></i>
+         </div>
+         <h3 className="font-black uppercase tracking-widest text-sm text-zinc-800 dark:text-zinc-400 mb-2">Season Closed</h3>
+         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center max-w-[250px] leading-relaxed">
+            There is no active season. Team Hub is unavailable until a new season begins.
+         </p>
       </div>
     );
   }

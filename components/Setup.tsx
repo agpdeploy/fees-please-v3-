@@ -7,6 +7,8 @@ import { useActiveClub } from "@/contexts/ClubContext";
 import PlayersTab from "@/components/PlayersTab";
 import FixturesTab from "@/components/FixturesTab"; 
 import AutomationsTab from "@/components/AutomationsTab";
+import PlayHQSeasonAlert from "@/components/PlayHQSeasonAlert";
+import FinaliseSeasonView from "@/components/FinaliseSeasonView";
 
 interface SetupProps {
   activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments';
@@ -58,6 +60,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [seasonName, setSeasonName] = useState("");
   const [seasonStart, setSeasonStart] = useState("");
   const [seasonEnd, setSeasonEnd] = useState("");
+  const [isEditingSeason, setIsEditingSeason] = useState(false);
   
   const [defaultMemberFee, setDefaultMemberFee] = useState<number | "">("");
   const [defaultCasualFee, setDefaultCasualFee] = useState<number | "">("");
@@ -94,6 +97,27 @@ export default function Setup({ activeTab }: SetupProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
+  const [newSeasons, setNewSeasons] = useState<any[]>([]);
+  const [isCheckingSeasons, setIsCheckingSeasons] = useState(false);
+  const [isFinaliseSeasonOpen, setIsFinaliseSeasonOpen] = useState(false);
+
+  async function checkForNewSeasons() {
+    if (!clubId || clubId === 'new') return;
+    setIsCheckingSeasons(true);
+    try {
+      const res = await fetch(`/api/cron/playhq-check?clubId=${clubId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success') {
+          setNewSeasons(data.unmappedSeasons || []);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to check for new PlayHQ seasons:", e);
+    } finally {
+      setIsCheckingSeasons(false);
+    }
+  }
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -125,6 +149,12 @@ export default function Setup({ activeTab }: SetupProps) {
       resetTeamForm();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'teams' && clubId && clubId !== 'new') {
+      checkForNewSeasons();
+    }
+  }, [activeTab, clubId]);
 
   useEffect(() => {
     if (!profile) return;
@@ -193,7 +223,10 @@ export default function Setup({ activeTab }: SetupProps) {
     }
 
     const { data: fixData } = await supabase.from("fixtures").select("*, teams(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
-    if (fixData) setFixtures(fixData);
+    if (fixData) {
+      const filteredFix = fixData.filter(f => clubData?.season_name ? f.season_name === clubData.season_name : !f.season_name);
+      setFixtures(filteredFix);
+    }
 
     const { data: playerData } = await supabase.from("players").select("*").eq("club_id", clubId).order("first_name", { ascending: true });
     if (playerData) setPlayers(playerData);
@@ -808,69 +841,6 @@ export default function Setup({ activeTab }: SetupProps) {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Season & Global Rules</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Season Name</label>
-                <input type="text" placeholder="e.g. Winter 2026" value={seasonName || ""} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Start Date</label>
-                  <input type="date" value={seasonStart || ""} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global End Date</label>
-                  <input type="date" value={seasonEnd || ""} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <div className="flex-[2]">
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Expense Label</label>
-                  <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel || ""} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
-                    <input 
-                      type="number" 
-                      placeholder="70" 
-                      value={defaultUmpireFee ?? ""} 
-                      onChange={(e) => setDefaultUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} 
-                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Member Fee ($)</label>
-                  <input 
-                    type="number" 
-                    value={defaultMemberFee ?? ""} 
-                    onChange={(e) => {
-                      const val = e.target.value === '' ? '' : Number(e.target.value);
-                      setDefaultMemberFee(val);
-                      setDefaultCasualFee(val);
-                    }} 
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Casual Fee ($)</label>
-                  <input 
-                    type="number" 
-                    value={defaultCasualFee ?? ""} 
-                    onChange={(e) => setDefaultCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
 
 
           <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
@@ -1171,23 +1141,173 @@ export default function Setup({ activeTab }: SetupProps) {
           </div>
         </div>
       )}
-
       {/* --- TEAMS TAB (REVAMPED UX) --- */}
       {clubId && clubId !== 'new' && activeTab === 'teams' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
           
-          <button
-            onClick={() => {
-              resetTeamForm();
-              setIsTeamModalOpen(true);
-            }}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <i className="fa-solid fa-plus text-sm"></i>
-            Add New Team
-          </button>
+          {!clubRecord?.season_name && (
+            <PlayHQSeasonAlert
+              clubRecord={clubRecord}
+              teams={teams}
+              newSeasons={newSeasons}
+              setNewSeasons={setNewSeasons}
+            />
+          )}
 
-          <div className="space-y-3">
+          {isFinaliseSeasonOpen ? (
+            <FinaliseSeasonView
+              clubId={clubId}
+              teams={teams}
+              seasonName={seasonName}
+              seasonStart={seasonStart}
+              seasonEnd={seasonEnd}
+              onCancel={() => setIsFinaliseSeasonOpen(false)}
+              onComplete={() => {
+                setIsFinaliseSeasonOpen(false);
+                loadClubData();
+              }}
+            />
+          ) : (
+            <>
+              {clubRecord?.season_name && !isEditingSeason && (
+                <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col gap-4 relative">
+                  <button 
+                    onClick={() => setIsEditingSeason(true)}
+                    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-white transition-all shadow-sm active:scale-95"
+                    title="Edit Season Details"
+                  >
+                    <i className="fa-solid fa-pen text-xs"></i>
+                  </button>
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-1">Active Season</h3>
+                    <p className="text-lg font-black text-emerald-600 dark:text-emerald-500 tracking-tight">{clubRecord.season_name}</p>
+                    {(clubRecord.season_start || clubRecord.season_end) && (
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
+                        {clubRecord.season_start ? new Date(clubRecord.season_start).toLocaleDateString() : 'TBA'} - {clubRecord.season_end ? new Date(clubRecord.season_end).toLocaleDateString() : 'TBA'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex mt-2">
+                    <button
+                      onClick={() => setIsFinaliseSeasonOpen(true)}
+                      disabled={clubRecord.season_end ? new Date() < new Date(clubRecord.season_end) : false}
+                      className="w-full py-3 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-transform shadow-md disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                      title={clubRecord.season_end && new Date() < new Date(clubRecord.season_end) ? "Season has not ended yet" : "Wrap up the season"}
+                    >
+                      <i className="fa-solid fa-flag-checkered"></i>
+                      Finalise Season
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {((!clubRecord?.season_name && !isFinaliseSeasonOpen) || isEditingSeason) && (
+                <div className="bg-white dark:bg-zinc-900 border-2 border-emerald-500/30 rounded-2xl p-6 shadow-sm mb-6 text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-500 mb-2">
+                    <i className={`fa-solid ${isEditingSeason ? 'fa-pen-to-square' : 'fa-seedling'} text-lg`}></i>
+                    <h3 className="text-sm font-black uppercase tracking-widest">{isEditingSeason ? "Edit Season Details" : "Start a New Season"}</h3>
+                  </div>
+                  {!isEditingSeason && (
+                    <p className="text-xs text-zinc-500 mb-4 max-w-sm mx-auto leading-relaxed">Your club has no active season. If you are not syncing from PlayHQ, manually start a new season below.</p>
+                  )}
+                  <div className="max-w-md mx-auto space-y-3 text-left">
+                    <div>
+                      <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Season Name</label>
+                      <input type="text" placeholder="e.g. Winter 2026" value={seasonName || ""} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                    </div>
+                    <div className="flex gap-3">
+                       <div className="flex-1">
+                         <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Start Date</label>
+                         <input type="date" value={seasonStart || ""} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
+                       </div>
+                       <div className="flex-1">
+                         <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">End Date</label>
+                         <input type="date" value={seasonEnd || ""} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none color-scheme-light dark:color-scheme-dark transition-colors" />
+                       </div>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <div className="flex-[2]">
+                        <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Global Expense Label</label>
+                        <input type="text" placeholder="e.g. Umpire Fee, Court Hire" value={expenseLabel || ""} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Amount</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                          <input 
+                            type="number" 
+                            placeholder="70" 
+                            value={defaultUmpireFee ?? ""} 
+                            onChange={(e) => setDefaultUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-7 pr-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Member Fee ($)</label>
+                        <input 
+                          type="number" 
+                          value={defaultMemberFee ?? ""} 
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            setDefaultMemberFee(val);
+                            setDefaultCasualFee(val);
+                          }} 
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Default Casual Fee ($)</label>
+                        <input 
+                          type="number" 
+                          value={defaultCasualFee ?? ""} 
+                          onChange={(e) => setDefaultCasualFee(e.target.value === '' ? '' : Number(e.target.value))} 
+                          className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white outline-none transition-colors" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      {isEditingSeason && (
+                        <button 
+                          onClick={() => setIsEditingSeason(false)}
+                          className="flex-1 py-3 rounded-xl bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-black text-xs uppercase tracking-widest shadow-sm active:scale-95 transition-all"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => {
+                          saveConfig();
+                          setIsEditingSeason(false);
+                          setTimeout(() => loadClubData(), 1000);
+                        }}
+                        disabled={!seasonName || isSaving}
+                        className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest shadow-md active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isEditingSeason ? <><i className="fa-solid fa-save"></i> Save Changes</> : <><i className="fa-solid fa-play"></i> {isSaving ? "Starting..." : "Start Season"}</>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4 mb-4">
+                <button
+                  onClick={() => {
+                    resetTeamForm();
+                    setIsTeamModalOpen(true);
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <i className="fa-solid fa-plus text-sm"></i>
+                  Add New Team
+                </button>
+              </div>
+
+              <div className="space-y-3">
             {teams.length === 0 ? (
               <div className="text-center p-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
                 <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">No teams created yet.</p>
@@ -1258,6 +1378,83 @@ export default function Setup({ activeTab }: SetupProps) {
                         <><i className="fa-solid fa-clipboard-user"></i> Assign Team Players</>
                       )}
                     </button>
+
+                    {clubRecord?.club_cat === 'PlayHQ' && (
+                      <div className="mt-3 bg-[#0051e5]/5 dark:bg-[#0051e5]/10 border border-[#0051e5]/20 dark:border-[#0051e5]/30 rounded-xl p-4 transition-colors">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-[10px] font-black uppercase italic text-[#0051e5] flex items-center gap-2">
+                            <i className="fa-solid fa-rotate-right"></i> PlayHQ Auto-Sync
+                          </h3>
+                        </div>
+                        <div className="flex gap-2">
+                          <input type="text" defaultValue={t.settings?.playhq_url || ""} placeholder="https://www.playhq.com/.../teams/..." id={`playhq-sync-${t.id}`} className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-[#0051e5] transition-colors" />
+                          <button onClick={async () => {
+                            const url = (document.getElementById(`playhq-sync-${t.id}`) as HTMLInputElement)?.value;
+                            if (!url) return showToast('Please enter a PlayHQ Team URL', 'error');
+                            setIsSaving(true);
+                            try {
+                              const res = await fetch('/api/playhq-sync', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ url })
+                              });
+                              if (!res.ok) throw new Error(await res.text());
+                              const data = await res.json();
+                              
+                              let targetSeasonName = clubRecord?.season_name;
+                              if (!targetSeasonName && data.seasonName) {
+                                await supabase.from('clubs').update({
+                                  season_name: data.seasonName,
+                                  season_start: data.seasonStart || null,
+                                  season_end: data.seasonEnd || null
+                                }).eq('id', activeClubId);
+                                targetSeasonName = data.seasonName;
+                              }
+
+                              // Save the URL to teams.settings
+                              const currentSettings = typeof t.settings === 'object' && t.settings !== null ? t.settings : {};
+                              await supabase.from('teams').update({ settings: { ...currentSettings, playhq_url: url } }).eq('id', t.id);
+
+                              if (data.fixtures && data.fixtures.length > 0) {
+                                // Delete existing fixtures for THIS team, but ONLY for the current season
+                                let deleteQuery = supabase.from('fixtures').delete().eq('team_id', t.id);
+                                if (targetSeasonName) {
+                                  deleteQuery = deleteQuery.eq('season_name', targetSeasonName);
+                                } else {
+                                  deleteQuery = deleteQuery.is('season_name', null);
+                                }
+                                const { error: delErr } = await deleteQuery;
+                                if (delErr) console.error("Error deleting old fixtures:", delErr);
+                                
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+
+                                const payload = data.fixtures.map((f: any) => {
+                                  const isPast = f.match_date ? new Date(f.match_date) < today : false;
+                                  return { 
+                                    ...f, 
+                                    team_id: t.id, 
+                                    umpire_fee: clubRecord?.default_umpire_fee || 0,
+                                    status: isPast ? 'completed' : 'upcoming',
+                                    is_active: true,
+                                    season_name: targetSeasonName || null
+                                  };
+                                });
+                                await supabase.from("fixtures").insert(payload);
+                              }
+
+                              showToast('PlayHQ Team Synced Successfully! Reloading...');
+                              setTimeout(() => window.location.reload(), 1500);
+                            } catch (e: any) {
+                              showToast(e.message, 'error');
+                              setIsSaving(false);
+                            }
+                          }} className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#0051e5] hover:bg-blue-600 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
+                            Sync
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* INLINE ROSTER ACCORDION */}
                     {expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
@@ -1339,6 +1536,8 @@ export default function Setup({ activeTab }: SetupProps) {
               })
             )}
           </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1453,6 +1652,7 @@ export default function Setup({ activeTab }: SetupProps) {
           clubPlayers={players}
           profile={profile}
           clubLogoUrl={logoUrl}
+          activeSeasonName={clubRecord?.season_name || null}
         />
       )}
 

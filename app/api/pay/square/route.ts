@@ -146,7 +146,8 @@ export async function POST(request: Request) {
       payment_method: 'Square Online',
       description: `Payment for ${transaction.description || 'fee'}`,
       status: 'completed',
-      square_payment_id: data.payment.id
+      square_payment_id: data.payment.id,
+      season_name: transaction.season_name || null
     });
     
     if (insertPaymentError) {

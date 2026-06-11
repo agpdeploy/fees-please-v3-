@@ -12,9 +12,9 @@ const google = createGoogleGenerativeAI({
 export async function generateContentWithFallback(genAI: GoogleGenerativeAI, promptArr: any[], systemInstruction?: string, safetySettings?: any[]) {
   const fallbackModels = [
     "gemini-flash-latest",
-    "gemini-2.5-flash-lite", 
-    "gemini-2.5-pro",
-    "gemini-pro-latest"
+    "gemini-pro-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
   ];
 
   let lastError: any = null;
@@ -42,8 +42,9 @@ export async function generateContentWithFallback(genAI: GoogleGenerativeAI, pro
  */
 export async function generateTextWithFallback(params: any) {
   const fallbackModels = [
+    "gemini-flash-latest",
+    "gemini-pro-latest",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
     "gemini-2.5-pro"
   ];
   
