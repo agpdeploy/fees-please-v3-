@@ -28,19 +28,31 @@ ALTER TABLE "public"."teams" ADD COLUMN IF NOT EXISTS "active_season_id" uuid re
 ALTER TABLE "public"."fixtures" ADD COLUMN IF NOT EXISTS "season_id" uuid references "public"."seasons"(id) on delete set null;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON "public"."seasons";
 CREATE POLICY "Enable read access for all users" ON "public"."seasons" FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Enable all access for club admins" ON "public"."seasons";
 CREATE POLICY "Enable all access for club admins" ON "public"."seasons" FOR ALL USING (
   exists (
     select 1 from public.profiles
-    where profiles.id = auth.uid() and profiles.club_id = seasons.club_id and (profiles.role = 'club_admin' or profiles.role = 'super_admin')
+    where profiles.id = auth.uid() and profiles.role = 'super_admin'
+  ) OR exists (
+    select 1 from public.user_roles
+    where user_roles.user_id = auth.uid() and user_roles.club_id = seasons.club_id and user_roles.role = 'club_admin'
   )
 );
 
+DROP POLICY IF EXISTS "Enable read access for all users" ON "public"."team_seasons";
 CREATE POLICY "Enable read access for all users" ON "public"."team_seasons" FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Enable all access for club admins" ON "public"."team_seasons";
 CREATE POLICY "Enable all access for club admins" ON "public"."team_seasons" FOR ALL USING (
   exists (
+    select 1 from public.profiles
+    where profiles.id = auth.uid() and profiles.role = 'super_admin'
+  ) OR exists (
     select 1 from public.teams t
-    join public.profiles p on p.club_id = t.club_id
-    where t.id = team_seasons.team_id and p.id = auth.uid() and (p.role = 'club_admin' or p.role = 'super_admin')
+    join public.user_roles ur on ur.club_id = t.club_id
+    where t.id = team_seasons.team_id and ur.user_id = auth.uid() and ur.role = 'club_admin'
   )
 );
