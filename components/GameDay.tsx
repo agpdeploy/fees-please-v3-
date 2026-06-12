@@ -990,7 +990,7 @@ export default function GameDay() {
     return !(isSquareEnabled && method === 'card');
   }).length;
 
-  if (loading && !profile) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading GameDay...</div>;
+  if (loading && !profile) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading Match Hub...</div>;
 
   if (isFinaliseModalOpen && activeFixture) {
     return (
@@ -1503,7 +1503,7 @@ export default function GameDay() {
                          onClick={() => toggleManageSquad(true)}
                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
                        >
-                         <i className="fa-solid fa-user-plus"></i> Select Squad
+                         <i className="fa-solid fa-user-plus"></i> Select Lineup
                        </button>
                      </>
                    ) : (

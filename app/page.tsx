@@ -411,7 +411,7 @@ export default function Home() {
         <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pt-3 pb-2">
         <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
           <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-stopwatch text-xl mb-1"></i><span>GameDay</span>
+            <i className="fa-solid fa-stopwatch text-xl mb-1"></i><span>Match Hub</span>
           </button>
           <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
             <i className="fa-solid fa-wallet text-xl mb-1"></i><span>Ledger</span>
