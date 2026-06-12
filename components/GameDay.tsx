@@ -118,6 +118,7 @@ export default function GameDay() {
   const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
   const isSuperAdmin = profile?.role === 'super_admin';
   const isClubAdmin = currentClubRole === 'club_admin';
+  const isClubOrSuperAdmin = isSuperAdmin || isClubAdmin;
   const isTeamCaptain = roles?.some((r: any) => r.role === 'team_admin' && r.team_id === selectedTeamId);
   const canManage = isSuperAdmin || isClubAdmin || isTeamCaptain;
   const currentTeamName = teams.find(t => t.id === selectedTeamId)?.name || "Our Team";
@@ -1178,7 +1179,7 @@ export default function GameDay() {
           </div>
           <h3 className="font-black uppercase tracking-widest text-sm text-zinc-800 dark:text-zinc-400 mb-2">Season Closed</h3>
           
-          {canManage ? (
+          {isClubOrSuperAdmin ? (
             <>
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[250px] leading-relaxed">
                 The season has been finalized. Start a new season in the Setup tab.
@@ -1287,7 +1288,7 @@ export default function GameDay() {
           </div>
           <h3 className="font-black uppercase tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-2">No Active Matches</h3>
           
-          {canManage ? (
+          {isClubOrSuperAdmin ? (
             <>
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[300px] leading-relaxed">
                 You've reached the end of your scheduled games. Would you like to add more matches or wrap up the season?
@@ -1307,9 +1308,13 @@ export default function GameDay() {
                 </button>
               </div>
             </>
+          ) : isTeamCaptain ? (
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[300px] leading-relaxed">
+              You've reached the end of your scheduled games. Please contact your Club Admin to add more matches or wrap up the season.
+            </p>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-              Waiting for your Team Admin to add the schedule.
+              Waiting for your Club Admin to add the schedule.
             </p>
           )}
         </div>
@@ -1320,7 +1325,7 @@ export default function GameDay() {
           </div>
           <h3 className="font-black uppercase tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-2">No Teams Found</h3>
           
-          {canManage ? (
+          {isClubOrSuperAdmin ? (
             <>
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6 max-w-[250px] leading-relaxed">
                 Create a team first so you can start adding players and matches.
