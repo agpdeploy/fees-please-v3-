@@ -226,7 +226,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
     const { data: fixData } = await supabase.from("fixtures").select("*, teams(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
     if (fixData) {
-      const filteredFix = fixData.filter(f => clubData?.season_name ? f.season_name === clubData.season_name : !f.season_name);
+      const filteredFix = fixData.filter(f => !clubData?.season_name || f.season_name === clubData.season_name || !f.season_name);
       setFixtures(filteredFix);
     }
 
@@ -1429,16 +1429,6 @@ export default function Setup({ activeTab }: SetupProps) {
                               await supabase.from('teams').update({ settings: { ...currentSettings, playhq_url: url } }).eq('id', t.id);
 
                               if (data.fixtures && data.fixtures.length > 0) {
-                                // Delete existing fixtures for THIS team, but ONLY for the current season
-                                let deleteQuery = supabase.from('fixtures').delete().eq('team_id', t.id);
-                                if (targetSeasonName) {
-                                  deleteQuery = deleteQuery.eq('season_name', targetSeasonName);
-                                } else {
-                                  deleteQuery = deleteQuery.is('season_name', null);
-                                }
-                                const { error: delErr } = await deleteQuery;
-                                if (delErr) console.error("Error deleting old fixtures:", delErr);
-                                
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
 
