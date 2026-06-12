@@ -767,12 +767,10 @@ export default function Setup({ activeTab }: SetupProps) {
               </div>
 
               <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Integration / Platform</label>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Platform Integration</label>
                 <select value={clubCat || ""} onChange={(e) => setClubCat(e.target.value || null)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
-                  <option value="">None / Custom</option>
-                  <option value="PlayHQ">PlayHQ Auto-Sync</option>
-                  <option value="Cricket">Cricket (Standard)</option>
-                  <option value="Other">Other</option>
+                  <option value="">None</option>
+                  <option value="PlayHQ">PlayHQ</option>
                 </select>
               </div>
               
