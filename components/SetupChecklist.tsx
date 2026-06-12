@@ -864,7 +864,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     if (seasonName) {
       // Run background update queries to backfill any existing untagged fixtures/transactions
       await Promise.all([
-        supabase.from('fixtures').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null),
+        supabase.from('fixtures').update({ season_name: seasonName }).in('team_id', teams.map(t => t.id)).is('season_name', null),
         supabase.from('transactions').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null)
       ]);
     }

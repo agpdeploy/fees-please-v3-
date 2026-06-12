@@ -301,7 +301,7 @@ export default function GameDay() {
          
          return uploadedAfterMatch;
       };
-      const activeSeasonFixtures = allFix.filter(f => clubInfo?.season_name ? f.season_name === clubInfo.season_name : !f.season_name);
+      const activeSeasonFixtures = allFix.filter(f => clubInfo?.season_name ? (f.season_name === clubInfo.season_name || !f.season_name) : !f.season_name);
 
       const upcoming = activeSeasonFixtures.filter(f => !isPastFixture(f))
         .sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
