@@ -42,6 +42,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
   // CONFIG STATE
   const [clubName, setClubName] = useState("");
+  const [clubCat, setClubCat] = useState<string | null>(null);
   const [isClubActive, setIsClubActive] = useState(true);
   const [godModeSearch, setGodModeSearch] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -183,6 +184,7 @@ export default function Setup({ activeTab }: SetupProps) {
     if (clubData) {
       setClubRecord(clubData);
       setClubName(clubData.name || "");
+      setClubCat(clubData.club_cat || null);
       setIsClubActive(clubData.is_active !== false);
       setLogoUrl(clubData.logo_url || "");
       setAnnouncement(clubData.announcement || "");
@@ -239,7 +241,7 @@ export default function Setup({ activeTab }: SetupProps) {
       loadClubData(); 
     } else if (clubId === 'new') {
       setIsLoading(false);
-      setClubName(""); setLogoUrl(""); setAnnouncement(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd(""); setIsClubActive(true);
+      setClubName(""); setClubCat(null); setLogoUrl(""); setAnnouncement(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd(""); setIsClubActive(true);
       setTeams([]); setPlayers([]); setFixtures([]); setClubUsers([]);
     }
   }, [clubId]);
@@ -353,6 +355,7 @@ export default function Setup({ activeTab }: SetupProps) {
     const generatedSlug = clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const payload = { 
       name: clubName, 
+      club_cat: clubCat,
       is_active: isClubActive,
       logo_url: logoUrl,
       announcement: announcement,
@@ -761,6 +764,16 @@ export default function Setup({ activeTab }: SetupProps) {
               <div>
                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Name</label>
                 <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              </div>
+
+              <div>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Integration / Platform</label>
+                <select value={clubCat || ""} onChange={(e) => setClubCat(e.target.value || null)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
+                  <option value="">None / Custom</option>
+                  <option value="PlayHQ">PlayHQ Auto-Sync</option>
+                  <option value="Cricket">Cricket (Standard)</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
               
               {profile?.role === 'super_admin' && clubId && clubId !== 'new' && (
