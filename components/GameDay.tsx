@@ -1032,7 +1032,7 @@ export default function GameDay() {
                      </div>
                      <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed">
                        {chargeAbandonedFee
-                         ? `Any unpaid fees from today's squad (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
+                         ? `Any unpaid fees from today's lineup (${squad.filter(p => !paidPlayerIds.includes(p.id)).length} player${squad.filter(p => !paidPlayerIds.includes(p.id)).length === 1 ? '' : 's'}) will automatically roll over to their outstanding debts.`
                          : "No match fees will be collected or added to player balances for this match."}
                      </p>
                   </div>
@@ -1365,7 +1365,7 @@ export default function GameDay() {
             <div className="bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 mb-6 animate-in slide-in-from-top-2 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-[10px] font-black text-zinc-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                  <i className="fa-solid fa-user-plus text-emerald-500"></i> Add Player to Squad
+                  <i className="fa-solid fa-user-plus text-emerald-500"></i> Add Player to Lineup
                 </h2>
                 <button onClick={() => setIsManageSquadExpanded(false)} className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">
                   <i className="fa-solid fa-xmark text-xs"></i>
@@ -1422,7 +1422,7 @@ export default function GameDay() {
                   const config = {
                     yes: { label: "Available", color: "text-emerald-500", icon: "fa-circle-check" },
                     maybe: { label: "Maybe", color: "text-amber-500", icon: "fa-circle-question" },
-                    no_reply: { label: fixtureAvailability.length > 0 ? "No Reply" : "Squad Players", color: "text-zinc-400 dark:text-zinc-500", icon: fixtureAvailability.length > 0 ? "fa-circle" : "fa-users" },
+                    no_reply: { label: fixtureAvailability.length > 0 ? "No Reply" : "Lineup Players", color: "text-zinc-400 dark:text-zinc-500", icon: fixtureAvailability.length > 0 ? "fa-circle" : "fa-users" },
                     no: { label: "Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
                   }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
 

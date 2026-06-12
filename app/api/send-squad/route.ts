@@ -128,7 +128,7 @@ export async function POST(req: Request) {
                 <img src="${teamLogoUrl}" width="48" height="48" style="display: block; border-radius: 8px; border: 1px solid #e4e4e7; background-color: #ffffff; object-fit: contain;" />
               </td>` : ''}
               <td align="left" valign="middle">
-                <h1 style="color: #18181b; font-size: 18px; font-weight: 900; margin: 0; text-transform: uppercase;">Squad Selection for ${team.name}</h1>
+                <h1 style="color: #18181b; font-size: 18px; font-weight: 900; margin: 0; text-transform: uppercase;">Lineup Selection for ${team.name}</h1>
               </td>
             </tr>
           </table>

@@ -336,7 +336,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
                     <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1">
                       <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Squad Status</h4>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
                         <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{yesCount} / {involvedIds.size} Confirmed</span>
                       </div>
                       <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">

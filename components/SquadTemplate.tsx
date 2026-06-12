@@ -13,7 +13,7 @@ import Step5_Payment from "./Step5_Payment";
 const STEPS = [
   { id: 1, title: "Identity", icon: "fa-robot" },
   { id: 2, title: "Branding", icon: "fa-palette" },
-  { id: 3, title: "Squad", icon: "fa-users" },
+  { id: 3, title: "Lineup", icon: "fa-users" },
   { id: 4, title: "Season", icon: "fa-calendar-days" },
   { id: 5, title: "Payments", icon: "fa-money-bill-wave" }
 ];

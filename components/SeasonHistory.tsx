@@ -404,7 +404,7 @@ export default function SeasonHistory() {
                                           </div>
 
                                           <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3 flex items-center gap-2">
-                                             <i className="fa-solid fa-clipboard-check"></i> Match Squad ({squadData[audit.id]?.length || 0})
+                                             <i className="fa-solid fa-clipboard-check"></i> Match Lineup ({squadData[audit.id]?.length || 0})
                                           </h4>
                                           
                                           {!squadData[audit.id] ? (
@@ -412,7 +412,7 @@ export default function SeasonHistory() {
                                                 <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                                              </div>
                                           ) : squadData[audit.id].length === 0 ? (
-                                             <p className="text-xs text-zinc-500 italic">No squad recorded for this match.</p>
+                                             <p className="text-xs text-zinc-500 italic">No lineup recorded for this match.</p>
                                           ) : (
                                              <div className="flex flex-wrap gap-2">
                                                 {squadData[audit.id].map((playerName: string, idx: number) => (

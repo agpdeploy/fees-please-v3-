@@ -118,7 +118,7 @@ export default function Step4_Season({ onNext, clubId }: { onNext: () => void, c
         {/* STEP 3: GAME DAY EXPENSES */}
         {chatStep === 3 && (
           <div className="animate-in slide-in-from-right fade-in duration-300">
-            <h3 className="text-2xl font-black italic tracking-tighter text-zinc-900 mb-2">Any game day expenses?</h3>
+            <h3 className="text-2xl font-black italic tracking-tighter text-zinc-900 mb-2">Any match day expenses?</h3>
             <p className="text-sm text-zinc-500 mb-6 font-bold">Like umpire fees or court hire.</p>
             
             <div className="space-y-4">

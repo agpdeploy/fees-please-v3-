@@ -126,7 +126,7 @@ export default function Team() {
         .eq("team_id", targetTeamId);
 
       let fixtures: any[] = [];
-      const rawFixtures = dbFixtures?.filter((f: any) => clubSeasonName ? f.season_name === clubSeasonName : !f.season_name) || [];
+      const rawFixtures = dbFixtures?.filter((f: any) => clubSeasonName ? (f.season_name === clubSeasonName || !f.season_name) : !f.season_name) || [];
       if (rawFixtures && rawFixtures.length > 0) {
         const isPastFixture = (f: any) => {
            if (['completed', 'forfeited', 'abandoned'].includes(f.status)) return true;
@@ -685,7 +685,7 @@ export default function Team() {
                                       onClick={() => setActiveTab('squad')} 
                                       className={`flex-1 relative z-10 py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors duration-300 ${activeTab === 'squad' ? 'text-white' : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/50'}`}
                                     >
-                                      <i className="fa-solid fa-clipboard-check"></i> Match Squad
+                                      <i className="fa-solid fa-clipboard-check"></i> Match Lineup
                                     </button>
                                   </div>
                                 </div>
@@ -962,7 +962,7 @@ export default function Team() {
                                           
                                           <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                                             <button onClick={() => saveSquad(f.id)} disabled={isSaving} className="w-full py-3 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-md">
-                                              {isSaving ? 'Saving...' : 'Lock In Match Squad'}
+                                              {isSaving ? 'Saving...' : 'Lock In Match Lineup'}
                                             </button>
                                           </div>
                                         </div>
@@ -972,7 +972,7 @@ export default function Team() {
                                      {f.lists.squadIds.length > 0 ? (
                                        <div className="space-y-3 mt-6 pt-6 border-t-2 border-dashed border-zinc-200 dark:border-zinc-800">
                                          <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-3 border-b border-zinc-100 dark:border-zinc-800 pb-1 flex justify-between">
-                                           <span>Confirmed Squad</span>
+                                           <span>Confirmed Lineup</span>
                                            <span>{f.lists.squadIds.length} Players</span>
                                          </h4>
                                          {f.lists.squadIds.map((pid: string) => {
@@ -1071,7 +1071,7 @@ export default function Team() {
                                          )}
                                        </div>
                                      ) : (
-                                       <div className="text-center text-zinc-500 text-[10px] font-black uppercase tracking-widest py-4 bg-zinc-50 dark:bg-zinc-900 rounded-xl mt-6">No Squad Selected Yet</div>
+                                       <div className="text-center text-zinc-500 text-[10px] font-black uppercase tracking-widest py-4 bg-zinc-50 dark:bg-zinc-900 rounded-xl mt-6">No Lineup Selected Yet</div>
                                      )}
                                     </>
                                   ) : (

@@ -18,7 +18,7 @@ export default function Step5_Payment({ clubId, onNext }: { clubId: string, onNe
   const [payIdValue, setPayIdValue] = useState("");
 
   const [messages, setMessages] = useState([
-    { id: '1', role: 'assistant', content: "Almost done! How would you like to collect fees from the squad mostly?" }
+    { id: '1', role: 'assistant', content: "Almost done! How would you like to collect fees from the lineup mostly?" }
   ]);
 
   const addMessage = (role: 'user' | 'assistant', content: string) => {

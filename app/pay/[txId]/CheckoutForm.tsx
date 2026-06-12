@@ -44,7 +44,7 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
-      {/* Header matching Game Day */}
+      {/* Header matching Match Day */}
       <div className="flex flex-col items-center gap-2 mb-6">
         <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center overflow-hidden">
           {teamLogoUrl || club?.logo_url ? <img src={teamLogoUrl || club.logo_url} className="w-full h-full object-contain p-1" /> : <i className="fa-solid fa-shield-halved text-zinc-300 dark:text-zinc-700 text-2xl"></i>}

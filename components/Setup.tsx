@@ -1471,7 +1471,7 @@ export default function Setup({ activeTab }: SetupProps) {
                           {/* CURRENT TEAM */}
                           {currentTeamPlayers.length > 0 && (
                             <div>
-                              <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Current Squad</h3>
+                              <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Current Lineup</h3>
                               <div className="flex flex-wrap gap-2.5">
                                 {currentTeamPlayers.map(p => {
                                   const isSelected = rosterPlayerIds.includes(p.id);

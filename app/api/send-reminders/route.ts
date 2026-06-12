@@ -238,11 +238,11 @@ export async function POST(req: Request) {
               </p>
             </div>
 
-            <!-- Squad Status -->
+            <!-- Lineup Status -->
             <div style="background-color: #fafafa; padding: 16px; border-top: 1px solid #f4f4f5;">
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
                 <tr>
-                  <td align="left"><span style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">Squad Status</span></td>
+                  <td align="left"><span style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">Lineup Status</span></td>
                   <td align="right"><span style="font-size: 10px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px;">${yesCount} / ${totalSquadSize} Confirmed</span></td>
                 </tr>
               </table>

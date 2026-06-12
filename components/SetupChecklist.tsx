@@ -1550,7 +1550,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             <i className="fa-solid fa-flag-checkered"></i> Setup Complete! Continue
           </button>
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-3 font-medium">
-            Continue to Game Day to assign players from your teams to your matches
+            Continue to Match Day to assign players from your teams to your matches
           </p>
         </div>
       )}

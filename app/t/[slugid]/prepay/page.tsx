@@ -163,7 +163,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] text-zinc-900 dark:text-white pt-8 pb-32 px-4 font-sans transition-colors relative flex flex-col items-center">
       <div className="w-full max-w-md mx-auto space-y-6">
-        {/* Header matching Game Day */}
+        {/* Header matching Match Day */}
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center overflow-hidden">
             {teamLogoUrl ? <img src={teamLogoUrl} className="w-full h-full object-contain p-1" /> : <i className="fa-solid fa-shield-halved text-zinc-300 dark:text-zinc-700 text-2xl"></i>}
