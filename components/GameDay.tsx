@@ -1131,7 +1131,7 @@ export default function GameDay() {
         </div>
       )}
 
-      {(profile?.role === 'club_admin' || profile?.role === 'team_admin' || profile?.role === 'super_admin') && !clubInfo?.season_name && (
+      {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && !clubInfo?.season_name && (
         <PlayHQSeasonAlert
           clubRecord={{ id: activeClubId, settings: clubInfo?.settings }}
           teams={teams}

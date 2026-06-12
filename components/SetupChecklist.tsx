@@ -44,7 +44,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [isPlayhqImported, setIsPlayhqImported] = useState(false);
   const [setupPath, setSetupPath] = useState<'playhq' | 'manual' | null>(null);
   
-  const isPlayhq = clubInfo?.club_cat === 'PlayHQ' || clubInfo?.sport_type === 'Other' || clubInfo?.season_name;
+  const isPlayhq = clubInfo?.club_cat === 'PlayHQ';
   const [showPlayhqBox, setShowPlayhqBox] = useState(!isPlayhq);
 
   // Logo state
@@ -957,74 +957,79 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       </div>
 
       {!setupPath ? (
-        <div className="flex flex-col gap-4 mb-6">
-          <button onClick={() => setSetupPath('playhq')} className="p-6 bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md transition-all text-left group">
-            <div className="h-12 w-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <img src="/branding/playhq_Logo.svg" alt="PlayHQ" className="w-8 h-8" />
+        <div className="flex flex-col gap-3 mb-6">
+          <button onClick={() => setSetupPath('playhq')} className="group relative flex items-center p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-[#0051e5] hover:shadow-md transition-all text-left w-full overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0051e5]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative h-14 w-14 rounded-full flex items-center justify-center bg-white border border-zinc-100 dark:border-zinc-800 shadow-sm mr-4 shrink-0 group-hover:scale-105 transition-transform">
+              <img src="/branding/playhq_Logo.svg" alt="PlayHQ" className="w-8 h-8 object-contain" />
             </div>
-            <h3 className="font-black uppercase tracking-widest text-emerald-800 dark:text-emerald-400 text-sm mb-2">PlayHQ Setup</h3>
-            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Fetch your team, logo and fixtures from a PlayHQ URL.</p>
+            <div className="flex-1 relative">
+              <h3 className="font-black text-sm text-zinc-900 dark:text-white uppercase tracking-widest mb-1 group-hover:text-[#0051e5] transition-colors">PlayHQ Setup</h3>
+              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-snug">Fetch your team, logo and fixtures from a PlayHQ URL.</p>
+            </div>
+            <i className="fa-solid fa-chevron-right text-zinc-300 dark:text-zinc-700 group-hover:text-[#0051e5] transition-colors ml-4 text-lg"></i>
           </button>
-          <button onClick={() => setSetupPath('manual')} className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md transition-all text-left group">
-            <div className="h-12 w-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <i className="fa-solid fa-keyboard text-xl text-zinc-400"></i>
+
+          <button onClick={() => setSetupPath('manual')} className="group relative flex items-center p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md transition-all text-left w-full overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative h-14 w-14 rounded-full flex items-center justify-center bg-white border border-zinc-100 dark:border-zinc-800 shadow-sm mr-4 shrink-0 group-hover:scale-105 transition-transform">
+              <i className="fa-solid fa-keyboard text-xl text-zinc-700 dark:text-zinc-300"></i>
             </div>
-            <h3 className="font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200 text-sm mb-2">Standard Setup</h3>
-            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Create your team, logo and fixtures manually or via dAIve.</p>
+            <div className="flex-1 relative">
+              <h3 className="font-black text-sm text-zinc-900 dark:text-white uppercase tracking-widest mb-1 group-hover:text-emerald-600 transition-colors">Standard Setup</h3>
+              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-snug">Create your team, logo and fixtures manually or via dAIve.</p>
+            </div>
+            <i className="fa-solid fa-chevron-right text-zinc-300 dark:text-zinc-700 group-hover:text-emerald-500 transition-colors ml-4 text-lg"></i>
           </button>
         </div>
       ) : (
         <>
-          {!isPlayhq && !activeClubId && (
-            <div className="flex items-center justify-between mb-4">
-               <button onClick={() => setSetupPath(null)} className="text-[10px] font-bold text-zinc-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center">
-                 <i className="fa-solid fa-arrow-left mr-1"></i> Back to Options
-               </button>
-               {setupPath === 'playhq' && !showPlayhqBox && (
-                 <button onClick={() => setShowPlayhqBox(true)} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest transition-colors flex items-center">
-                   <i className="fa-solid fa-rotate-right mr-1"></i> Resync PlayHQ
+            {!isPlayhq && !activeClubId && (
+              <div className="flex items-center justify-between mb-4">
+                 <button onClick={() => setSetupPath(null)} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 uppercase tracking-widest transition-colors flex items-center">
+                   <i className="fa-solid fa-arrow-left mr-1"></i> Back
                  </button>
-               )}
-            </div>
-          )}
-          
-          {setupPath === 'playhq' && showPlayhqBox && (
-            <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-3 shadow-sm transition-colors">
-               <div className="flex justify-between items-center">
-                 <h4 className="text-[10px] text-emerald-800 dark:text-emerald-400 uppercase font-black tracking-widest flex items-center gap-2">
-                   <img src="/branding/playhq_Logo.svg" alt="PlayHQ" className="h-4" /> Magic Import
-                 </h4>
-                 {activeClubId && (
-                   <button onClick={() => setShowPlayhqBox(false)} className="text-zinc-400 hover:text-zinc-600 transition-colors">
-                     <i className="fa-solid fa-xmark"></i>
+                 {setupPath === 'playhq' && !showPlayhqBox && (
+                   <button onClick={() => setShowPlayhqBox(true)} className="text-[10px] font-bold text-zinc-400 hover:text-[#0051e5] uppercase tracking-widest transition-colors flex items-center">
+                     <i className="fa-solid fa-rotate-right mr-1"></i> Resync PlayHQ
                    </button>
                  )}
-               </div>
-               <p className="text-[9px] text-emerald-700 dark:text-emerald-500 font-bold leading-tight">Got a PlayHQ Team URL? Paste it below to instantly fetch your team name, logo, and fixtures.</p>
-               <div className="flex flex-col gap-2">
-                 <input type="url" value={playhqUrl} onChange={e => setPlayhqUrl(e.target.value)} placeholder="https://www.playhq.com/..." className="w-full bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                 <button onClick={handlePlayhqImport} disabled={!playhqUrl || isImportingPlayhq} className="relative overflow-hidden w-full py-3 bg-[#0051e5] hover:bg-[#0041b5] text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50">
-                   {isImportingPlayhq ? (
-                     <div className="absolute inset-0 flex items-center justify-center bg-[#0051e5]">
-                       <img src="/branding/playhq_Logow.png" alt="PlayHQ" className="h-5 w-auto animate-pulse" />
-                     </div>
-                   ) : "Sync from PlayHQ"}
-                 </button>
-               </div>
-               {playhqImportError && <p className="text-red-500 text-[10px] font-bold">{playhqImportError}</p>}
-            </div>
-          )}
+              </div>
+            )}
+            
+            {setupPath === 'playhq' && showPlayhqBox && (
+              <div className="mb-6">
+                 {activeClubId && (
+                   <div className="flex justify-end mb-2">
+                     <button onClick={() => setShowPlayhqBox(false)} className="text-zinc-400 hover:text-zinc-600 transition-colors">
+                       <i className="fa-solid fa-xmark"></i>
+                     </button>
+                   </div>
+                 )}
+                 <div className="flex flex-col gap-2">
+                   <input type="url" value={playhqUrl} onChange={e => setPlayhqUrl(e.target.value)} placeholder="Paste PlayHQ Team URL..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 dark:text-white outline-none focus:border-[#0051e5] transition-colors shadow-sm" />
+                   <button onClick={handlePlayhqImport} disabled={!playhqUrl || isImportingPlayhq} className="relative overflow-hidden w-full py-3 bg-[#0051e5] hover:bg-[#0041b5] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 shadow-sm">
+                     {isImportingPlayhq ? (
+                       <div className="absolute inset-0 flex items-center justify-center bg-[#0051e5]">
+                         <img src="/branding/playhq_Logow.png" alt="PlayHQ" className="h-5 w-auto animate-pulse" />
+                       </div>
+                     ) : "Import Team"}
+                   </button>
+                 </div>
+                 {playhqImportError && <p className="text-red-500 text-[10px] font-bold mt-2 text-center">{playhqImportError}</p>}
+              </div>
+            )}
 
       {(setupPath !== 'playhq' || isPlayhqImported || activeClubId) && (
         <div className="space-y-3">
           {visibleSteps.map(step => (
-            <div key={step.id} className={`flex flex-col p-3.5 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
+            <div key={step.id} className={`flex flex-col p-3.5 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-600 border-emerald-700 shadow-sm' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${step.completed ? 'bg-emerald-500 text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-400'}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${step.completed ? 'bg-white text-emerald-600 shadow-sm' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-400'}`}>
                   {step.completed ? <i className="fa-solid fa-check text-[10px]"></i> : <span className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-500"></span>}
                 </div>
-                <span className={`text-xs font-bold ${step.completed ? 'line-through text-emerald-700/60 dark:text-emerald-500/60' : 'text-zinc-900 dark:text-white'}`}>
+                <span className={`text-xs font-bold ${step.completed ? 'text-white' : 'text-zinc-900 dark:text-white'}`}>
                   {step.title}
                 </span>
               </div>
@@ -1035,14 +1040,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                     if (expandedStep === step.id) setExpandedStep(null);
                   }}
                   title="Dismiss step"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${step.completed ? 'text-emerald-100 hover:text-white hover:bg-emerald-700' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
                 >
                   <i className="fa-solid fa-xmark text-sm"></i>
                 </button>
                 <button 
                   onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
                   title={expandedStep === step.id ? "Collapse" : "Expand"}
-                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${expandedStep === step.id ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20'}`}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${expandedStep === step.id ? (step.completed ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400') : (step.completed ? 'text-emerald-100 hover:bg-emerald-700 hover:text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20')}`}
                 >
                   <i className={`fa-solid fa-chevron-${expandedStep === step.id ? 'up' : 'down'} text-xs`}></i>
                 </button>
