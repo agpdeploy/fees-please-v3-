@@ -261,6 +261,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
                   appId={appId} 
                   locationId={club.square_location_id} 
                   amount={totalToCollect} 
+                  grossAmount={calculateSquareOnlineGross(totalToCollect, club)}
                 />
               ) : (
                 <div className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl text-center">

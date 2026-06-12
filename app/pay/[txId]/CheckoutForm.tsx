@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { PaymentForm, CreditCard } from 'react-square-web-payments-sdk';
+import { PaymentForm, CreditCard, ApplePay, GooglePay } from 'react-square-web-payments-sdk';
 import { useRouter } from 'next/navigation';
 import { calculateSquareOnlineGross } from '@/lib/fees';
 
@@ -153,23 +153,40 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
               applicationId={appId}
               locationId={locationId}
               cardTokenizeResponseReceived={handlePayment}
+              createPaymentRequest={() => ({
+                countryCode: 'AU',
+                currencyCode: 'AUD',
+                total: {
+                  amount: grossAmount.toFixed(2),
+                  label: team?.name || club?.name || 'Match Fees',
+                },
+              })}
             >
-              <CreditCard 
-                buttonProps={{
-                  css: {
-                    backgroundColor: '#10b981',
-                    fontSize: '12px',
-                    fontWeight: '900',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    color: '#fff',
-                    borderRadius: '0.75rem',
-                    '&:hover': {
-                      backgroundColor: '#059669'
+              <div className="flex flex-col gap-3">
+                <ApplePay />
+                <GooglePay />
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                  <span className="flex-shrink mx-4 text-[10px] font-black uppercase tracking-widest text-zinc-400">Or Pay with Card</span>
+                  <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                </div>
+                <CreditCard 
+                  buttonProps={{
+                    css: {
+                      backgroundColor: '#10b981',
+                      fontSize: '12px',
+                      fontWeight: '900',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      color: '#fff',
+                      borderRadius: '0.75rem',
+                      '&:hover': {
+                        backgroundColor: '#059669'
+                      }
                     }
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
             </PaymentForm>
           </div>
         </div>
