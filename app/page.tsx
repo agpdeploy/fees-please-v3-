@@ -322,7 +322,7 @@ export default function Home() {
           className={`flex items-center gap-3 text-left ${uniqueClubs.length > 1 ? 'group cursor-pointer' : 'cursor-default'}`}
         >
           {clubMeta.logo ? (
-            <img src={clubMeta.logo} className="w-9 h-9 rounded-lg object-cover border border-zinc-200 dark:border-zinc-800" alt="Club Logo" />
+            <img src={clubMeta.logo} className="w-9 h-9 rounded-lg object-cover border border-zinc-200 dark:border-zinc-800" alt="Account Logo" />
           ) : (
             <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center font-black text-xs text-emerald-600 dark:text-emerald-500 uppercase">
               {clubMeta.name.substring(0, 2)}
@@ -331,7 +331,7 @@ export default function Home() {
           <div>
             <h1 className="text-xl font-black italic uppercase tracking-tighter text-emerald-600 dark:text-emerald-500">Fees Please</h1>
             <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none mt-0.5">
-              <span className="truncate max-w-[160px]">{clubMeta.name || 'Select Club'}</span>
+              <span className="truncate max-w-[160px]">{clubMeta.name || 'Select Account'}</span>
               {uniqueClubs.length > 1 && <i className="fa-solid fa-caret-down text-zinc-400"></i>}
             </div>
           </div>
@@ -348,7 +348,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowClubMenu(false)}></div>
           <div className="w-full max-w-[320px] bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl relative z-10 animate-in slide-in-from-top-4 fade-in duration-200 overflow-hidden">
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50">
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Switch Club</h3>
+               <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Switch Account</h3>
                <button onClick={() => setShowClubMenu(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><i className="fa-solid fa-xmark"></i></button>
             </div>
             {uniqueClubs.length > 5 && (
@@ -471,7 +471,7 @@ export default function Home() {
                   {isAdmin && (
                     <>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-sliders w-5 text-center"></i> Configuration
+                        <i className="fa-solid fa-sliders w-5 text-center"></i> Account Details
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('payments'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'payments' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-credit-card w-5 text-center"></i> Payments
@@ -502,6 +502,9 @@ export default function Home() {
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('sponsors'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'sponsors' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-bullhorn w-5 text-center"></i> Sponsors
                       </button>
                       <button onClick={() => { handleTabChange('history'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'history' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-clock-rotate-left w-5 text-center"></i> Season History

@@ -11,7 +11,7 @@ import PlayHQSeasonAlert from "@/components/PlayHQSeasonAlert";
 import FinaliseSeasonView from "@/components/FinaliseSeasonView";
 
 interface SetupProps {
-  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments';
+  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments' | 'sponsors';
 }
 
 interface UserRole {
@@ -43,6 +43,12 @@ export default function Setup({ activeTab }: SetupProps) {
   // CONFIG STATE
   const [clubName, setClubName] = useState("");
   const [clubCat, setClubCat] = useState<string | null>(null);
+  
+  // PUBLIC CLUB INFO
+  const [publicEmail, setPublicEmail] = useState("");
+  const [publicWebsite, setPublicWebsite] = useState("");
+  const [publicAddress, setPublicAddress] = useState("");
+
   const [isClubActive, setIsClubActive] = useState(true);
   const [godModeSearch, setGodModeSearch] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -185,6 +191,12 @@ export default function Setup({ activeTab }: SetupProps) {
       setClubRecord(clubData);
       setClubName(clubData.name || "");
       setClubCat(clubData.club_cat || null);
+      
+      const settings = clubData.settings || {};
+      setPublicEmail(settings.public_email || "");
+      setPublicWebsite(settings.public_website || "");
+      setPublicAddress(settings.public_address || "");
+
       setIsClubActive(clubData.is_active !== false);
       setLogoUrl(clubData.logo_url || "");
       setAnnouncement(clubData.announcement || "");
@@ -242,6 +254,7 @@ export default function Setup({ activeTab }: SetupProps) {
     } else if (clubId === 'new') {
       setIsLoading(false);
       setClubName(""); setClubCat(null); setLogoUrl(""); setAnnouncement(""); setSeasonName(""); setSeasonStart(""); setSeasonEnd(""); setIsClubActive(true);
+      setPublicEmail(""); setPublicWebsite(""); setPublicAddress("");
       setTeams([]); setPlayers([]); setFixtures([]); setClubUsers([]);
     }
   }, [clubId]);
@@ -353,9 +366,16 @@ export default function Setup({ activeTab }: SetupProps) {
   async function saveConfig() {
     setIsSaving(true);
     const generatedSlug = clubName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const currentSettings = clubRecord?.settings || {};
     const payload = { 
       name: clubName, 
       club_cat: clubCat,
+      settings: {
+        ...currentSettings,
+        public_email: publicEmail,
+        public_website: publicWebsite,
+        public_address: publicAddress
+      },
       is_active: isClubActive,
       logo_url: logoUrl,
       announcement: announcement,
@@ -661,8 +681,8 @@ export default function Setup({ activeTab }: SetupProps) {
         
         <div className="w-full max-w-sm space-y-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
-            <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1"><i className="fa-solid fa-plus text-emerald-500 mr-2"></i> Register New Club</h3>
-            <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-4 leading-relaxed">Create a brand new workspace for your club or team.</p>
+            <h3 className="text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs mb-1"><i className="fa-solid fa-plus text-emerald-500 mr-2"></i> Register New Account</h3>
+            <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-4 leading-relaxed">Create a brand new workspace for your account or team.</p>
             
             <div className="space-y-3">
               <input 
@@ -677,7 +697,7 @@ export default function Setup({ activeTab }: SetupProps) {
                 disabled={isSaving || !clubName} 
                 className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
               >
-                {isSaving ? "Creating..." : "Create Club"}
+                {isSaving ? "Creating..." : "Create Account"}
               </button>
             </div>
           </div>
@@ -713,7 +733,7 @@ export default function Setup({ activeTab }: SetupProps) {
             <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
               <i className="fa-solid fa-crown text-emerald-600 dark:text-emerald-500 text-sm"></i>
             </div>
-            <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">God Mode: Active Club</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">God Mode: Active Account</h3>
           </div>
           
           <div className="relative mb-2">
@@ -735,7 +755,7 @@ export default function Setup({ activeTab }: SetupProps) {
             }}
             className="block w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-emerald-500/20 text-zinc-900 dark:text-white rounded-xl shadow-sm appearance-none outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm font-bold"
           >
-            <option value="new">🌟 Create New Club</option>
+            <option value="new">🌟 Create New Account</option>
             {allClubs
               .filter(c => c.name.toLowerCase().includes(godModeSearch.toLowerCase()))
               .map(c => <option key={c.id} value={c.id}>{c.name} {c.is_active === false ? '(Deactivated)' : ''}</option>)}
@@ -747,23 +767,26 @@ export default function Setup({ activeTab }: SetupProps) {
       {activeTab === 'config' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Branding & Sponsors</h2>
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Details</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Active Club Announcement</label>
-                <textarea 
-                  value={announcement} 
-                  onChange={(e) => setAnnouncement(e.target.value)} 
-                  placeholder="e.g. 📢 Ground closed today due to rain. All games cancelled." 
-                  rows={2}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors resize-none"
-                />
-                <p className="text-[8px] text-zinc-400 mt-1 ml-1 font-bold uppercase tracking-widest">This appears at the very top of all team landing pages.</p>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Name</label>
+                <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
 
               <div>
-                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Name</label>
-                <input type="text" value={clubName || ""} onChange={(e) => setClubName(e.target.value)} placeholder="e.g. Ferny Districts CC" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Email</label>
+                <input type="email" value={publicEmail || ""} onChange={(e) => setPublicEmail(e.target.value)} placeholder="e.g. contact@fernydistrictscc.com" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              </div>
+
+              <div>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Website</label>
+                <input type="url" value={publicWebsite || ""} onChange={(e) => setPublicWebsite(e.target.value)} placeholder="e.g. https://fernydistrictscc.com" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+              </div>
+
+              <div>
+                <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Address</label>
+                <input type="text" value={publicAddress || ""} onChange={(e) => setPublicAddress(e.target.value)} placeholder="e.g. 26 Tramway St, Ferny Grove" className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               </div>
 
               <div>
@@ -777,12 +800,12 @@ export default function Setup({ activeTab }: SetupProps) {
               {profile?.role === 'super_admin' && clubId && clubId !== 'new' && (
                 <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">Club Status</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">Account Status</div>
                     <div className="text-xs text-zinc-500 mt-0.5">{isClubActive ? 'Active' : 'Deactivated (Hidden)'}</div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={handleToggleClubStatus} disabled={isLoading} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${isClubActive ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'}`}>
-                      {isClubActive ? 'Deactivate Club' : 'Reactivate Club'}
+                      {isClubActive ? 'Deactivate Account' : 'Reactivate Account'}
                     </button>
                     {!isClubActive && (
                       <button onClick={handleHardDeleteClub} disabled={isLoading} className="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-white hover:bg-red-500">
@@ -795,11 +818,11 @@ export default function Setup({ activeTab }: SetupProps) {
               
               {(!clubId || clubId === 'new') ? (
                 <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
-                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Club First to Upload Logo</p>
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Account First to Upload Logo</p>
                 </div>
               ) : (
                 <div>
-                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Club Logo</label>
+                  <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Account Logo</label>
                   <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 p-3 rounded-xl transition-colors">
                     {logoUrl ? <img src={logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-cover bg-white" /> : <div className="w-12 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500"><i className="fa-solid fa-image"></i></div>}
                     <div className="flex-1">
@@ -812,12 +835,22 @@ export default function Setup({ activeTab }: SetupProps) {
                 </div>
               )}
 
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/50 space-y-4">
-                 <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-2">Club Sponsors (Public Page)</label>
-                 
+            </div>
+          </div>          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+            {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Account Settings" : "Create New Account")}
+          </button>
+        </div>
+      )}
+
+      {/* --- SPONSORS TAB --- */}
+      {activeTab === 'sponsors' && (
+        <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Sponsors (Public Page)</h2>
+            <div className="space-y-4">
                  {(!clubId || clubId === 'new') ? (
                     <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
-                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Club First to Upload Sponsors</p>
+                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Account First to Upload Sponsors</p>
                     </div>
                  ) : (
                    [
@@ -838,7 +871,7 @@ export default function Setup({ activeTab }: SetupProps) {
                            <div className="flex-1 space-y-2">
                              <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor} />
                              <div className="flex justify-between items-center">
-                                <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30'}`}>
+                                <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30`}>
                                    {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
                                 </label>
                              </div>
@@ -848,21 +881,17 @@ export default function Setup({ activeTab }: SetupProps) {
                      </div>
                    ))
                  )}
-              </div>
             </div>
           </div>
-
-
-
           <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-            {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Club Settings" : "Create New Club")}
+            {isSaving ? "Saving Sponsors..." : "Save Sponsors"}
           </button>
         </div>
       )}
 
       {(!clubId || clubId === 'new') && activeTab !== 'config' && (
         <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mt-6 shadow-sm transition-colors">
-          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your club configuration first.</p>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Please save your account configuration first.</p>
         </div>
       )}
 
@@ -928,7 +957,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     </div>
                     <div>
                       <span className="text-sm font-bold text-emerald-800 dark:text-emerald-400 block">Override Platform Fee</span>
-                      <span className="text-xs text-emerald-600/80 dark:text-emerald-500/80">Disable the 1.4% platform clip for this club. Square wholesale fees still apply.</span>
+                      <span className="text-xs text-emerald-600/80 dark:text-emerald-500/80">Disable the 1.4% platform clip for this account. Square wholesale fees still apply.</span>
                     </div>
                   </label>
                 </div>
@@ -974,7 +1003,7 @@ export default function Setup({ activeTab }: SetupProps) {
           </div>
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Club Level)</h2>
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">Manual Payment Fallback (Account Level)</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold mb-4 leading-relaxed">If you don't connect Square (or if a player prefers bank transfer), they will be given these details to transfer funds directly via their banking app. <strong className="text-zinc-700 dark:text-zinc-300">Note:</strong> These payments are self-reported by the player and won't be automatically verified.</p>
             <div className="space-y-4">
               <div className="flex gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors">
@@ -996,7 +1025,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     type="text" 
                     value={payIdValue || ""} 
                     onChange={(e) => setPayIdValue(e.target.value)} 
-                    placeholder={payIdType === 'mobile' ? 'e.g. 0400 000 000' : payIdType === 'email' ? 'e.g. admin@club.com' : 'e.g. BSB: 123-456 ACC: 12345678'}
+                    placeholder={payIdType === 'mobile' ? 'e.g. 0400 000 000' : payIdType === 'email' ? 'e.g. admin@account.com' : 'e.g. BSB: 123-456 ACC: 12345678'}
                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                   />
                 </div>
@@ -1155,6 +1184,25 @@ export default function Setup({ activeTab }: SetupProps) {
       {/* --- TEAMS TAB (REVAMPED UX) --- */}
       {clubId && clubId !== 'new' && activeTab === 'teams' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
+            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Active Account Announcement</h2>
+            <div>
+              <textarea 
+                value={announcement} 
+                onChange={(e) => setAnnouncement(e.target.value)} 
+                placeholder="e.g. 📢 Ground closed today due to rain. All games cancelled." 
+                rows={2}
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors resize-none"
+              />
+              <p className="text-[8px] text-zinc-400 mt-1 font-bold uppercase tracking-widest">This appears at the very top of all team landing pages.</p>
+              <div className="mt-3 flex justify-end">
+                <button onClick={saveConfig} disabled={isSaving} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
+                  {isSaving ? "Saving..." : "Save Announcement"}
+                </button>
+              </div>
+            </div>
+          </div>
           
           {!clubRecord?.season_name && (
             <PlayHQSeasonAlert
@@ -1219,7 +1267,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <h3 className="text-sm font-black uppercase tracking-widest">{isEditingSeason ? "Edit Season Details" : "Start a New Season"}</h3>
                   </div>
                   {!isEditingSeason && (
-                    <p className="text-xs text-zinc-500 mb-4 max-w-sm mx-auto leading-relaxed">Your club has no active season. If you are not syncing from PlayHQ, manually start a new season below.</p>
+                    <p className="text-xs text-zinc-500 mb-4 max-w-sm mx-auto leading-relaxed">Your account has no active season. If you are not syncing from PlayHQ, manually start a new season below.</p>
                   )}
                   <div className="max-w-md mx-auto space-y-3 text-left">
                     <div>
@@ -1420,6 +1468,27 @@ export default function Setup({ activeTab }: SetupProps) {
                                   season_end: data.seasonEnd || null
                                 }).eq('id', activeClubId);
                                 targetSeasonName = data.seasonName;
+                              }
+
+                              if (data.orgDetails) {
+                                const currentClubSettings = clubRecord?.settings || {};
+                                const newPublicEmail = currentClubSettings.public_email || data.orgDetails.email;
+                                const newPublicWebsite = currentClubSettings.public_website || data.orgDetails.website;
+                                const newPublicAddress = currentClubSettings.public_address || data.orgDetails.address;
+                                
+                                if (newPublicEmail !== currentClubSettings.public_email || newPublicWebsite !== currentClubSettings.public_website || newPublicAddress !== currentClubSettings.public_address) {
+                                  const updatedClubSettings = {
+                                    ...currentClubSettings,
+                                    public_email: newPublicEmail,
+                                    public_website: newPublicWebsite,
+                                    public_address: newPublicAddress,
+                                  };
+                                  await supabase.from('clubs').update({ settings: updatedClubSettings }).eq('id', activeClubId);
+                                  if (clubRecord) clubRecord.settings = updatedClubSettings;
+                                  setPublicEmail(newPublicEmail || "");
+                                  setPublicWebsite(newPublicWebsite || "");
+                                  setPublicAddress(newPublicAddress || "");
+                                }
                               }
 
                               // Save the URL to teams.settings

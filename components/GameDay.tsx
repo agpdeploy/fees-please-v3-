@@ -24,6 +24,7 @@ export default function GameDay() {
   const [activeFixture, setActiveFixture] = useState<any>(null);
   const [pastFixtures, setPastFixtures] = useState<any[]>([]);
   const [showPastFixtures, setShowPastFixtures] = useState(false);
+  const [isFixturesLoading, setIsFixturesLoading] = useState(true);
   
   const [squad, setSquad] = useState<any[]>([]);
   const [isSquadLoading, setIsSquadLoading] = useState(false); 
@@ -281,7 +282,11 @@ export default function GameDay() {
   }, [profile, roles, activeClubId]);
 
   const loadTeamData = useCallback(async () => {
-    if (!selectedTeamId) return;
+    if (!selectedTeamId) {
+      setIsFixturesLoading(false);
+      return;
+    }
+    setIsFixturesLoading(true);
     const { data: teamData } = await supabase.from("teams").select("member_fee, casual_fee").eq("id", selectedTeamId).single();
     if (teamData) setTeamFees({ member: teamData.member_fee || 10, casual: teamData.casual_fee || 25 });
     
@@ -314,6 +319,7 @@ export default function GameDay() {
       setActiveFixture(null);
       setPastFixtures([]);
     }
+    setIsFixturesLoading(false);
   }, [selectedTeamId, clubInfo.season_name]);
 
   useEffect(() => {
@@ -990,7 +996,7 @@ export default function GameDay() {
     return !(isSquareEnabled && method === 'card');
   }).length;
 
-  if (loading && !profile) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading Match Hub...</div>;
+  if (loading || isFixturesLoading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading Match Hub...</div>;
 
   if (isFinaliseModalOpen && activeFixture) {
     return (

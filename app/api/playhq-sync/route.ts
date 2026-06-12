@@ -64,6 +64,21 @@ query teamFixture($teamID: ID!) {
         }
       }
     }
+}
+}
+`;
+
+const ORG_DETAILS_QUERY = `
+query getOrg($code: String!) {
+  discoverOrganisation(code: $code) {
+    name
+    email
+    websiteUrl
+    address {
+      suburb
+      state
+      postcode
+    }
   }
 }
 `;
@@ -83,6 +98,8 @@ export async function POST(req: Request) {
 
     // [tenant_slug, 'org', org_slug, org_id, season_slug, 'teams', team_slug, team_id]
     const tenantSlug = pathParts[0];
+    const orgIndex = pathParts.indexOf('org');
+    const orgId = orgIndex !== -1 && orgIndex + 2 < pathParts.length ? pathParts[orgIndex + 2] : null;
     const teamIdIndex = pathParts.indexOf('teams') + 2;
     const teamId = pathParts[teamIdIndex];
     const seasonSlug = pathParts[pathParts.indexOf('teams') - 1];
@@ -173,13 +190,48 @@ export async function POST(req: Request) {
       seasonEnd = new Date(Math.max(...validDates)).toISOString().split('T')[0];
     }
 
+    let orgDetails = null;
+    if (orgId) {
+      try {
+        const orgRes = await fetch("https://api.playhq.com/graphql", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "tenant": tenant,
+            "Origin": "https://www.playhq.com"
+          },
+          body: JSON.stringify({
+            query: ORG_DETAILS_QUERY,
+            variables: { code: orgId }
+          })
+        });
+        if (orgRes.ok) {
+          const orgData = await orgRes.json();
+          const org = orgData?.data?.discoverOrganisation;
+          if (org) {
+            const addressParts = [org.address?.suburb, org.address?.state, org.address?.postcode].filter(Boolean);
+            const addressStr = addressParts.length > 0 ? addressParts.join(', ') : null;
+
+            orgDetails = {
+              email: org.email || null,
+              website: org.websiteUrl || null,
+              address: addressStr
+            };
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch org details:", e);
+      }
+    }
+
     return NextResponse.json({
       clubName,
       logoUrl,
       seasonName,
       seasonStart,
       seasonEnd,
-      fixtures
+      fixtures,
+      orgDetails
     });
 
   } catch (error: any) {
