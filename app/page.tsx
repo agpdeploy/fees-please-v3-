@@ -342,8 +342,8 @@ export default function Home() {
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Account Admin' : 
                       currentClubRole === 'team_admin' ? 'Team Admin' : 
-                      profile?.role === 'player' ? 'Player' :
-                      (!roles || roles.length === 0) ? 'Affiliate' : 'Player';
+                      (!roles || roles.length === 0) ? 'Affiliate' : 
+                      profile?.role === 'player' ? 'Player' : 'Player';
 
   const userMeta = session?.user?.user_metadata || {};
   const avatarUrl = userMeta?.avatar_url;
