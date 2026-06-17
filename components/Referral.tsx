@@ -90,7 +90,7 @@ export default function Referral() {
             <h3 className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest text-[10px] mb-1">Pending</h3>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-black tracking-tighter text-amber-500">
-                {referrals.filter(r => !r.onboarding_completed).length}
+                {referrals.filter(r => !r.has_reached_reward_status).length}
               </span>
               <span className="text-amber-500 font-bold tracking-widest uppercase text-[10px] mb-1.5">Users</span>
             </div>
@@ -99,16 +99,24 @@ export default function Referral() {
             <h3 className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest text-[10px] mb-1">Actual</h3>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-black tracking-tighter text-emerald-500">
-                {referrals.filter(r => r.onboarding_completed).length}
+                {referrals.filter(r => r.has_reached_reward_status).length}
               </span>
               <span className="text-emerald-500 font-bold tracking-widest uppercase text-[10px] mb-1.5">Users</span>
             </div>
           </div>
         </div>
 
-        {referrals.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-800/80">
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-4">Referred Users</h4>
+        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-4">
+            Recent Referrals
+          </h3>
+          
+          {referrals.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-bold">No referrals yet.</p>
+              <p className="text-zinc-400 dark:text-zinc-500 text-[10px]">Share your link to get started!</p>
+            </div>
+          ) : (
             <div className="space-y-3">
               {referrals.map(ref => {
                 let displayName = ref.email.split('@')[0];
@@ -126,13 +134,13 @@ export default function Referral() {
                       <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{new Date(ref.updated_at || new Date()).toLocaleDateString('en-AU')}</div>
                     </div>
                     <div>
-                      {ref.onboarding_completed ? (
+                      {ref.has_reached_reward_status ? (
                         <span className="text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border border-emerald-500/20 shadow-sm flex items-center gap-1.5">
-                          <i className="fa-solid fa-check-circle"></i> Active
+                          <i className="fa-solid fa-check-circle"></i> Actual
                         </span>
                       ) : (
                         <span className="text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border border-amber-500/20 shadow-sm flex items-center gap-1.5">
-                          <i className="fa-solid fa-clock"></i> Pending
+                          <i className="fa-solid fa-clock"></i> Pending (waiting on matches)
                         </span>
                       )}
                     </div>
@@ -140,8 +148,8 @@ export default function Referral() {
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {(!profile.role || profile.role === 'player') && (
