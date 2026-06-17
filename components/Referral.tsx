@@ -140,7 +140,7 @@ export default function Referral() {
                         </span>
                       ) : (
                         <span className="text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border border-amber-500/20 shadow-sm flex items-center gap-1.5">
-                          <i className="fa-solid fa-clock"></i> Pending (waiting on matches)
+                          <i className="fa-solid fa-clock"></i> Pending
                         </span>
                       )}
                     </div>
