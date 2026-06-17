@@ -50,6 +50,17 @@ export default function Home() {
     }
   }, [setupTab]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'referral') {
+        setActiveTab('referral');
+        sessionStorage.setItem('activeTab', 'referral');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+  }, []);
+
   const [session, setSession] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [updateAvailable, setUpdateAvailable] = useState(false);
