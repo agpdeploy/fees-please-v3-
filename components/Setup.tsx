@@ -1581,16 +1581,34 @@ export default function Setup({ activeTab }: SetupProps) {
               )}
 
               <div className="flex gap-4 mb-4">
-                <button
-                  onClick={() => {
-                    resetTeamForm();
-                    setIsTeamModalOpen(true);
-                  }}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  <i className="fa-solid fa-plus text-sm"></i>
-                  Add New Team
-                </button>
+                {(clubRecord?.plan_tier === 'free' || !clubRecord?.plan_tier) && teams.length >= 1 ? (
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
+                    className="w-full bg-amber-400 hover:bg-amber-300 text-amber-900 font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-solid fa-lock text-sm"></i>
+                    Upgrade to Add More Teams
+                  </button>
+                ) : clubRecord?.plan_tier === 'pro' && teams.length >= 5 ? (
+                  <button
+                    onClick={() => showToast("Pro plan is limited to 5 teams. Please contact support to expand your club.", "error")}
+                    className="w-full bg-zinc-200 dark:bg-zinc-800 text-zinc-500 font-black py-4 rounded-xl uppercase tracking-widest text-xs cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-solid fa-ban text-sm"></i>
+                    Team Limit Reached
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      resetTeamForm();
+                      setIsTeamModalOpen(true);
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-solid fa-plus text-sm"></i>
+                    Add New Team
+                  </button>
+                )}
               </div>
 
               <div className="space-y-3">
