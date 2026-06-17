@@ -81,32 +81,37 @@ export async function POST(req: Request) {
                 .single();
                 
               if (club?.referred_by_user_id) {
-                const { data: referral } = await supabase
+                let { data: referral } = await supabase
                   .from('referrals')
                   .select('*')
                   .eq('referred_club_id', clubId)
                   .single();
                   
+                // If they upgraded before hitting the 2 free matches, the referral row won't exist yet!
+                if (!referral) {
+                  const { data: newRef } = await supabase
+                    .from('referrals')
+                    .insert({
+                      referrer_user_id: club.referred_by_user_id,
+                      referred_club_id: clubId,
+                      status: 'pending',
+                    })
+                    .select('*')
+                    .single();
+                  referral = newRef;
+                }
+                  
                 if (referral && !referral.rewarded_at) {
-                  // Perform Active Usage Checks
-                  const { count: teamCount } = await supabase.from('teams').select('id', { count: 'exact', head: true }).eq('club_id', clubId);
-                  const { count: playerCount } = await supabase.from('players').select('id', { count: 'exact', head: true }).eq('club_id', clubId);
-                  const { count: completedGameCount } = await supabase.from('fixtures').select('id', { count: 'exact', head: true }).eq('club_id', clubId).eq('status', 'completed');
-                  const { count: transactionCount } = await supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('club_id', clubId);
+                  // Since they just paid an invoice for a Stripe subscription, they are a PAID referral!
+                  // No need to check usage limits (2 games etc). They're literally on a paid plan now.
                   
-                  const usageMet = (teamCount || 0) >= 1 && (playerCount || 0) >= 3 && (completedGameCount || 0) >= 2 && (transactionCount || 0) >= 1;
-                  
-                  if (!usageMet) {
-                     // Set to pending_usage and wait for the next invoice cycle
-                     await supabase.from('referrals').update({ status: 'pending_usage', updated_at: new Date().toISOString() }).eq('id', referral.id);
-                  } else {
-                    // Usage met! Upgrade status to paid
-                    await supabase
-                      .from('referrals')
-                      .update({ status: 'paid', updated_at: new Date().toISOString() })
-                      .eq('id', referral.id);
+                  // Upgrade status to paid
+                  await supabase
+                    .from('referrals')
+                    .update({ status: 'paid', updated_at: new Date().toISOString() })
+                    .eq('id', referral.id);
                       
-                    // Check referrer roles to determine reward type
+                  // Check referrer roles to determine reward type
                     const { data: userRoles } = await supabase
                       .from('user_roles')
                       .select('club_id')
