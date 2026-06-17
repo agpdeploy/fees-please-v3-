@@ -336,8 +336,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
               umpire_fee: clubInfo?.default_umpire_fee || 0,
               season_name: clubInfo?.season_name || seasonName || null
             }));
-            await supabase.from('fixtures').insert(payload);
-           setHasFixtures(true);
+            const { error: fixtureInsertError } = await supabase.from('fixtures').insert(payload);
+            if (fixtureInsertError) throw fixtureInsertError;
+            setHasFixtures(true);
         }
       }
 
