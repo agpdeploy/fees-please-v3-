@@ -253,6 +253,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         const { data: clubData, error: clubError } = await supabase
           .from('clubs').insert([{ 
             name: data.clubName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "PlayHQ", entity_type: "Team", sport_type: "Other",
+            referred_by_user_id: user?.referred_by || null,
             logo_url: data.logoUrl || null,
             season_name: data.seasonName || null,
             season_start: data.seasonStart || null,
@@ -376,9 +377,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       
       const { data: clubData, error: clubError } = await supabase
         .from('clubs').insert([{ 
-          name: teamName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "Other", entity_type: "Team", sport_type: sportType,
-          settings: { public_email: clubEmail || null, public_website: clubWebsite || null, public_address: clubAddress || null },
-          season_name: null, default_casual_fee: null, default_member_fee: null, default_umpire_fee: null, expense_label: null, income_label: null
+            name: teamName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "Other", entity_type: "Team", sport_type: sportType,
+            referred_by_user_id: user?.referred_by || null,
+            settings: { public_email: clubEmail || null, public_website: clubWebsite || null, public_address: clubAddress || null },
+            season_name: null, default_casual_fee: null, default_member_fee: null, default_umpire_fee: null, expense_label: null, income_label: null
         }]).select().single();
       if (clubError) throw clubError;
 
