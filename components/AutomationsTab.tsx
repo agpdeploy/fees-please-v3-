@@ -9,9 +9,10 @@ interface AutomationsTabProps {
   teams: any[];
   clubUsers: any[];
   showToast: (msg: string, type?: "success" | "error") => void;
+  planTier: string;
 }
 
-export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: AutomationsTabProps) {
+export default function AutomationsTab({ clubId, teams, clubUsers, showToast, planTier }: AutomationsTabProps) {
   const { profile, roles } = useProfile();
   const [reportsConfig, setReportsConfig] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -248,6 +249,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
     });
   });
 
+
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
       
@@ -401,28 +403,40 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast }: 
                 </div>
 
                 {/* Buttons */}
-                <div className="flex items-center gap-2">
-                  
-                  {/* Send Now Button */}
-                  <button 
-                    onClick={() => triggerManualSend(report)}
-                    disabled={isSending}
-                    className={`h-9 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${isActive ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500' : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500'}`}
-                  >
-                    <i className={`fa-solid ${isSending ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> 
-                    <span>Send Now</span>
-                  </button>
-
-                  {/* Schedule Button */}
-                  <button 
-                    onClick={() => handleScheduleClick(report)}
-                    className={`h-9 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest ${isActive ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500' : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500'}`}
-                  >
-                    <i className="fa-solid fa-clock"></i> 
-                    <span>{isActive ? 'Scheduled' : 'Schedule'}</span>
-                  </button>
-
-                </div>
+                {/* Buttons */}
+                {planTier === 'free' ? (
+                  <div className="flex flex-col items-start gap-1 mt-2">
+                     <button 
+                       onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
+                       className="h-9 px-4 bg-amber-400 hover:bg-amber-300 text-amber-900 rounded-lg transition-colors flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm shadow-amber-500/20"
+                     >
+                       <i className="fa-solid fa-lock"></i> 
+                       <span>Upgrade to Plus</span>
+                     </button>
+                     <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 ml-1 mt-1">Requires Plus Plan</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-2">
+                    {/* Send Now Button */}
+                    <button 
+                      onClick={() => triggerManualSend(report)}
+                      disabled={isSending}
+                      className={`h-9 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${isActive ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500' : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500'}`}
+                    >
+                      <i className={`fa-solid ${isSending ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> 
+                      <span>Send Now</span>
+                    </button>
+  
+                    {/* Schedule Button */}
+                    <button 
+                      onClick={() => handleScheduleClick(report)}
+                      className={`h-9 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest ${isActive ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500' : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500'}`}
+                    >
+                      <i className="fa-solid fa-clock"></i> 
+                      <span>{isActive ? 'Scheduled' : 'Schedule'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -39,7 +39,7 @@ export function useProfile() {
         const [profileRes, rolesRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
           supabase.from('user_roles')
-            .select('*, clubs(id, name, logo_url, is_active)')
+            .select('*, clubs(id, name, logo_url, is_active, plan_tier)')
             .or(`user_id.eq.${user.id},email.eq.${user.email}`) 
         ]);
 
@@ -62,13 +62,61 @@ export function useProfile() {
         const adminRole = rolesData.find((r: any) => r.role === 'club_admin');
         const teamRole = rolesData.find((r: any) => r.role === 'team_admin');
 
+        let finalRole = isSuper ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player'));
+        let finalClubId = adminRole?.club_id || teamRole?.club_id || null;
+        let finalTeamId = teamRole?.team_id || null;
+
+        // --- 🚨 NEW: MULTI-TEAM PLAYER AUTO-LINKING 🚨 ---
+        const { data: playerMatchesData } = await supabase
+          .from('players')
+          .select('id, club_id, default_team_id, user_id')
+          .eq('email', user.email);
+        const playerMatches = (playerMatchesData || []) as any[];
+
+        if (playerMatches.length > 0) {
+          const clubIds = [...new Set(playerMatches.map((p: any) => p.club_id).filter(Boolean))];
+          const { data: clubsData } = await supabase
+            .from('clubs')
+            .select('id, name, logo_url, is_active, plan_tier')
+            .in('id', clubIds);
+          const clubMap = new Map(clubsData?.map((c: any) => [c.id, c]) || []);
+
+          for (const p of playerMatches) {
+            p.clubs = clubMap.get(p.club_id) || null;
+            // Auto-link their user ID if not already linked
+            if (p.user_id !== user.id) {
+              await supabase.from('players').update({ user_id: user.id }).eq('id', p.id);
+            }
+            
+            // Add a synthetic role to rolesData so they appear in the club switcher
+            // Only if they don't already have an admin role in this specific team/club
+            const existingRole = rolesData.find((r: any) => r.club_id === p.club_id && (r.role === 'club_admin' || r.team_id === p.default_team_id));
+            if (!existingRole && p.clubs) {
+              rolesData.push({
+                role: 'player',
+                club_id: p.club_id,
+                team_id: p.default_team_id,
+                clubs: p.clubs,
+                player_id: p.id
+              });
+            }
+          }
+
+          // If they didn't have any admin roles, default their profile to the first player record
+          if (!isSuper && !adminRole && !teamRole) {
+            finalRole = 'player';
+            finalClubId = playerMatches[0].club_id;
+            finalTeamId = playerMatches[0].default_team_id;
+          }
+        }
+
         const finalProfile = {
           id: user.id,
           email: user.email,
           ...(profileData || {}), 
-          role: isSuper ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
-          club_id: adminRole?.club_id || teamRole?.club_id || null,
-          team_id: teamRole?.team_id || null
+          role: finalRole,
+          club_id: finalClubId,
+          team_id: finalTeamId
         };
 
         if (isMounted) {
@@ -116,17 +164,67 @@ export function useProfile() {
         ? `user_id.eq.${userId},email.eq.${email}` 
         : `user_id.eq.${userId}`;
         
-      const { data: rolesData } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active)').or(query);
+      const { data: rolesRes } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active)').or(query);
+      let rolesData = rolesRes || [];
       const adminRole = rolesData?.find((r: any) => r.role === 'club_admin');
       const teamRole = rolesData?.find((r: any) => r.role === 'team_admin');
+
+      let finalRole = isSuper || baseProfileData?.role === 'super_admin' ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player'));
+      let finalClubId = adminRole?.club_id || teamRole?.club_id || null;
+      let finalTeamId = teamRole?.team_id || null;
+
+      if (email) {
+        const { data: playerMatchesData } = await supabase
+          .from('players')
+          .select('id, club_id, default_team_id, user_id')
+          .eq('email', email);
+        const playerMatches = (playerMatchesData || []) as any[];
+
+        if (playerMatches.length > 0) {
+          const clubIds = [...new Set(playerMatches.map((p: any) => p.club_id).filter(Boolean))];
+          const { data: clubsData } = await supabase
+            .from('clubs')
+            .select('id, name, logo_url, is_active, plan_tier')
+            .in('id', clubIds);
+          const clubMap = new Map(clubsData?.map((c: any) => [c.id, c]) || []);
+
+          for (const p of playerMatches) {
+            p.clubs = clubMap.get(p.club_id) || null;
+            // Auto-link their user ID if not already linked
+            if (p.user_id !== userId) {
+              await supabase.from('players').update({ user_id: userId }).eq('id', p.id);
+            }
+            
+            // Add a synthetic role to rolesData so they appear in the club switcher
+            // Only if they don't already have an admin role in this specific team/club
+            const existingRole = rolesData.find((r: any) => r.club_id === p.club_id && (r.role === 'club_admin' || r.team_id === p.default_team_id));
+            if (!existingRole && p.clubs) {
+              rolesData.push({
+                role: 'player',
+                club_id: p.club_id,
+                team_id: p.default_team_id,
+                clubs: p.clubs,
+                player_id: p.id
+              });
+            }
+          }
+
+          // If they didn't have any admin roles, default their profile to the first player record
+          if (!isSuper && !adminRole && !teamRole) {
+            finalRole = 'player';
+            finalClubId = playerMatches[0].club_id;
+            finalTeamId = playerMatches[0].default_team_id;
+          }
+        }
+      }
 
       const updatedProfile = {
         id: userId,
         email: baseProfileData?.email || email, 
         ...(baseProfileData || {}), 
-        role: isSuper || baseProfileData?.role === 'super_admin' ? 'super_admin' : (adminRole ? 'club_admin' : (teamRole ? 'team_admin' : 'player')),
-        club_id: adminRole?.club_id || teamRole?.club_id || null,
-        team_id: teamRole?.team_id || null
+        role: finalRole,
+        club_id: finalClubId,
+        team_id: finalTeamId
       };
 
       setProfile(updatedProfile);

@@ -7,13 +7,14 @@ import { Inter, Roboto_Mono } from 'next/font/google';
 const interItalic = Inter({ subsets: ['latin'], style: 'italic' });
 const robotoMono = Roboto_Mono({ subsets: ['latin'] });
 
-export default function Login() {
+export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
   const handleGoogleLogin = async () => {
+    document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -21,18 +22,19 @@ export default function Login() {
         // FIX: This query parameter forces Google to prompt the user to select an account
         // instead of automatically logging them in with a cached session.
         queryParams: {
-          prompt: 'select_account'
-        }
+          prompt: 'select_account',
+        },
       },
     });
     if (error) setError(error.message);
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { 
@@ -95,7 +97,7 @@ export default function Login() {
               <div className="relative flex justify-center"><span className="bg-zinc-900 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-600">Or use email</span></div>
             </div>
 
-            <form onSubmit={handleMagicLink} className="space-y-4">
+            <form onSubmit={handleEmailLogin} className="space-y-4">
               <div>
                 <input
                   type="email"

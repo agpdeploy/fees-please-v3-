@@ -54,7 +54,8 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          has_onboarded: true
+          has_onboarded: true,
+          full_name: `${firstName} ${lastName}`
         })
         .eq('id', user.id);
 

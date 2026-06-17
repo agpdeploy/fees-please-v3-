@@ -13,9 +13,12 @@ import MyTeam from "../components/MyTeam";
 import SeasonHistory from "../components/SeasonHistory";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
+import PlayerHub from "../components/PlayerHub";
+import Referral from "../components/Referral";
 import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
+import { hasFeature } from "../lib/features";
 
 export default function Home() {
   useOfflineSync(); 
@@ -27,7 +30,14 @@ export default function Home() {
     return 'gameday';
   });
 
-  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments'>(() => {
+  const [creatingTeam, setCreatingTeam] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('creating_team') === 'true';
+    }
+    return false;
+  });
+
+  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments' | 'billing' | 'sponsors'>(() => {
     if (typeof window !== 'undefined') {
       return (sessionStorage.getItem('setupTab') as any) || 'config';
     }
@@ -48,9 +58,15 @@ export default function Home() {
   const { activeClubId, setActiveClubId } = useActiveClub();
   
   // --- ROLE CHECKING LOGIC ---
-  const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
-  const isAdmin = profile?.role === 'super_admin' || currentClubRole === 'club_admin';
-  const isTeamAdmin = roles?.some((r: any) => r.role === 'team_admin' && r.club_id === activeClubId);
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const rolesForClub = roles?.filter((r: any) => r.club_id === activeClubId) || [];
+  const currentClubRole = isSuperAdmin ? 'super_admin' : (
+    rolesForClub.some((r: any) => r.role === 'club_admin') ? 'club_admin' :
+    rolesForClub.some((r: any) => r.role === 'team_admin') ? 'team_admin' :
+    rolesForClub[0]?.role
+  );
+  const isAdmin = isSuperAdmin || currentClubRole === 'club_admin';
+  const isTeamAdmin = rolesForClub.some((r: any) => r.role === 'team_admin');
   const canManage = isAdmin || isTeamAdmin;
   
   const [clubMeta, setClubMeta] = useState({ name: 'FP', logo: '' });
@@ -60,6 +76,8 @@ export default function Home() {
   
   const [isDaiveOpen, setIsDaiveOpen] = useState(false);
   const [allClubs, setAllClubs] = useState<any[]>([]);
+  const [showNewAccountModal, setShowNewAccountModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
 
   // --- PWA UPDATE LISTENER (Fix for aggressive caching) ---
   useEffect(() => {
@@ -107,7 +125,7 @@ export default function Home() {
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
-      supabase.from('clubs').select('id, name, logo_url, is_active').order('name').then(({ data }) => {
+      supabase.from('clubs').select('id, name, logo_url, is_active, plan_tier').order('name').then(({ data }) => {
         if (data) setAllClubs(data.filter((c: any) => c.is_active !== false));
       });
     }
@@ -120,6 +138,8 @@ export default function Home() {
   const filteredClubs = uniqueClubs.filter((c: any) => 
     c.name.toLowerCase().includes(clubSearchTerm.toLowerCase())
   );
+
+  const activeClub = uniqueClubs.find((c: any) => c.id === activeClubId);
 
   const handleTabChange = (tab: string) => {
     if (tab === "daive") {
@@ -181,7 +201,7 @@ export default function Home() {
 
     let targetClubId = activeClubId;
 
-    if (!targetClubId) {
+    if (!targetClubId && !creatingTeam) {
       if (savedClubId) {
         targetClubId = savedClubId;
       } else if (profile?.role === 'super_admin') {
@@ -194,11 +214,17 @@ export default function Home() {
     }
 
     // Auto-correct if the targetClubId is no longer valid for this user
-    if (targetClubId && profile?.role !== 'super_admin' && roles && roles.length > 0) {
-      const isValid = roles.some((r: any) => r.club_id === targetClubId);
-      if (!isValid) {
-        targetClubId = roles[0].club_id;
+    if (targetClubId && profile?.role !== 'super_admin') {
+      const isValid = roles && roles.some((r: any) => r.club_id === targetClubId);
+      const isProfileClub = profile?.club_id === targetClubId;
+      
+      if (!isValid && !isProfileClub) {
+        targetClubId = roles && roles.length > 0 ? roles[0].club_id : null;
       }
+    }
+
+    if (creatingTeam) {
+      targetClubId = null;
     }
 
     if (targetClubId !== activeClubId) {
@@ -217,8 +243,13 @@ export default function Home() {
         }
       };
       fetchClubMeta();
+    } else {
+      setClubMeta({ name: 'FP', logo: '' });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('fp_active_club_id');
+      }
     }
-  }, [profile, roles, activeClubId, setActiveClubId, allClubs]);
+  }, [profile, roles, activeClubId, setActiveClubId, allClubs, creatingTeam]);
 
   useEffect(() => {
     if (profile && !isAdmin && activeTab === 'setup') {
@@ -227,6 +258,26 @@ export default function Home() {
   }, [profile, isAdmin, activeTab]);
 
 
+
+  // Auto-redirect logic
+  useEffect(() => {
+    if (!profileLoading && profile && !creatingTeam) {
+      // Auto-redirect pure affiliates to partner portal
+      const hasActiveTeam = profile.team_id || profile.club_id;
+      if (!roles || roles.length === 0) {
+        if (profile.onboarding_completed && !hasActiveTeam) {
+          setActiveTab('referral');
+        }
+      }
+
+      // Auto-switch to player_hub if they are on an admin tab but are only a player
+      if (currentClubRole === 'player' && ['gameday', 'ledger', 'setup'].includes(activeTab)) {
+        setActiveTab('player_hub');
+      } else if (currentClubRole !== 'player' && activeTab === 'player_hub') {
+        setActiveTab('gameday');
+      }
+    }
+  }, [profileLoading, profile, roles, creatingTeam, currentClubRole, activeTab]);
 
   useEffect(() => {
     const handleNavigateSetup = (e: Event) => {
@@ -279,7 +330,9 @@ export default function Home() {
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
                       currentClubRole === 'club_admin' ? 'Account Admin' : 
-                      currentClubRole === 'team_admin' ? 'Team Admin' : 'Player';
+                      currentClubRole === 'team_admin' ? 'Team Admin' : 
+                      profile?.role === 'player' ? 'Player' :
+                      (!roles || roles.length === 0) ? 'Affiliate' : 'Player';
 
   const userMeta = session?.user?.user_metadata || {};
   const avatarUrl = userMeta?.avatar_url;
@@ -288,8 +341,9 @@ export default function Home() {
   
   let userInitials = 'U';
   try {
-    if (fullName && typeof fullName === 'string') {
-      const parts = fullName.trim().split(' ');
+    const nameToUse = profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : fullName;
+    if (nameToUse && typeof nameToUse === 'string') {
+      const parts = nameToUse.split(' ');
       userInitials = parts.length > 1 && parts[parts.length - 1]
         ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() 
         : parts[0].substring(0, 2).toUpperCase();
@@ -300,7 +354,7 @@ export default function Home() {
     userInitials = 'U'; 
   }
   
-  const displayFirstName = fullName?.split(' ')?.[0] || emailStr?.split('@')?.[0] || 'User';
+  const displayFirstName = profile?.first_name || fullName?.split(' ')?.[0] || emailStr?.split('@')?.[0] || 'User';
 
   return (
     <div className="flex flex-col h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
@@ -318,8 +372,8 @@ export default function Home() {
 
       <header className="shrink-0 p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-black z-40">
         <button 
-          onClick={() => uniqueClubs.length > 1 && setShowClubMenu(true)} 
-          className={`flex items-center gap-3 text-left ${uniqueClubs.length > 1 ? 'group cursor-pointer' : 'cursor-default'}`}
+          onClick={() => uniqueClubs.length > 1 ? setShowClubMenu(true) : null} 
+          className={`flex items-center gap-3 text-left group ${uniqueClubs.length > 1 ? 'cursor-pointer' : 'cursor-default'}`}
         >
           {clubMeta.logo ? (
             <img src={clubMeta.logo} className="w-9 h-9 rounded-lg object-cover border border-zinc-200 dark:border-zinc-800" alt="Account Logo" />
@@ -343,7 +397,7 @@ export default function Home() {
         </button>
       </header>
 
-      {showClubMenu && uniqueClubs.length > 1 && (
+      {showClubMenu && (
         <div className="fixed inset-0 z-[200] flex justify-center items-start pt-20 px-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowClubMenu(false)}></div>
           <div className="w-full max-w-[320px] bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl relative z-10 animate-in slide-in-from-top-4 fade-in duration-200 overflow-hidden">
@@ -391,12 +445,14 @@ export default function Home() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 relative z-30 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto">
+          {activeTab === "player_hub" && <div className="p-0"><PlayerHub /></div>}
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
           {activeTab === "team" && <div className="p-4"><Team /></div>}
           {activeTab === "my-team" && <div className="p-4"><MyTeam /></div>}
-          {activeTab === "history" && <div className="p-4"><SeasonHistory /></div>}
+          {activeTab === "history" && <div className="p-4"><SeasonHistory planTier={activeClub?.plan_tier} /></div>}
           {activeTab === "setup" && isAdmin && <div className="p-4"><Setup activeTab={setupTab} /></div>}
+          {activeTab === "referral" && <div className="p-4"><Referral /></div>}
         </div>
 
         {isDaiveOpen && (
@@ -407,18 +463,20 @@ export default function Home() {
       </main>
 
       {/* RESTORED BOTTOM NAVIGATION FOR PWA */}
-      {!isDaiveOpen && (
+      {!isDaiveOpen && (isSuperAdmin || (roles && roles.length > 0)) && currentClubRole !== 'player' && (
         <nav className="absolute bottom-0 left-0 w-full shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black z-40 pt-3 pb-2">
         <div className="flex text-[11px] max-w-[480px] mx-auto font-black uppercase text-zinc-500">
-          <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-stopwatch text-xl mb-1"></i><span>Match Hub</span>
-          </button>
-          <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-wallet text-xl mb-1"></i><span>Ledger</span>
-          </button>
-          <button onClick={() => setActiveTab("team")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "team" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
-            <i className="fa-solid fa-users text-xl mb-1"></i><span>Team Hub</span>
-          </button>
+            <>
+              <button onClick={() => handleTabChange("gameday")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "gameday" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+                <i className="fa-solid fa-stopwatch text-xl mb-1"></i><span>Game Day</span>
+              </button>
+              <button onClick={() => handleTabChange("ledger")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "ledger" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+                <i className="fa-solid fa-wallet text-xl mb-1"></i><span>Ledger</span>
+              </button>
+              <button onClick={() => setActiveTab("team")} className={`flex-1 flex flex-col items-center transition-colors ${activeTab === "team" && !isDaiveOpen ? "text-emerald-600 dark:text-emerald-500" : "hover:text-zinc-700 dark:hover:text-zinc-300"}`}>
+                <i className="fa-solid fa-users text-xl mb-1"></i><span>Team Hub</span>
+              </button>
+            </>
         </div>
       </nav>
       )}
@@ -451,8 +509,24 @@ export default function Home() {
                 {emailStr}
               </div>
               
-              <div className="mt-3 inline-block px-3 py-1 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
-                {displayRole}
+              <div className="flex justify-center items-center gap-2 mt-3">
+                <div className="inline-block px-3 py-1 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
+                  {displayRole}
+                </div>
+                {activeClub && activeClub.plan_tier && activeClub.plan_tier !== 'free' && currentClubRole !== 'player' && (
+                  <div className={`inline-block px-3 py-1 border rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${
+                    activeClub.plan_tier === 'pro' 
+                      ? 'bg-amber-100 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400'
+                      : 'bg-indigo-100 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-400'
+                  }`}>
+                    {activeClub.plan_tier} PLAN
+                  </div>
+                )}
+                {activeClub && (!activeClub.plan_tier || activeClub.plan_tier === 'free') && currentClubRole !== 'player' && (
+                  <div className="inline-block px-3 py-1 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
+                    FREE PLAN
+                  </div>
+                )}
               </div>
             </div>
 
@@ -472,6 +546,9 @@ export default function Home() {
                     <>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-sliders w-5 text-center"></i> Account Details
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('billing'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'billing' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Billing
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('payments'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'payments' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-credit-card w-5 text-center"></i> Payments
@@ -516,12 +593,8 @@ export default function Home() {
 
               {canManage && (
                 <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
-                  <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                    <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
-                  </button>
-
                   {/* MANUAL FORCE REFRESH FOR ADMINS (Bypass Cache) */}
-                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-4">
+                  <div className="mt-2">
                     <button onClick={applyUpdate} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
                       <i className="fa-solid fa-arrows-rotate w-5 text-center"></i> Force Update App
                     </button>
@@ -531,6 +604,29 @@ export default function Home() {
                   </div>
                 </div>
               )}
+
+              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                {(!roles || roles.length === 0 || currentClubRole === 'player') && activeTab !== 'player_hub' && (
+                  <button onClick={() => { setIsSidebarOpen(false); handleTabChange('player_hub'); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                    <i className="fa-solid fa-house w-5 text-center text-emerald-500"></i> Dashboard
+                  </button>
+                )}
+                <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                  <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
+                </button>
+                <button onClick={() => { setIsSidebarOpen(false); handleTabChange('referral'); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                  <i className="fa-solid fa-gift w-5 text-center text-emerald-500"></i> Refer a Friend
+                </button>
+                <button 
+                  onClick={() => { 
+                    setIsSidebarOpen(false); 
+                    setShowNewAccountModal(true); 
+                  }} 
+                  className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300"
+                >
+                  <i className="fa-solid fa-plus w-5 text-center text-zinc-400"></i> Register New Account
+                </button>
+              </div>
             </div>
 
             <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
@@ -541,6 +637,89 @@ export default function Home() {
             <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
               <button onClick={handleLogout} className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-3">
                 <i className="fa-solid fa-arrow-right-from-bracket"></i> Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW ACCOUNT MODAL */}
+      {showNewAccountModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowNewAccountModal(false)}></div>
+          <div className="bg-white dark:bg-[#111] rounded-3xl w-full max-w-sm relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border-4 border-white dark:border-[#111] shadow-lg">
+                <i className="fa-solid fa-sitemap"></i>
+              </div>
+              <h3 className="text-xl font-black uppercase italic tracking-tighter text-zinc-900 dark:text-white mb-2">Register New Account?</h3>
+              {(!roles || roles.length === 0) ? (
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                  Are you sure you want to register a new team? This will begin the setup process for a new team.
+                </p>
+              ) : (
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                  Create a new account if you want new teams & players <span className="font-bold">separate to your current team</span>.
+                  <br/><br/>
+                  If you wish to add a new team to this account, please contact your Account Admin.
+                </p>
+              )}
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => {
+                    setShowNewAccountModal(false);
+                    setActiveClubId(null);
+                    setActiveTab('gameday');
+                    sessionStorage.setItem('activeTab', 'gameday');
+                    sessionStorage.setItem('creating_team', 'true');
+                    setCreatingTeam(true);
+                  }}
+                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm transition-colors shadow-lg shadow-emerald-500/25"
+                >
+                  Yes, Create Account
+                </button>
+                <button onClick={() => setShowNewAccountModal(false)} className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-2xl font-black uppercase tracking-widest text-sm transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REFERRAL MODAL */}
+      {showReferralModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReferralModal(false)}></div>
+          <div className="bg-white dark:bg-[#111] rounded-3xl w-full max-w-sm relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border-4 border-white dark:border-[#111] shadow-lg">
+                <i className="fa-solid fa-gift"></i>
+              </div>
+              <h3 className="text-xl font-black uppercase italic tracking-tighter text-center text-zinc-900 dark:text-white mb-2">Refer a Friend</h3>
+              <p className="text-sm text-center text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                Invite friends and earn rewards when they join and lock in matches!
+              </p>
+              
+              <div className="bg-zinc-50 dark:bg-zinc-900 p-4 rounded-2xl mb-6 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Your Personal Link</div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    readOnly 
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/register?ref=${profile?.referral_code || ''}`}
+                    className="flex-1 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none"
+                  />
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/register?ref=${profile?.referral_code || ''}`)}
+                    className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600 transition-colors shrink-0"
+                  >
+                    <i className="fa-regular fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+              
+              <button onClick={() => setShowReferralModal(false)} className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-2xl font-black uppercase tracking-widest text-sm transition-colors">
+                Close
               </button>
             </div>
           </div>

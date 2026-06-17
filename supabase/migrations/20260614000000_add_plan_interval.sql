@@ -1,0 +1,1 @@
+ALTER TABLE clubs ADD COLUMN IF NOT EXISTS plan_interval VARCHAR(20) DEFAULT 'monthly';

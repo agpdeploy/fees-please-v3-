@@ -11,9 +11,10 @@ interface ClientProps {
   clubId: string;
   teamName: string;
   initialPlayerId?: string;
+  isEmbedded?: boolean;
 }
 
-export default function TeamAvailabilityClient({ teamId, clubId, teamName, initialPlayerId }: ClientProps) {
+export default function TeamAvailabilityClient({ teamId, clubId, teamName, initialPlayerId, isEmbedded = false }: ClientProps) {
   const [teamInfo, setTeamInfo] = useState<any>({ team_id: teamId, team_name: teamName });
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -38,30 +39,32 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
   useEffect(() => {
     async function loadPublicData() {
       try {
-        // 🚨 FIX: Use .maybeSingle() so it doesn't crash if the profile isn't saved yet
-        const { data: publicProfile } = await supabase
+        // 🚨 FIX: Use .limit(1) so it doesn't crash if the profile isn't saved yet or blocked by RLS
+        const { data: publicProfileArr } = await supabase
           .from("public_team_profiles")
           .select("*")
           .eq("team_id", teamId)
-          .maybeSingle();
+          .limit(1);
+        const publicProfile = publicProfileArr?.[0] || null;
         
         // If it exists, overwrite our fallback data with the real logos/sponsors
         if (publicProfile) {
           setTeamInfo(publicProfile);
         }
 
-        const [clubRes, teamCountRes, playerRes] = await Promise.all([
-          supabase.from('clubs').select('announcement').eq('id', clubId).maybeSingle(),
+        const [clubResArr, teamCountRes, playerRes] = await Promise.all([
+          supabase.from('clubs').select('announcement').eq('id', clubId).limit(1),
           supabase.from('teams').select('id', { count: 'exact', head: true }).eq('club_id', clubId),
-          supabase.from("players").select("id, first_name, last_name, nickname, default_team_id").eq("club_id", clubId).order("first_name")
+          supabase.from("players").select("id, user_id, first_name, last_name, nickname, default_team_id").eq("club_id", clubId).order("first_name")
         ]);
 
+        const clubRes = { data: clubResArr?.data?.[0] || null };
         if (clubRes.data?.announcement) setClubAnnouncement(clubRes.data.announcement);
         setHasMultipleTeams((teamCountRes.count || 0) > 1);
         if (playerRes.data) {
           setAllClubPlayers(playerRes.data);
           if (initialPlayerId) {
-            const player = playerRes.data.find((p: any) => p.id === initialPlayerId);
+            const player = playerRes.data.find((p: any) => p.user_id === initialPlayerId || p.id === initialPlayerId);
             if (player) setSelectedPlayer(player);
           }
         }
@@ -216,7 +219,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-6 transition-colors">
+      <div className={`${isEmbedded ? 'py-20' : 'min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] transition-colors'} flex flex-col items-center justify-center p-6`}>
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -224,7 +227,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
   if (!teamInfo) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-6 transition-colors">
+      <div className={`${isEmbedded ? 'py-20' : 'min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] transition-colors'} flex flex-col items-center justify-center p-6`}>
         <h1 className="text-zinc-900 dark:text-white font-black uppercase text-xl">Team Not Found</h1>
         <p className="text-zinc-500 text-sm mt-2 text-center max-w-xs">Make sure the URL is correct, or ask your manager to hit 'Save' on the Team Settings.</p>
       </div>
@@ -232,7 +235,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] text-zinc-900 dark:text-white pb-6 font-sans transition-colors relative">
+    <div className={`${isEmbedded ? 'pb-6 relative' : 'min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] pb-6 relative'} text-zinc-900 dark:text-white font-sans transition-colors`}>
       {clubAnnouncement && (
         <div className="w-full bg-emerald-600 text-white px-4 py-2.5 text-center text-xs font-bold shadow-sm flex items-center justify-center gap-2 relative z-50">
           <i className="fa-solid fa-bullhorn"></i> {clubAnnouncement}

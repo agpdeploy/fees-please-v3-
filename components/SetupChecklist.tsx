@@ -23,10 +23,13 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [dismissedSteps, setDismissedSteps] = useState<Record<string, boolean>>({});
 
   // Club Creation State
-  const [ownerFirstName, setOwnerFirstName] = useState(user?.full_name?.split(' ')[0] || "");
-  const [ownerLastName, setOwnerLastName] = useState(user?.full_name?.split(' ').slice(1).join(' ') || "");
+  const [ownerFirstName, setOwnerFirstName] = useState(user?.full_name ? user.full_name.split(' ')[0] : "");
+  const [ownerLastName, setOwnerLastName] = useState(user?.full_name ? user.full_name.split(' ').slice(1).join(' ') : "");
   const [teamName, setTeamName] = useState("");
   const [sportType, setSportType] = useState("");
+  const [clubEmail, setClubEmail] = useState("");
+  const [clubWebsite, setClubWebsite] = useState("");
+  const [clubAddress, setClubAddress] = useState("");
   const [showSportsDropdown, setShowSportsDropdown] = useState(false);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [clubCreateError, setClubCreateError] = useState("");
@@ -154,7 +157,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     checkStatus();
   }, [activeClubId]);
 
-  const hasSeason = !!clubInfo?.season_name && !!clubInfo?.season_start && !!clubInfo?.season_end && clubInfo?.default_umpire_fee != null && teamsCount > 0 && teams[0].member_fee != null;
+  const hasSeason = !!clubInfo?.season_name && !!clubInfo?.season_start && !!clubInfo?.season_end && clubInfo?.default_umpire_fee != null && teamsCount > 0 && memberFee !== "";
   const hasLogo = !!clubInfo?.logo;
   const hasTeams = teamsCount > 0;
   const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
@@ -164,22 +167,32 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     { id: 'logo', title: 'Upload Club Logo', icon: 'fa-image', completed: !!clubInfo?.logo, required: false },
     { id: 'players', title: 'Add Players', icon: 'fa-users', completed: hasPlayers, required: true },
     { id: 'season', title: 'Season Setup', icon: 'fa-calendar', completed: hasSeason, required: true },
-    { id: 'fixtures', title: 'Add Matches', icon: 'fa-list-ol', completed: hasFixtures, required: false },
-    { id: 'financials', title: 'Financials', icon: 'fa-sack-dollar', completed: hasFinancials, required: true }
+    { id: 'fixtures', title: 'Add Fixtures', icon: 'fa-list-ol', completed: hasFixtures, required: false },
+    { id: 'financials', title: 'Payment Methods', icon: 'fa-sack-dollar', completed: hasFinancials, required: true }
   ];
 
-  const allRequiredCompleted = steps.filter(s => s.required).every(s => s.completed);
-
-  useEffect(() => {
-    if (allRequiredCompleted) {
-      const timer = setTimeout(() => {
-        onDismiss();
-      }, 1000);
-      return () => clearTimeout(timer);
+  const advanceToNextUncompleted = (afterStepId: string) => {
+    const startIndex = steps.findIndex(s => s.id === afterStepId);
+    if (startIndex === -1) return;
+    for (let i = startIndex + 1; i < steps.length; i++) {
+      if (!steps[i].completed && steps[i].id !== afterStepId) {
+        setExpandedStep(steps[i].id);
+        return;
+      }
     }
-  }, [allRequiredCompleted, onDismiss]);
+    for (let i = 0; i < startIndex; i++) {
+      if (!steps[i].completed && steps[i].id !== afterStepId) {
+        setExpandedStep(steps[i].id);
+        return;
+      }
+    }
+    setExpandedStep(null);
+  };
 
   const visibleSteps = steps.filter(s => {
+    if (isPlayhqImported || isPlayhq) {
+       if (['club', 'logo', 'fixtures'].includes(s.id)) return false;
+    }
     if (setupPath === 'playhq') {
        if (!['players', 'season', 'financials'].includes(s.id)) return false;
        return true;
@@ -187,13 +200,20 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
        if (!activeClubId && s.id !== 'club') return false;
        if (s.id === 'logo' && dismissedSteps['logo']) return false;
        if (s.id === 'fixtures' && dismissedSteps['fixtures']) return false;
-       if (isPlayhqImported && ['club', 'logo', 'fixtures'].includes(s.id)) return false;
        return true;
     }
   });
+  
   const allCompleted = visibleSteps.every(s => s.completed) && visibleSteps.length > 0;
 
-  // Removed automatic onDismiss to prevent unexpected reloads
+  useEffect(() => {
+    if (allCompleted) {
+      const timer = setTimeout(() => {
+        onDismiss();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [allCompleted, onDismiss]);
 
   const handlePlayhqImport = async () => {
     if (!playhqUrl) return;
@@ -237,7 +257,11 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             season_name: data.seasonName || null,
             season_start: data.seasonStart || null,
             season_end: data.seasonEnd || null,
+            default_casual_fee: null,
+            default_member_fee: null,
             default_umpire_fee: null,
+            expense_label: null,
+            income_label: null,
             settings: { playhq_tenant: playhqTenant, playhq_org_id: playhqOrgId }
           }]).select().single();
         if (clubError) throw clubError;
@@ -246,6 +270,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         const { data: teamData, error: teamError } = await supabase
           .from('teams').insert([{ 
             name: data.clubName, club_id: clubData.id, owner_id: user.id, slug: `${clubSlug}-team`,
+            member_fee: null,
+            casual_fee: null,
             settings: { playhq_url: playhqUrl }
           }]).select().single();
         if (teamError) throw teamError;
@@ -342,7 +368,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       if (user.full_name !== `${ownerFirstName} ${ownerLastName}`) {
         await supabase.auth.updateUser({ data: { full_name: `${ownerFirstName} ${ownerLastName}` } });
       }
-      await supabase.from('profiles').update({ has_onboarded: true }).eq('id', user.id);
+      await supabase.from('profiles').update({ has_onboarded: true, full_name: `${ownerFirstName} ${ownerLastName}` }).eq('id', user.id);
 
       const baseSlug = teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       const clubSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
@@ -350,6 +376,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       const { data: clubData, error: clubError } = await supabase
         .from('clubs').insert([{ 
           name: teamName, owner_id: user.id, slug: clubSlug, is_club: false, club_cat: "Other", entity_type: "Team", sport_type: sportType,
+          settings: { public_email: clubEmail || null, public_website: clubWebsite || null, public_address: clubAddress || null },
           season_name: null, default_casual_fee: null, default_member_fee: null, default_umpire_fee: null, expense_label: null, income_label: null
         }]).select().single();
       if (clubError) throw clubError;
@@ -448,7 +475,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         clubInfo.logo = data.publicUrl;
       }
 
-      setExpandedStep('players');
+      advanceToNextUncompleted('logo');
     } catch (err) {
       console.error(err);
       alert("Error uploading logo");
@@ -645,7 +672,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     setIsSavingPlayer(false);
     if (!error) {
       setHasPlayers(true);
-      setExpandedStep('fixtures');
+      advanceToNextUncompleted('players');
       setDraftPlayers([]);
     } else {
       alert("Error saving players");
@@ -674,7 +701,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     setIsSavingPlayer(false);
     if (!error) {
       setHasPlayers(true);
-      setExpandedStep('fixtures');
+      advanceToNextUncompleted('players');
     } else {
       alert("Error saving player: " + error.message);
     }
@@ -795,7 +822,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       setFixtureNeedsAlias(false);
       setFixtureCachedUpload(null);
       setFixtureDrawAlias("");
-      setExpandedStep('financials');
+      advanceToNextUncompleted('fixtures');
     }
   };
 
@@ -821,7 +848,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     setIsSavingFixture(false);
     if (!error) {
       setHasFixtures(true);
-      setExpandedStep('financials');
+      advanceToNextUncompleted('fixtures');
     } else {
       alert("Error saving fixture: " + error.message);
     }
@@ -885,7 +912,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
     
     setIsSavingSeason(false);
-    setExpandedStep('fixtures');
+    advanceToNextUncompleted('season');
   };
 
   // --- FINANCIALS ---
@@ -932,7 +959,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
     
     setIsSavingFinancials(false);
-    setExpandedStep(null);
+    advanceToNextUncompleted('financials');
   };
 
   if (loading) return null;
@@ -941,19 +968,23 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   return (
     <div className="mb-8 animate-in slide-in-from-top-4 relative">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-center items-center mb-6 text-center">
         <div>
-          <h3 className="font-black uppercase tracking-widest text-zinc-900 dark:text-white text-lg mb-1 flex items-center gap-2">
-            <i className="fa-solid fa-rocket text-emerald-500"></i> Get Started
+          <h3 className={`font-black text-xl mb-1 flex items-center justify-center gap-2 ${isPlayhqImported || isPlayhq ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-white'}`}>
+            {isPlayhqImported || isPlayhq 
+              ? 'Success!' 
+              : setupPath === 'playhq' 
+                ? 'Import from PlayHQ' 
+                : 'Get Started'}
           </h3>
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Set up your account with teams, fixtures, players and payment methods.</p>
+          <p className="text-sm font-bold text-zinc-500">
+            {isPlayhqImported || isPlayhq
+              ? 'Your team & fixtures have been successfully added from PlayHQ. Now add your Players and Financial Settings to complete your setup.'
+              : setupPath === 'playhq' 
+                ? 'Paste your public team URL to instantly fetch your team logo and upcoming fixtures.' 
+                : 'Set up your account with teams, fixtures, players and payment methods.'}
+          </p>
         </div>
-        <button 
-          onClick={onDismiss}
-          className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-200 dark:hover:border-emerald-800 px-4 py-2 rounded-full shadow-sm"
-        >
-          Dismiss All
-        </button>
       </div>
 
       {!setupPath ? (
@@ -965,19 +996,19 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             </div>
             <div className="flex-1 relative">
               <h3 className="font-black text-sm text-zinc-900 dark:text-white uppercase tracking-widest mb-1 group-hover:text-[#0051e5] transition-colors">PlayHQ Setup</h3>
-              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-snug">Fetch your team, logo and fixtures from a PlayHQ URL.</p>
+              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-snug">Quick start using your public PlayHQ team url.</p>
             </div>
             <i className="fa-solid fa-chevron-right text-zinc-300 dark:text-zinc-700 group-hover:text-[#0051e5] transition-colors ml-4 text-lg"></i>
           </button>
 
           <button onClick={() => setSetupPath('manual')} className="group relative flex items-center p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-emerald-500 hover:shadow-md transition-all text-left w-full overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative h-14 w-14 rounded-full flex items-center justify-center bg-white border border-zinc-100 dark:border-zinc-800 shadow-sm mr-4 shrink-0 group-hover:scale-105 transition-transform">
-              <i className="fa-solid fa-keyboard text-xl text-zinc-700 dark:text-zinc-300"></i>
+            <div className="relative h-14 w-14 rounded-full overflow-hidden flex items-center justify-center bg-[#09B67A] border border-zinc-100 dark:border-zinc-800 shadow-sm mr-4 shrink-0 group-hover:scale-105 transition-transform">
+              <img src="/branding/icon-192.png" alt="Fees Please" className="w-full h-full object-cover scale-[0.85]" />
             </div>
             <div className="flex-1 relative">
               <h3 className="font-black text-sm text-zinc-900 dark:text-white uppercase tracking-widest mb-1 group-hover:text-emerald-600 transition-colors">Standard Setup</h3>
-              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-snug">Create your team, logo and fixtures manually or via dAIve.</p>
+              <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 leading-snug">Set up your account fast with Fees Please.</p>
             </div>
             <i className="fa-solid fa-chevron-right text-zinc-300 dark:text-zinc-700 group-hover:text-emerald-500 transition-colors ml-4 text-lg"></i>
           </button>
@@ -1006,16 +1037,31 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                      </button>
                    </div>
                  )}
-                 <div className="flex flex-col gap-2">
-                   <input type="url" value={playhqUrl} onChange={e => setPlayhqUrl(e.target.value)} placeholder="Paste PlayHQ Team URL..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 dark:text-white outline-none focus:border-[#0051e5] transition-colors shadow-sm" />
-                   <button onClick={handlePlayhqImport} disabled={!playhqUrl || isImportingPlayhq} className="relative overflow-hidden w-full py-3 bg-[#0051e5] hover:bg-[#0041b5] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 shadow-sm">
-                     {isImportingPlayhq ? (
-                       <div className="absolute inset-0 flex items-center justify-center bg-[#0051e5]">
-                         <img src="/branding/playhq_Logow.png" alt="PlayHQ" className="h-5 w-auto animate-pulse" />
+                 {isImportingPlayhq ? (
+                   <div className="flex flex-col items-center justify-center py-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm text-center">
+                     <div className="relative h-16 w-16 mb-4 flex items-center justify-center">
+                       <div className="absolute inset-0 bg-[#0051e5]/20 rounded-full animate-ping"></div>
+                       <div className="relative bg-white h-12 w-12 rounded-full flex items-center justify-center shadow-sm border border-zinc-100 dark:border-zinc-800 z-10">
+                         <img src="/branding/playhq_Logo.svg" alt="PlayHQ" className="h-8 w-8 object-contain animate-pulse" />
                        </div>
-                     ) : "Import Team"}
-                   </button>
-                 </div>
+                     </div>
+                     <h4 className="font-black text-sm text-[#0051e5] uppercase tracking-widest mb-1">Importing team from PlayHQ</h4>
+                     <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Fetching logo and fixtures...</p>
+                   </div>
+                 ) : (
+                   <div className="flex flex-col gap-2">
+                     <input type="url" value={playhqUrl} onChange={e => setPlayhqUrl(e.target.value)} placeholder="Paste PlayHQ Team URL..." className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-900 dark:text-white outline-none focus:border-[#0051e5] transition-colors shadow-sm" />
+                     <div className="text-center mb-1">
+                       <span className="text-[10px] font-bold text-zinc-400">Example reference: </span>
+                       <a href="https://www.playhq.com/cricket-australia/org/ferny-districts-cricket-club/462e4428/senior-competition-winter-2026/teams/ferny-districts-bin-chickens/b7cf852d" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#0051e5] hover:underline">
+                         Ferny Districts Bin Chickens
+                       </a>
+                     </div>
+                     <button onClick={handlePlayhqImport} disabled={!playhqUrl} className="relative overflow-hidden w-full py-3 bg-[#0051e5] hover:bg-[#0041b5] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 shadow-sm">
+                       Import Team
+                     </button>
+                   </div>
+                 )}
                  {playhqImportError && <p className="text-red-500 text-[10px] font-bold mt-2 text-center">{playhqImportError}</p>}
               </div>
             )}
@@ -1023,13 +1069,13 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       {(setupPath !== 'playhq' || isPlayhqImported || activeClubId) && (
         <div className="space-y-3">
           {visibleSteps.map(step => (
-            <div key={step.id} className={`flex flex-col p-3.5 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-600 border-emerald-700 shadow-sm' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
+            <div key={step.id} className={`flex flex-col p-4 rounded-xl border transition-colors ${step.completed ? 'bg-emerald-600 border-emerald-700 shadow-sm' : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${step.completed ? 'bg-white text-emerald-600 shadow-sm' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-400'}`}>
                   {step.completed ? <i className="fa-solid fa-check text-[10px]"></i> : <span className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-500"></span>}
                 </div>
-                <span className={`text-xs font-bold ${step.completed ? 'text-white' : 'text-zinc-900 dark:text-white'}`}>
+                <span className={`text-sm font-bold ${step.completed ? 'text-white' : 'text-zinc-900 dark:text-white'}`}>
                   {step.title}
                 </span>
               </div>
@@ -1062,40 +1108,53 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {step.id === 'club' && !activeClubId && (
                   <form onSubmit={handleCreateClub} className="space-y-4">
                     <div>
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-3">Your Details</h4>
+                      <h4 className="text-xs text-zinc-500 uppercase font-black tracking-widest mb-4">Your Details</h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">First Name</label>
-                          <input type="text" value={ownerFirstName} onChange={(e) => setOwnerFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="First Name" required />
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">First Name</label>
+                          <input type="text" value={ownerFirstName} onChange={(e) => setOwnerFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="First Name" required />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Last Name</label>
-                          <input type="text" value={ownerLastName} onChange={(e) => setOwnerLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="Last Name" required />
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Last Name</label>
+                          <input type="text" value={ownerLastName} onChange={(e) => setOwnerLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="Last Name" required />
                         </div>
                       </div>
                     </div>
-                    <div className="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800">
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-3 mt-4">Team Details</h4>
+                    <div className="pt-4 mt-4 border-t border-zinc-100 dark:border-zinc-800">
+                      <h4 className="text-xs text-zinc-500 uppercase font-black tracking-widest mb-4">Team Details</h4>
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Team Name</label>
-                          <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. The Mighty Ducks" required />
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Team Name</label>
+                          <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. The Mighty Ducks" required />
                         </div>
                         <div className="relative">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 ml-1">Sport Type</label>
-                          <input type="text" value={sportType} onChange={(e) => { setSportType(e.target.value); setShowSportsDropdown(true); }} onFocus={() => setShowSportsDropdown(true)} onBlur={() => setTimeout(() => setShowSportsDropdown(false), 200)} placeholder="e.g. Football / Soccer" className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" required />
-                      {showSportsDropdown && (
-                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg max-h-48 overflow-y-auto py-2">
-                          {predefinedSports.filter(s => s.toLowerCase().includes(sportType.toLowerCase())).map(s => (
-                            <div key={s} className="px-4 py-2 text-xs font-bold text-zinc-900 dark:text-white hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer transition-colors" onClick={() => { setSportType(s); setShowSportsDropdown(false); }}>{s}</div>
-                          ))}
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Sport Type</label>
+                          <input type="text" value={sportType} onChange={(e) => { setSportType(e.target.value); setShowSportsDropdown(true); }} onFocus={() => setShowSportsDropdown(true)} onBlur={() => setTimeout(() => setShowSportsDropdown(false), 200)} placeholder="e.g. Football / Soccer" className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" required />
+                          {showSportsDropdown && (
+                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg max-h-48 overflow-y-auto py-2">
+                              {predefinedSports.filter(s => s.toLowerCase().includes(sportType.toLowerCase())).map(s => (
+                                <div key={s} className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-white hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer transition-colors" onClick={() => { setSportType(s); setShowSportsDropdown(false); }}>{s}</div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
+
+                        <div>
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Email <span className="text-[10px] text-zinc-400 font-bold lowercase tracking-normal ml-1">(Optional)</span></label>
+                          <input type="email" value={clubEmail} onChange={(e) => setClubEmail(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. contact@yourteam.com" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Website <span className="text-[10px] text-zinc-400 font-bold lowercase tracking-normal ml-1">(Optional)</span></label>
+                          <input type="url" value={clubWebsite} onChange={(e) => setClubWebsite(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. https://yourteam.com" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Main Address <span className="text-[10px] text-zinc-400 font-bold lowercase tracking-normal ml-1">(Optional)</span></label>
+                          <input type="text" value={clubAddress} onChange={(e) => setClubAddress(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" placeholder="e.g. 123 Sports Court, City" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
                 {clubCreateError && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest text-center mt-2">{clubCreateError}</div>}
-                <button type="submit" disabled={isCreatingClub} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4 group">
+                <button type="submit" disabled={isCreatingClub} className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-6 group">
                       {isCreatingClub ? "Setting up..." : "Let's Go"}
                     </button>
                   </form>
@@ -1126,32 +1185,32 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {/* Players Inline */}
                 {step.id === 'players' && (
                   <div>
-                    <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-4 transition-colors">
-                      <button onClick={() => setPlayerMode('daive')} className={`flex-1 py-2 text-[9px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${playerMode === 'daive' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> dAIve
-                      </button>
-                      <button onClick={() => setPlayerMode('manual')} className={`flex-1 py-2 text-[9px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${playerMode === 'manual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
-                        <i className="fa-solid fa-keyboard"></i> MANUAL
-                      </button>
-                    </div>
+                      <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-4 transition-colors">
+                        <button onClick={() => setPlayerMode('daive')} className={`flex-1 py-3 text-xs font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${playerMode === 'daive' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                          <i className="fa-solid fa-wand-magic-sparkles"></i> SMART IMPORT
+                        </button>
+                        <button onClick={() => setPlayerMode('manual')} className={`flex-1 py-3 text-xs font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${playerMode === 'manual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                          <i className="fa-solid fa-keyboard"></i> MANUAL
+                        </button>
+                      </div>
 
                     {playerMode === 'daive' ? (
                       draftPlayers.length === 0 ? (
                         isExtracting ? (
                           <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
                             <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-500 animate-pulse mb-4"></i>
-                            <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-[10px] text-center">{loadingText}</p>
+                            <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-xs text-center">{loadingText}</p>
                           </div>
                         ) : (
-                          <div key="daive-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                          <div key="daive-upload" className="relative text-center p-8 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
                             {daiveError && <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">{daiveError}</div>}
                             <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveUpload} disabled={isExtracting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                            <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
+                            <i className="fa-solid fa-wand-magic-sparkles text-3xl text-emerald-500 mb-3"></i>
                             <div className="flex flex-col items-center">
-                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">
+                              <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">
                                 Upload Image, PDF, or CSV
                               </p>
-                              <p className="text-[9px] text-zinc-500 font-bold max-w-[200px] text-center leading-snug">
+                              <p className="text-[10px] text-zinc-500 font-bold max-w-[220px] text-center leading-snug">
                                 Upload a screenshot, photo, or CSV file of your team roster. Include email addresses if you have them.
                               </p>
                             </div>
@@ -1220,41 +1279,41 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         </div>
                       )
                     ) : (
-                      <div key="manual-entry" className="space-y-3">
-                        <div className="flex flex-col gap-2">
+                      <div key="manual-entry" className="space-y-4">
+                        <div className="flex flex-col gap-4">
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">First Name</label>
-                            <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">First Name</label>
+                            <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Last Name</label>
-                            <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Last Name</label>
+                            <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Nickname</label>
-                            <input type="text" placeholder="Nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Nickname</label>
+                            <input type="text" placeholder="Nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Mobile Number</label>
-                            <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Mobile Number</label>
+                            <input type="tel" placeholder="Mobile Number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Email Address</label>
-                            <input type="email" placeholder="Email Address" value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Email Address</label>
+                            <input type="email" placeholder="Email Address" value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                         </div>
                         
-                        <div className="flex items-center justify-between border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800 transition-colors">
-                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
+                        <div className="flex items-center justify-between border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 bg-zinc-50 dark:bg-zinc-800/50 transition-colors">
+                           <span className="text-xs font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Status</span>
                            <button 
                              onClick={() => setIsMember(!isMember)}
-                             className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'}`}
+                             className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-sm ${isMember ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'}`}
                            >
                              {isMember ? 'MEMBER' : 'CASUAL'}
                            </button>
                         </div>
 
-                        <button disabled={isSavingPlayer || !firstName} onClick={handleSavePlayerManual} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+                        <button disabled={isSavingPlayer || !firstName} onClick={handleSavePlayerManual} className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-6">
                           {isSavingPlayer ? 'Saving...' : 'Add Player'}
                         </button>
                       </div>
@@ -1266,10 +1325,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {step.id === 'fixtures' && (
                   <div>
                     <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 mb-4 transition-colors">
-                      <button onClick={() => setFixtureMode('daive')} className={`flex-1 py-2 text-[9px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${fixtureMode === 'daive' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> dAIve
+                      <button onClick={() => setFixtureMode('daive')} className={`flex-1 py-3 text-xs font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${fixtureMode === 'daive' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> SMART IMPORT
                       </button>
-                      <button onClick={() => setFixtureMode('manual')} className={`flex-1 py-2 text-[9px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${fixtureMode === 'manual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                      <button onClick={() => setFixtureMode('manual')} className={`flex-1 py-3 text-xs font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${fixtureMode === 'manual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
                         <i className="fa-solid fa-keyboard"></i> MANUAL
                       </button>
                     </div>
@@ -1280,14 +1339,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                           isExtractingFixture ? (
                             <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
                               <i className="fa-solid fa-wand-magic-sparkles text-4xl text-emerald-500 animate-pulse mb-4"></i>
-                              <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-[10px] text-center">{loadingText}</p>
+                              <p className="font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 animate-pulse text-xs text-center">{loadingText}</p>
                             </div>
                           ) : (
-                            <div key="daive-fixture-upload" className="relative text-center p-6 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                            <div key="daive-fixture-upload" className="relative text-center p-8 border-2 border-dashed border-emerald-500/50 rounded-xl bg-white dark:bg-zinc-800 cursor-pointer hover:bg-emerald-50/50 transition-colors">
                               {daiveError && <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">{daiveError}</div>}
                               <input type="file" accept="image/*,.csv,.pdf" onChange={handleDaiveFixtureUpload} disabled={isExtractingFixture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                              <i className="fa-solid fa-wand-magic-sparkles text-2xl text-emerald-500 mb-2"></i>
-                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400">
+                              <i className="fa-solid fa-wand-magic-sparkles text-3xl text-emerald-500 mb-3"></i>
+                              <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">
                                 Upload Master Draw (PDF/IMG/CSV)
                               </p>
                             </div>
@@ -1356,27 +1415,27 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         </div>
                       )
                     ) : (
-                      <div key="manual-fixture-entry" className="space-y-3">
-                        <div className="flex flex-col gap-2">
+                      <div key="manual-fixture-entry" className="space-y-4">
+                        <div className="flex flex-col gap-4">
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Opponent Name</label>
-                            <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Opponent Name</label>
+                            <input type="text" placeholder="Opponent Name" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Date</label>
-                            <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Date</label>
+                            <input type="date" value={matchDate} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Time</label>
-                            <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Time</label>
+                            <input type="text" placeholder="Time (e.g. 1:00 PM)" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Location</label>
-                            <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                            <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Location</label>
+                            <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors shadow-sm" />
                           </div>
                         </div>
                         
-                        <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixtureManual} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+                        <button disabled={isSavingFixture || !opponent || !matchDate} onClick={handleSaveFixtureManual} className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-6">
                           {isSavingFixture ? 'Saving...' : 'Save Fixture'}
                         </button>
                       </div>
@@ -1387,48 +1446,48 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {/* Season Details */}
                 {step.id === 'season' && (
                   <div className="space-y-4">
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
+                    <div className="p-5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-4">
                       <div>
-                        <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Season Name</label>
-                        <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                        <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Season Name</label>
+                        <input type="text" placeholder="e.g. Winter 2026" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} disabled={isPlayhqImported || isPlayhq} className={`w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors ${(isPlayhqImported || isPlayhq) ? 'opacity-70 cursor-not-allowed' : ''}`} />
                       </div>
                       
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-3">
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Start Date</label>
-                          <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Start Date</label>
+                          <input type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
                         </div>
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">End Date</label>
-                          <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">End Date</label>
+                          <input type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
                         </div>
                       </div>
                     </div>
 
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Defaults & Labels</h4>
+                    <div className="p-5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-4">
+                      <h4 className="text-xs text-zinc-500 uppercase font-black tracking-widest mb-3">Defaults & Labels</h4>
                       
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-4">
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Player Match Fee ($)</label>
-                          <input type="number" value={memberFee} onChange={(e) => setMemberFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Player Match Fee ($)</label>
+                          <input type="number" value={memberFee} onChange={(e) => setMemberFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Label</label>
-                          <input type="text" placeholder="e.g. Match Fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                          <p className="text-[9px] text-zinc-400 mt-1 font-bold leading-snug">This is for your match expenses that are not player fees (e.g., ground/court hire, umpire fees).</p>
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Match Expense Label</label>
+                          <input type="text" placeholder="e.g. Match Fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <p className="text-[10px] text-zinc-400 mt-1.5 font-bold leading-snug">This is for your match expenses that are not player fees (e.g., ground/court hire, umpire fees).</p>
                         </div>
                         
                         <div>
-                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Match Expense Amount ($)</label>
-                          <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                          <p className="text-[8px] text-zinc-400 mt-1 uppercase tracking-widest font-black leading-tight">E.G. GROUND FEES, COURT HIRE, UMPIRE FEES</p>
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Match Expense Amount ($)</label>
+                          <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                          <p className="text-[9px] text-zinc-400 mt-1.5 uppercase tracking-widest font-black leading-tight">E.G. GROUND FEES, COURT HIRE, UMPIRE FEES</p>
                         </div>
                       </div>
                     </div>
 
-                    <button onClick={handleSaveSeason} disabled={isSavingSeason || !seasonName || memberFee === ""} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4">
+                    <button onClick={handleSaveSeason} disabled={isSavingSeason || !seasonName || memberFee === ""} className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-6">
                       {isSavingSeason ? 'Saving...' : 'Save Settings'}
                     </button>
                   </div>
@@ -1460,8 +1519,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                       )}
                     </div>
 
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3 mb-4">
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2">Accepted Payment Methods</h4>
+                    <div className="p-5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-4 mb-4">
+                      <h4 className="text-xs text-zinc-500 uppercase font-black tracking-widest mb-3">Accepted Payment Methods</h4>
                       <div className="flex gap-4">
                         <label className="flex items-center gap-3 cursor-pointer">
                           <div className={`w-10 h-6 rounded-full p-1 transition-colors ${acceptsCash ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
@@ -1497,17 +1556,17 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                       </div>
                     </div>
 
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-3">
-                      <h4 className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-1">Manual Payment Fallback</h4>
-                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold mb-3 leading-relaxed">If you skip Square, players can self-report payments using these details.</p>
+                    <div className="p-5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors space-y-4">
+                      <h4 className="text-xs text-zinc-500 uppercase font-black tracking-widest mb-2">Manual Payment Fallback</h4>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold mb-4 leading-relaxed">If you skip Square, players can self-report payments using these details.</p>
                       
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-3">
                         <div className="w-full">
-                          <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Type</label>
+                          <label className="text-[10px] text-zinc-500 uppercase font-black ml-1 block mb-2">Type</label>
                           <select 
                             value={payIdType || ""} 
                             onChange={(e) => setPayIdType(e.target.value as any)} 
-                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors"
                           >
                             <option value="mobile">PayID (Mobile)</option>
                             <option value="email">PayID (Email)</option>
@@ -1515,20 +1574,20 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                           </select>
                         </div>
                         <div className="w-full">
-                          <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Details</label>
+                          <label className="text-[10px] text-zinc-500 uppercase font-black ml-1 block mb-2">Details</label>
                           <input 
                             type="text" 
                             value={payId || ""} 
                             onChange={(e) => setPayId(e.target.value)} 
                             placeholder={payIdType === 'mobile' ? 'e.g. 0400 000 000' : payIdType === 'email' ? 'e.g. admin@club.com' : 'e.g. BSB: 123-456 ACC: 12345678'}
-                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" 
                           />
                         </div>
                       </div>
                     </div>
 
-                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!squareToken && !payId)} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-4">
-                      {isSavingFinancials ? 'Saving...' : 'Complete Setup'}
+                    <button onClick={handleSaveFinancials} disabled={isSavingFinancials || (!squareToken && !payId)} className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-6">
+                      {isSavingFinancials ? 'Saving...' : 'Save Payment Methods'}
                     </button>
                   </div>
                 )}
@@ -1544,10 +1603,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       {allCompleted && activeClubId && (
         <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-bottom-4">
           <button 
-            onClick={onDismiss}
-            className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+            disabled
+            className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 rounded-xl transition-all shadow-md opacity-70"
           >
-            <i className="fa-solid fa-flag-checkered"></i> Setup Complete! Continue
+            <i className="fa-solid fa-circle-notch fa-spin"></i> Setup Complete! Redirecting...
           </button>
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-3 font-medium">
             Continue to Match Day to assign players from your teams to your matches

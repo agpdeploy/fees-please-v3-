@@ -7,10 +7,11 @@ import { useActiveClub } from "@/contexts/ClubContext";
 
 export default function Team() {
   const { profile, roles } = useProfile();
-  const { activeClubId, clubInfo } = useActiveClub();
+  const { activeClubId } = useActiveClub();
 
   const [isLoading, setIsLoading] = useState(true);
   const [activeSeasonName, setActiveSeasonName] = useState<string | null | undefined>(undefined);
+  const [planTier, setPlanTier] = useState<string>('free');
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [clubPlayers, setClubPlayers] = useState<any[]>([]);
@@ -84,10 +85,11 @@ export default function Team() {
       if (refreshTrigger === 0) setIsLoading(true);
 
       
-      // Fetch club info to get season_name for filtering
-      const { data: clubData } = await supabase.from('clubs').select('season_name').eq('id', activeClubId).single();
+      // Fetch club info to get season_name and plan_tier for filtering/features
+      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier').eq('id', activeClubId).single();
       const clubSeasonName = clubData?.season_name || null;
       setActiveSeasonName(clubSeasonName);
+      setPlanTier(clubData?.plan_tier || 'free');
 
       // 1. Determine Teams
       let teamQuery = supabase.from("teams").select("id, name, slug").eq("club_id", activeClubId);
@@ -730,7 +732,9 @@ export default function Team() {
                                          <i className="fa-solid fa-paper-plane"></i>
                                        </div>
                                        <div>
-                                         <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Email Players</h4>
+                                         <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                           Email Players {planTier === 'free' && <i className="fa-solid fa-lock text-amber-500 text-[10px]"></i>}
+                                         </h4>
                                          <p className="text-[10px] font-medium text-zinc-500">Send an availability email directly to specific players.</p>
                                        </div>
                                      </button>
@@ -767,7 +771,7 @@ export default function Team() {
                                        </button>
                                      </div>
                                      
-                                     <textarea 
+                                                                          <textarea 
                                        placeholder="Add a custom note (e.g. We need to know by Thursday)..."
                                        className="w-full text-xs p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#1A1A1A] text-zinc-900 dark:text-white mb-3 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 shadow-sm focus:border-blue-500 transition-colors"
                                        rows={2}
@@ -865,12 +869,18 @@ export default function Team() {
                                      </div>
                                      
                                      <button 
-                                       onClick={() => handleConfirmSendReminders(f)}
-                                       disabled={emailSelectedPlayerIds.length === 0 || isSendingReminders}
-                                       className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50"
+                                       onClick={() => {
+                                         if (planTier === 'free') {
+                                           window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }));
+                                           return;
+                                         }
+                                         handleConfirmSendReminders(f);
+                                       }}
+                                       disabled={isSendingReminders || (planTier !== 'free' && emailSelectedPlayerIds.length === 0)}
+                                       className={`w-full py-4 mt-4 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${planTier === 'free' ? 'bg-amber-400 hover:bg-amber-300 text-amber-900 shadow-amber-500/20' : 'text-white bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'}`}
                                      >
-                                       {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                                       Send to {emailSelectedPlayerIds.length} Player{emailSelectedPlayerIds.length !== 1 ? 's' : ''}
+                                       {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${planTier === 'free' ? 'fa-lock' : 'fa-paper-plane'}`}></i>}
+                                       {planTier === 'free' ? 'Upgrade to Email' : `Send to ${emailSelectedPlayerIds.length} Player${emailSelectedPlayerIds.length !== 1 ? 's' : ''}`}
                                      </button>
                                    </div>
                                  )}
@@ -1062,8 +1072,10 @@ export default function Team() {
                                                  <i className="fa-solid fa-paper-plane"></i>
                                                </div>
                                                <div>
-                                                 <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Email Team Members</h4>
-                                                 <p className="text-[10px] font-medium text-zinc-500">Send selection & pre-pay links.</p>
+                                                 <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                                   Email Team Members {planTier === 'free' && <i className="fa-solid fa-lock text-amber-500 text-[10px]"></i>}
+                                                 </h4>
+                                                                                                  <p className="text-[10px] font-medium text-zinc-500">Send selection & pre-pay links.</p>
                                                </div>
                                              </button>
                                              
@@ -1200,12 +1212,18 @@ export default function Team() {
                                         })}
                                       </div>
                                       <button 
-                                        onClick={() => handleSendSquadEmail(f.id)}
-                                        disabled={squadEmailSelectedPlayerIds.length === 0 || isSendingSquadEmail}
-                                        className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 disabled:opacity-50"
+                                        onClick={() => {
+                                          if (planTier === 'free') {
+                                            window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }));
+                                            return;
+                                          }
+                                          handleSendSquadEmail(f.id);
+                                        }}
+                                        disabled={isSendingSquadEmail || (planTier !== 'free' && squadEmailSelectedPlayerIds.length === 0)}
+                                        className={`w-full py-4 mt-4 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${planTier === 'free' ? 'bg-amber-400 hover:bg-amber-300 text-amber-900 shadow-amber-500/20' : 'text-white bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'}`}
                                       >
-                                        {isSendingSquadEmail ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                                        Send to {squadEmailSelectedPlayerIds.length} Player{squadEmailSelectedPlayerIds.length !== 1 ? 's' : ''}
+                                        {isSendingSquadEmail ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${planTier === 'free' ? 'fa-lock' : 'fa-paper-plane'}`}></i>}
+                                        {planTier === 'free' ? 'Upgrade to Email' : `Send to ${squadEmailSelectedPlayerIds.length} Player${squadEmailSelectedPlayerIds.length !== 1 ? 's' : ''}`}
                                       </button>
                                     </div>
                                   )}

@@ -9,9 +9,14 @@ import FixturesTab from "@/components/FixturesTab";
 import AutomationsTab from "@/components/AutomationsTab";
 import PlayHQSeasonAlert from "@/components/PlayHQSeasonAlert";
 import FinaliseSeasonView from "@/components/FinaliseSeasonView";
+import { loadStripe } from '@stripe/stripe-js';
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
+import { hasFeature } from "@/lib/features";
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string);
 
 interface SetupProps {
-  activeTab: 'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments' | 'sponsors';
+  activeTab: 'config' | 'billing' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments' | 'sponsors';
 }
 
 interface UserRole {
@@ -135,10 +140,32 @@ export default function Setup({ activeTab }: SetupProps) {
   const isSuperAdmin = profile?.role === 'super_admin';
   const { activeClubId, setActiveClubId } = useActiveClub();
   const [clubId, setClubId] = useState<string | null>(null);
+  const [isAnnual, setIsAnnual] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (clubRecord?.plan_interval) {
+      setIsAnnual(clubRecord.plan_interval === 'yearly' || clubRecord.plan_interval === 'annual');
+    }
+  }, [clubRecord?.plan_interval]);
 
   useEffect(() => {
     // If the url has ?success=square_connected or ?error, show a toast
     const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('session_id')) {
+      const sessionId = urlParams.get('session_id');
+      fetch('/api/pay/stripe/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      }).then(res => res.json()).then(data => {
+        if (data.success && data.plan) {
+          setClubRecord((prev: any) => prev ? { ...prev, plan_tier: data.plan } : null);
+        }
+        showToast("Subscription updated successfully!");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      });
+    }
     if (urlParams.get('success') === 'square_connected') {
       showToast("Connected to Square successfully!");
       // clean up url
@@ -563,6 +590,16 @@ export default function Setup({ activeTab }: SetupProps) {
   
   async function saveTeam() {
     if (!teamName) return showToast("Team name is required.", "error");
+
+    if (!editingTeamId && clubRecord?.plan_tier === 'free' && teams.length >= 1) {
+      showToast("Free plan is limited to 1 team. Upgrade to Plus/Pro to manage multiple teams!", "error");
+      return;
+    }
+
+    if (!editingTeamId && clubRecord?.plan_tier === 'pro' && teams.length >= 5) {
+      showToast("Pro plan is limited to 5 teams. Please manage existing teams or contact support to expand your club.", "error");
+      return;
+    }
     
     // Fallback if slug is empty
     const finalSlug = teamSlug || teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -656,6 +693,53 @@ export default function Setup({ activeTab }: SetupProps) {
     } else {
       showToast(`Team ${currentStatus ? 'deactivated' : 'reactivated'}.`);
       loadClubData();
+    }
+  }
+
+  async function handleStripeCheckout(plan: 'plus' | 'pro') {
+    if (!clubId || clubId === 'new') return;
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/pay/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          clubId, 
+          plan,
+          interval: isAnnual ? 'annual' : 'monthly'
+        })
+      });
+      const data = await res.json();
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret);
+      } else {
+        throw new Error(data.error || "Failed to start checkout");
+      }
+    } catch (e: any) {
+      showToast(e.message, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleStripePortal() {
+    if (!clubId || clubId === 'new') return;
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/pay/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          clubId,
+          returnUrl: window.location.href
+        })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else throw new Error(data.error || "Failed to open portal");
+    } catch (e: any) {
+      showToast(e.message, "error");
+      setIsSaving(false);
     }
   }
 
@@ -766,6 +850,7 @@ export default function Setup({ activeTab }: SetupProps) {
       {/* --- CONFIG TAB --- */}
       {activeTab === 'config' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+          
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
             <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Details</h2>
             <div className="space-y-4">
@@ -836,56 +921,198 @@ export default function Setup({ activeTab }: SetupProps) {
               )}
 
             </div>
-          </div>          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+          </div>
+          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
             {isSaving ? "Saving Configuration..." : (clubId && clubId !== 'new' ? "Save Account Settings" : "Create New Account")}
           </button>
+        </div>
+      )}
+
+      {/* --- BILLING TAB --- */}
+      {activeTab === 'billing' && (
+        <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+          {clubId && clubId !== 'new' && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors overflow-hidden">
+              <div className="flex flex-col items-start mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4 gap-4">
+                <div>
+                  <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-1">Subscription Plan</h2>
+                  <p className="text-zinc-500 text-xs">Choose the right plan based on your needs. All paid plans include a 14-day free trial. Current plan: <strong className="text-zinc-900 dark:text-white uppercase">{clubRecord?.plan_tier} {clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}</strong></p>
+                </div>
+                
+              </div>
+
+              {clientSecret ? (
+                <div className="animate-in fade-in slide-in-from-bottom-4 mt-6">
+                  <button 
+                    onClick={() => setClientSecret(null)} 
+                    className="mb-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-arrow-left"></i> Back to Plans
+                  </button>
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden min-h-[500px]">
+                    <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
+                      <EmbeddedCheckout />
+                    </EmbeddedCheckoutProvider>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {/* Free Plan */}
+                <div className={`border rounded-xl p-5 ${clubRecord?.plan_tier === 'free' ? 'border-zinc-400 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800/20' : 'border-zinc-200 dark:border-zinc-800 opacity-70'}`}>
+                  {clubRecord?.plan_tier === 'free' && <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-2">Current</div>}
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white mb-2">Free</h3>
+                  <p className="text-xs text-zinc-500 mb-4">For individuals or teams just getting started. Up to 1 team with basic features.</p>
+                  <div className="text-2xl font-black text-zinc-900 dark:text-white mb-4">$0</div>
+                  {clubRecord?.plan_tier === 'free' ? (
+                    <div className="w-full text-center py-2 text-xs font-bold text-zinc-400 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900">Current plan</div>
+                  ) : (
+                    <div className="w-full text-center py-2 text-xs font-bold text-zinc-400 border border-zinc-200 dark:border-zinc-800 rounded-lg">Included</div>
+                  )}
+                  <ul className="mt-6 space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 1 Team Limit</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Financial Ledger</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Team Hub (Public share link)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 2.5% platform fee + Square processing (if integrated)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Cash & Bank transfer tracking (0% fee)</li>
+                  </ul>
+                </div>
+
+                {/* Plus Plan */}
+                <div className={`relative bg-white dark:bg-zinc-900 border-2 rounded-2xl p-5 sm:p-6 transition-all ${clubRecord?.plan_tier === 'plus' ? 'border-emerald-500 shadow-md' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                  {clubRecord?.plan_tier === 'plus' && <div className="absolute -top-2.5 left-5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Current {clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}</div>}
+                  {clubRecord?.plan_tier !== 'plus' && <div className="absolute -top-2.5 left-5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Recommended</div>}
+                  
+                  <h3 className="text-xl font-black text-emerald-600 dark:text-emerald-400 mb-2">Plus</h3>
+                  <p className="text-xs text-zinc-500 mb-4">Unlimited teams with reduced transaction fees and email capability.</p>
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-4 bg-emerald-50 dark:bg-emerald-900/10 inline-flex p-2 rounded-lg border border-emerald-500/10">
+                    <span className={!isAnnual ? 'text-zinc-900 dark:text-white' : ''}>Monthly</span>
+                    <div className={`w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors ${isAnnual ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} onClick={() => setIsAnnual(!isAnnual)}>
+                      <div className={`w-3 h-3 rounded-full bg-white transition-transform ${isAnnual ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                    </div>
+                    <span className={isAnnual ? 'text-emerald-600 dark:text-emerald-500' : ''}>Annual (Save 15%)</span>
+                  </div>
+                  <div className="text-3xl font-black text-zinc-900 dark:text-white mb-2">
+                    {isAnnual ? '$69.00' : '$6.99'} <span className="text-sm text-zinc-500 font-normal">{isAnnual ? '/yr per team' : '/mo per team'}</span>
+                  </div>
+                  
+                  {clubRecord?.plan_tier === 'plus' ? (
+                     <button onClick={handleStripePortal} disabled={isSaving} className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors">Manage</button>
+                  ) : (
+                     <button onClick={() => handleStripeCheckout('plus')} disabled={isSaving || clubRecord?.plan_tier === 'pro'} className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors disabled:opacity-50">Upgrade</button>
+                  )}
+
+                  <ul className="mt-6 space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
+                    <li className="flex gap-2 font-bold text-zinc-800 dark:text-zinc-200"><i className="fa-solid fa-plus text-emerald-500 mt-0.5"></i> Everything on Free, plus:</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Unlimited teams (billed per team)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Team Hub (Email reminders & pre-pay)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 30c platform fee + Square processing (if integrated)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Cash & Bank transfer tracking (0% fee)</li>
+                  </ul>
+                </div>
+
+                {/* Pro Plan */}
+                <div className={`relative bg-white dark:bg-zinc-900 border-2 rounded-2xl p-5 sm:p-6 transition-all ${clubRecord?.plan_tier === 'pro' ? 'border-emerald-500 shadow-md' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                  {clubRecord?.plan_tier === 'pro' && <div className="absolute -top-2.5 left-5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Current {clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}</div>}
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white mb-2">Pro</h3>
+                  <p className="text-xs text-zinc-500 mb-4">Flat rate covering up to 5 teams with our lowest fees. SMS capability included (coming soon).</p>
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-4 bg-zinc-50 dark:bg-zinc-800/50 inline-flex p-2 rounded-lg border border-zinc-200 dark:border-zinc-700/50">
+                    <span className={!isAnnual ? 'text-zinc-900 dark:text-white' : ''}>Monthly</span>
+                    <div className={`w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors ${isAnnual ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} onClick={() => setIsAnnual(!isAnnual)}>
+                      <div className={`w-3 h-3 rounded-full bg-white transition-transform ${isAnnual ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                    </div>
+                    <span className={isAnnual ? 'text-emerald-600 dark:text-emerald-500' : ''}>Annual (Save 15%)</span>
+                  </div>
+                  <div className="text-3xl font-black text-zinc-900 dark:text-white mb-2">
+                    {isAnnual ? '$139.00' : '$13.98'} <span className="text-sm text-zinc-500 font-normal">{isAnnual ? '/yr flat' : '/mo flat'}</span>
+                  </div>
+                  
+                  {clubRecord?.plan_tier === 'pro' ? (
+                     <button onClick={handleStripePortal} disabled={isSaving} className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors">Manage</button>
+                  ) : (
+                     <button onClick={() => clubRecord?.plan_tier === 'free' ? handleStripeCheckout('pro') : handleStripePortal()} disabled={isSaving} className="w-full mt-3 py-2 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-xs font-black uppercase tracking-widest rounded-lg transition-colors">Upgrade</button>
+                  )}
+
+                  <ul className="mt-6 space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
+                    <li className="flex gap-2 font-bold text-zinc-800 dark:text-zinc-200"><i className="fa-solid fa-plus text-emerald-500 mt-0.5"></i> Everything on Plus, plus:</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Up to 5 teams included</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Team Hub (SMS allowance included)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 15c platform fee + Square processing (if integrated)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Cash & Bank transfer tracking (0% fee)</li>
+                  </ul>
+                </div>
+              </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* --- SPONSORS TAB --- */}
       {activeTab === 'sponsors' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-            <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Sponsors (Public Page)</h2>
-            <div className="space-y-4">
-                 {(!clubId || clubId === 'new') ? (
-                    <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
-                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Account First to Upload Sponsors</p>
-                    </div>
-                 ) : (
-                   [
-                     { id: 'sponsor1', num: 1, logo: sponsor1Logo, url: sponsor1Url, setUrl: setSponsor1Url, clear: () => {setSponsor1Logo(""); setSponsor1Url("")} },
-                     { id: 'sponsor2', num: 2, logo: sponsor2Logo, url: sponsor2Url, setUrl: setSponsor2Url, clear: () => {setSponsor2Logo(""); setSponsor2Url("")} },
-                     { id: 'sponsor3', num: 3, logo: sponsor3Logo, url: sponsor3Url, setUrl: setSponsor3Url, clear: () => {setSponsor3Logo(""); setSponsor3Url("")} }
-                   ].map((s) => (
-                     <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
-                        <div className="flex gap-3">
-                           <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative group">
-                              {s.logo ? (
-                                 <>
-                                   <img src={s.logo} className="w-full h-full object-contain p-1" />
-                                   <button onClick={s.clear} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="fa-solid fa-trash text-xs"></i></button>
-                                 </>
-                              ) : <i className="fa-solid fa-image text-zinc-400"></i>}
-                           </div>
-                           <div className="flex-1 space-y-2">
-                             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor} />
-                             <div className="flex justify-between items-center">
-                                <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30`}>
-                                   {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
-                                </label>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm relative overflow-hidden transition-colors">
+            {!hasFeature(clubRecord?.plan_tier, 'SPONSORS') && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 dark:bg-zinc-900/70 backdrop-blur-[2px]">
+                <div className="text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-2xl shadow-xl max-w-xs mx-auto">
+                   <div className="w-12 h-12 mx-auto bg-amber-100 dark:bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
+                     <i className="fa-solid fa-bullhorn text-xl"></i>
+                   </div>
+                   <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-2">Unlock Sponsors</h3>
+                   <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6">Showcase sponsors across your team hub, payment pages, and emails.</p>
+                   <button 
+                     onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
+                     className="w-full py-3 rounded-xl font-black uppercase tracking-widest text-xs text-amber-900 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                   >
+                     <i className="fa-solid fa-lock"></i> Upgrade to Plus
+                   </button>
+                   <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mt-3">Requires Plus Plan</p>
+                </div>
+              </div>
+            )}
+            <div className={`p-5 transition-all duration-300 ${!hasFeature(clubRecord?.plan_tier, 'SPONSORS') ? 'opacity-30 pointer-events-none blur-[1px]' : ''}`}>
+              <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Sponsors</h2>
+              <div className="space-y-4">
+                   {(!clubId || clubId === 'new') ? (
+                      <div className="p-4 text-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+                          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Account First to Upload Sponsors</p>
+                      </div>
+                   ) : (
+                     [
+                       { id: 'sponsor1', num: 1, logo: sponsor1Logo, url: sponsor1Url, setUrl: setSponsor1Url, clear: () => {setSponsor1Logo(""); setSponsor1Url("")} },
+                       { id: 'sponsor2', num: 2, logo: sponsor2Logo, url: sponsor2Url, setUrl: setSponsor2Url, clear: () => {setSponsor2Logo(""); setSponsor2Url("")} },
+                       { id: 'sponsor3', num: 3, logo: sponsor3Logo, url: sponsor3Url, setUrl: setSponsor3Url, clear: () => {setSponsor3Logo(""); setSponsor3Url("")} }
+                     ].map((s) => (
+                       <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
+                          <div className="flex gap-3">
+                             <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative group">
+                                {s.logo ? (
+                                   <>
+                                     <img src={s.logo} className="w-full h-full object-contain p-1" />
+                                     <button onClick={s.clear} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="fa-solid fa-trash text-xs"></i></button>
+                                   </>
+                                ) : <i className="fa-solid fa-image text-zinc-400"></i>}
                              </div>
-                             <input type="url" placeholder="https://..." value={s.url} onChange={(e) => s.setUrl(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                           </div>
-                        </div>
-                     </div>
-                   ))
-                 )}
+                             <div className="flex-1 space-y-2">
+                               <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor} />
+                               <div className="flex justify-between items-center">
+                                  <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30`}>
+                                     {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
+                                  </label>
+                               </div>
+                               <input type="url" placeholder="https://..." value={s.url} onChange={(e) => s.setUrl(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                             </div>
+                          </div>
+                       </div>
+                     ))
+                   )}
+              </div>
             </div>
           </div>
-          <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-            {isSaving ? "Saving Sponsors..." : "Save Sponsors"}
-          </button>
+          {hasFeature(clubRecord?.plan_tier, 'SPONSORS') && (
+            <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+              {isSaving ? "Saving Sponsors..." : "Save Sponsors"}
+            </button>
+          )}
         </div>
       )}
 
@@ -1733,8 +1960,10 @@ export default function Setup({ activeTab }: SetupProps) {
           teams={teams} 
           showToast={showToast} 
           clubUsers={clubUsers}
+          planTier={clubRecord?.plan_tier || 'free'}
         />
       )}
+
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
 
-export default function SeasonHistory() {
+export default function SeasonHistory({ planTier }: { planTier?: string }) {
   const { profile, roles } = useProfile();
   const { activeClubId } = useActiveClub();
 
@@ -20,6 +20,7 @@ export default function SeasonHistory() {
   const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
   const [squadData, setSquadData] = useState<Record<string, any[]>>({});
   const [allPlayers, setAllPlayers] = useState<any[]>([]);
+  const [playersLoaded, setPlayersLoaded] = useState(false);
 
   // Financial Stats
   const [seasonWallet, setSeasonWallet] = useState({ cash: 0, card: 0 });
@@ -64,8 +65,9 @@ export default function SeasonHistory() {
   // 2. Fetch players for the club
   useEffect(() => {
     if (activeClubId) {
-      supabase.from('players').select('id, first_name, last_name, nickname, is_active, default_team_id').eq('club_id', activeClubId).then(({data}) => {
+      supabase.from('players').select('id, first_name, last_name, nickname, is_active, default_team_id').eq('club_id', activeClubId).then(({data, error}) => {
         if (data) setAllPlayers(data);
+        setPlayersLoaded(true);
       });
     }
   }, [activeClubId]);
@@ -73,7 +75,7 @@ export default function SeasonHistory() {
   // 3. Fetch fixtures and transactions
   useEffect(() => {
     async function fetchHistory() {
-      if (!selectedTeamId || !activeClubId || allPlayers.length === 0) return;
+      if (!selectedTeamId || !activeClubId || !playersLoaded) return;
       setIsLoading(true);
 
       const [fixRes, clubRes, txRes] = await Promise.all([
@@ -222,7 +224,7 @@ export default function SeasonHistory() {
     }
 
     fetchHistory();
-  }, [selectedTeamId, activeClubId, selectedSeason, allPlayers]);
+  }, [selectedTeamId, activeClubId, selectedSeason, allPlayers, playersLoaded]);
 
   // Fetch match squad when a fixture is expanded
   const handleExpand = async (fixtureId: string) => {
@@ -307,7 +309,26 @@ export default function SeasonHistory() {
 
       {/* Financial Health Box */}
       {!isLoading && fixtures.length > 0 && (
-         <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm mx-1">
+         <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm mx-1 relative overflow-hidden">
+            {planTier === 'free' && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 dark:bg-[#111]/70 backdrop-blur-[2px]">
+                <div className="text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-2xl shadow-xl max-w-xs mx-auto transform -translate-y-4">
+                   <div className="w-12 h-12 mx-auto bg-amber-100 dark:bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
+                     <i className="fa-solid fa-clock-rotate-left text-xl"></i>
+                   </div>
+                   <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-2">Unlock Financial Insights</h3>
+                   <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6">See where your club stands.</p>
+                   <button 
+                     onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
+                     className="w-full py-3 rounded-xl font-black uppercase tracking-widest text-xs text-amber-900 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                   >
+                     <i className="fa-solid fa-lock"></i> Upgrade to Plus
+                   </button>
+                   <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mt-3">Requires Plus Plan</p>
+                </div>
+              </div>
+            )}
+            <div className={`p-5 transition-all duration-300 ${planTier === 'free' ? 'opacity-30 pointer-events-none blur-[1px]' : ''}`}>
             <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-5">
                <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
                   <i className="fa-solid fa-heart-pulse text-sm"></i>
@@ -432,6 +453,7 @@ export default function SeasonHistory() {
                   </tbody>
                </table>
             </div>
+          </div>
          </div>
       )}
     </div>

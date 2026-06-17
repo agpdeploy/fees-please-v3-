@@ -8,18 +8,22 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "docs:sync": "node scripts/sync-docs.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.64",
     "@ai-sdk/react": "^3.0.170",
     "@ducanh2912/next-pwa": "^10.2.6",
     "@google/generative-ai": "^0.24.1",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.100.1",
     "ai": "^6.0.168",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.7.0",
+    "marked": "^18.0.5",
     "next": "16.2.1",
     "next-mdx-remote": "^6.0.0",
     "next-themes": "^0.4.6",
@@ -32,6 +36,7 @@
     "react-square-web-payments-sdk": "^3.3.0",
     "resend": "^6.12.4",
     "square": "^44.0.1",
+    "stripe": "^22.2.0",
     "svix": "^1.94.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"

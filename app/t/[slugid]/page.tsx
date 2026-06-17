@@ -17,7 +17,7 @@ export async function generateMetadata(props: { params: Promise<any> }): Promise
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
   
   // Query to grab the team name and club logo for the preview card
-  const { data: team } = await supabase
+  const { data: teamArr } = await supabase
     .from('teams')
     .select(`
       name,
@@ -26,8 +26,9 @@ export async function generateMetadata(props: { params: Promise<any> }): Promise
       )
     `)
     .or(`slug.eq.${identifier},id.eq.${isUuid ? identifier : '00000000-0000-0000-0000-000000000000'}`)
-    .maybeSingle();
+    .limit(1);
 
+  const team = teamArr?.[0] || null;
   const teamName = team?.name || "Team";
   
   // Safely extract the logo depending on how Supabase returns the joined data
@@ -81,9 +82,11 @@ export default async function PublicTeamAvailabilityPage(props: { params: Promis
   
   // 2. Query the DB
   const query = supabase.from('teams').select('id, club_id, name');
-  const { data: teamData, error: teamError } = await (isUuid 
-    ? query.eq('id', identifier).maybeSingle() 
-    : query.eq('slug', identifier).maybeSingle());
+  const { data: teamDataArr, error: teamError } = await (isUuid 
+    ? query.eq('id', identifier).limit(1) 
+    : query.eq('slug', identifier).limit(1));
+    
+  const teamData = teamDataArr?.[0] || null;
 
   if (teamError || !teamData) {
     return (

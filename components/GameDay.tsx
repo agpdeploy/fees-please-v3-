@@ -231,9 +231,11 @@ export default function GameDay() {
               season_end: data.season_end,
               default_umpire_fee: data.default_umpire_fee,
               accepts_cash: data.accepts_cash,
+              plan_tier: data.plan_tier,
               
               square_access_token: data.square_access_token,
-              square_location_id: data.square_location_id
+              square_location_id: data.square_location_id,
+              club_cat: data.club_cat
             });
             setIsSquareEnabled(!!data.square_access_token);
           }
@@ -260,6 +262,9 @@ export default function GameDay() {
         }
       } else {
         const teamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id).filter(Boolean) || [];
+        if (profile.role === 'player' && profile.team_id) {
+           teamIds.push(profile.team_id);
+        }
         if (teamIds.length > 0) query = query.in('id', teamIds);
         else { setTeams([]); setLoading(false); return; }
       }
@@ -1146,7 +1151,7 @@ export default function GameDay() {
         />
       )}
 
-      {profile && profile.onboarding_completed !== true && profile.role !== 'super_admin' && (!roles || roles.length === 0 || isClubAdmin) && (
+      {profile && (!profile.onboarding_completed || (typeof window !== 'undefined' && sessionStorage.getItem('creating_team') === 'true')) && profile.role !== 'super_admin' && (!roles || roles.length === 0 || isClubAdmin) && (
           <SetupChecklist 
             user={profile}
             activeClubId={activeClubId} 
@@ -1166,7 +1171,7 @@ export default function GameDay() {
           />
       )}
 
-      {(!profile || profile.onboarding_completed === true || profile.role === 'super_admin' || (roles && roles.length > 0 && !isClubAdmin)) && (
+      {(!profile || (profile.onboarding_completed === true && (typeof window === 'undefined' || sessionStorage.getItem('creating_team') !== 'true')) || profile.role === 'super_admin' || (roles && roles.length > 0 && !isClubAdmin)) && (
         <>
           {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 1 && (
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
@@ -1800,13 +1805,25 @@ export default function GameDay() {
                                      </div>
                                    </div>
                                    
-                                   <button 
-                                     onClick={() => handleGenerateReport(pf)}
-                                     disabled={reporterImages.length === 0}
-                                     className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white shadow-md active:scale-95 transition-all disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 mt-2"
-                                   >
-                                     Generate Report
-                                   </button>
+                                   {clubInfo?.plan_tier === 'free' ? (
+                                     <div className="flex flex-col items-center gap-2 mt-2">
+                                       <button 
+                                         onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
+                                         className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-amber-900 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                       >
+                                         <i className="fa-solid fa-wand-magic-sparkles"></i> Upgrade to Generate Report
+                                       </button>
+                                       <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Requires Plus Plan</p>
+                                     </div>
+                                   ) : (
+                                     <button 
+                                       onClick={() => handleGenerateReport(pf)}
+                                       disabled={reporterImages.length === 0}
+                                       className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white shadow-md active:scale-95 transition-all disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 mt-2"
+                                     >
+                                       Generate Report
+                                     </button>
+                                   )}
                                  </div>
                                )}
 
