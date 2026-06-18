@@ -1032,7 +1032,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <span className={isAnnual ? 'text-emerald-600 dark:text-emerald-500' : ''}>Annual (Save 15%)</span>
                   </div>
                   <div className="text-3xl font-black text-zinc-900 dark:text-white mb-2">
-                    {isAnnual ? '$139.00' : '$13.98'} <span className="text-sm text-zinc-500 font-normal">{isAnnual ? '/yr flat' : '/mo flat'}</span>
+                    {isAnnual ? '$129.00' : '$12.99'} <span className="text-sm text-zinc-500 font-normal">{isAnnual ? '/yr flat' : '/mo flat'}</span>
                   </div>
                   
                   {clubRecord?.plan_tier === 'pro' ? (
