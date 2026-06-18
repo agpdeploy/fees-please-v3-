@@ -112,13 +112,6 @@ export async function POST(req: Request) {
       metadata: {
         club_id: clubId,
         plan_tier: plan,
-      },
-      subscription_data: {
-        trial_period_days: 14,
-        metadata: {
-          club_id: clubId,
-          plan_tier: plan,
-        }
       }
     });
 
