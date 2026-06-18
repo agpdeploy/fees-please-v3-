@@ -1629,50 +1629,52 @@ export default function Setup({ activeTab }: SetupProps) {
               teams.map(t => {
                 const assignedManager = clubUsers.find(u => u.team_id === t.id && u.role === 'team_admin');
                 return (
-                  <div key={t.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm transition-colors group">
+                  <div key={t.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm transition-colors group">
                     <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <div className="font-black text-zinc-900 dark:text-white text-lg uppercase tracking-wide group-hover:text-emerald-500 transition-colors flex items-center gap-2">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="font-black text-zinc-900 dark:text-white text-lg uppercase tracking-wide group-hover:text-emerald-500 transition-colors flex items-center flex-wrap gap-2 leading-tight">
                           {t.name}
                           {t.is_active === false && (
-                            <span className="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border border-red-200 dark:border-red-800/50">
+                            <span className="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest border border-red-200 dark:border-red-800/50 leading-none">
                               Deactivated
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest flex items-center gap-2">
-                          <span className="text-emerald-600 dark:text-emerald-500">M: ${t.member_fee}</span>
-                          <span>•</span>
-                          <span className="text-zinc-400">C: ${t.casual_fee}</span>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border border-emerald-200 dark:border-emerald-500/20 leading-none">
+                            Match: ${t.member_fee}
+                          </span>
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 leading-none">
+                            Casual: ${t.casual_fee}
+                          </span>
                           {clubRecord?.season_name && (
-                            <>
-                              <span>•</span>
-                              <span className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-400">
-                                {clubRecord.season_name}
-                              </span>
-                            </>
+                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 leading-none truncate max-w-[200px]">
+                              {clubRecord.season_name}
+                            </span>
                           )}
                         </div>
-                        <div className="text-[9px] text-zinc-400 uppercase tracking-widest mt-2">
-                          MANAGER: <span className="font-bold text-zinc-600 dark:text-zinc-300">{assignedManager ? assignedManager.email : 'Unassigned'}</span>
+                        <div className="text-[9px] text-zinc-400 uppercase tracking-widest mt-3 flex items-center gap-1.5 truncate w-full">
+                          <i className="fa-solid fa-user-tie shrink-0"></i> 
+                          <span className="shrink-0">MANAGER:</span> 
+                          <span className="font-bold text-zinc-600 dark:text-zinc-300 truncate">{assignedManager ? assignedManager.email : 'Unassigned'}</span>
                         </div>
                       </div>
                       
-                      <div className="flex gap-2 shrink-0 ml-4">
+                      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
                         <button onClick={() => {
                           const link = `${window.location.origin}/t/${t.slug || t.id}`;
                           navigator.clipboard.writeText(link);
                           showToast("Team Link Copied!");
-                        }} className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-colors flex items-center justify-center" title="Copy Public Availability Link">
+                        }} className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-colors flex items-center justify-center shrink-0" title="Copy Public Availability Link">
                           <i className="fa-solid fa-link text-xs"></i>
                         </button>
-                        <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center">
+                        <button onClick={() => startEditingTeam(t)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center shrink-0">
                           <i className="fa-solid fa-pen text-xs"></i>
                         </button>
-                        <button onClick={() => toggleTeamActiveStatus(t.id, t.is_active !== false)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-orange-500 transition-colors flex items-center justify-center" title={t.is_active !== false ? "Deactivate Team" : "Reactivate Team"}>
+                        <button onClick={() => toggleTeamActiveStatus(t.id, t.is_active !== false)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-orange-500 transition-colors flex items-center justify-center shrink-0" title={t.is_active !== false ? "Deactivate Team" : "Reactivate Team"}>
                           <i className={`fa-solid ${t.is_active !== false ? 'fa-ban' : 'fa-rotate-left'} text-xs`}></i>
                         </button>
-                        <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center">
+                        <button onClick={() => deleteItem('teams', t.id)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center shrink-0">
                           <i className="fa-solid fa-trash text-xs"></i>
                         </button>
                       </div>
