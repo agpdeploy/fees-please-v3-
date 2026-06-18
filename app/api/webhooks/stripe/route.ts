@@ -270,11 +270,15 @@ export async function POST(req: Request) {
               }
             }
 
+            const { data: currentClub } = await supabase.from('clubs').select('settings').eq('id', clubId).single();
+            const currentSettings = currentClub?.settings || {};
+
             await supabase
               .from('clubs')
               .update({
                 plan_tier: planTier,
                 stripe_subscription_id: subscription.id,
+                settings: { ...currentSettings, cancel_at_period_end: subscription.cancel_at_period_end }
               })
               .eq('id', clubId);
           }

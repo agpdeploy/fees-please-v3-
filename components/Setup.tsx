@@ -939,6 +939,15 @@ export default function Setup({ activeTab }: SetupProps) {
                   <p className="text-zinc-500 text-xs">Choose the right plan based on your needs. All paid plans include a 14-day free trial. Current plan: <strong className="text-zinc-900 dark:text-white uppercase">{clubRecord?.plan_tier} {clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}</strong></p>
                 </div>
                 
+                {clubRecord?.plan_tier !== 'free' && clubRecord?.settings?.cancel_at_period_end && (
+                  <div className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-3 items-start animate-in fade-in zoom-in-95">
+                    <i className="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-amber-900 dark:text-amber-400 mb-1">Pending Cancellation</h3>
+                      <p className="text-xs text-amber-700 dark:text-amber-500">Your subscription has been canceled and will not renew. You will retain your current plan features until the end of the billing period, after which you will be downgraded to the Free plan.</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {clientSecret ? (
