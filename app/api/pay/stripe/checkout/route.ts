@@ -73,31 +73,13 @@ export async function POST(req: Request) {
     }
 
     // 5. Build line items
-    let lineItems = [];
-    if (plan === 'plus' && teams && teams.length > 0) {
-      const price = await stripe.prices.retrieve(priceId);
-      lineItems = teams.map((team: any) => ({
-        price_data: {
-          currency: price.currency,
-          product_data: {
-            name: `Plus Plan - ${team.name}`,
-          },
-          recurring: {
-            interval: price.recurring?.interval || (interval === 'annual' ? 'year' : 'month'),
-          },
-          unit_amount: price.unit_amount || 0,
-        },
-        quantity: 1,
-      }));
-    } else {
-      const quantity = plan === 'pro' ? 1 : (teams ? Math.max(1, teams.length) : 1);
-      lineItems = [
-        {
-          price: priceId,
-          quantity: quantity,
-        },
-      ];
-    }
+    const quantity = plan === 'pro' ? 1 : (teams ? Math.max(1, teams.length) : 1);
+    const lineItems = [
+      {
+        price: priceId,
+        quantity: quantity,
+      },
+    ];
 
     const hasUsedTrial = club.settings?.has_used_trial === true;
 
