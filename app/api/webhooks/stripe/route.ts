@@ -54,7 +54,7 @@ export async function POST(req: Request) {
             .update({
               stripe_subscription_id: subscriptionId,
               plan_tier: planTier,
-              settings: { ...currentSettings, has_used_trial: true }
+              settings: { ...currentSettings, has_used_trial: true, cancel_at_period_end: false }
             })
             .eq('id', clubId);
         }
@@ -292,15 +292,16 @@ export async function POST(req: Request) {
       
       case 'charge.refunded':
       case 'charge.dispute.created': {
-        const charge = event.data.object as Stripe.Charge;
+        const charge = event.data.object as any;
         
         let clubId: string | undefined;
         
-        // Find club_id from invoice or customer metadata
+        // If this charge is attached to an invoice/subscription, cancel the subscription immediately
         if (charge.invoice) {
           try {
-            const invoice = await stripe.invoices.retrieve(charge.invoice as string);
+            const invoice = await stripe.invoices.retrieve(charge.invoice as string) as any;
             if (invoice.subscription) {
+              await stripe.subscriptions.cancel(invoice.subscription as string);
               const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
               clubId = subscription.metadata.club_id;
             }
