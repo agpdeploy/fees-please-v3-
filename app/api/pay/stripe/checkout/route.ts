@@ -99,9 +99,12 @@ export async function POST(req: Request) {
       ];
     }
 
+    const hasUsedTrial = club.settings?.has_used_trial === true;
+
     // 6. Create Stripe Checkout Session
     const origin = req.headers.get('origin');
-    const session = await stripe.checkout.sessions.create({
+    
+    const checkoutOptions: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items: lineItems,
@@ -113,7 +116,19 @@ export async function POST(req: Request) {
         club_id: clubId,
         plan_tier: plan,
       }
-    });
+    };
+
+    if (!hasUsedTrial) {
+      checkoutOptions.subscription_data = {
+        trial_period_days: 14,
+        metadata: {
+          club_id: clubId,
+          plan_tier: plan,
+        }
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(checkoutOptions);
 
     return NextResponse.json({ clientSecret: session.client_secret });
   } catch (error: any) {

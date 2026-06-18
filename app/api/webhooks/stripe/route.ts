@@ -46,11 +46,15 @@ export async function POST(req: Request) {
             console.error("Failed to retrieve subscription for interval:", e);
           }
 
+          const { data: currentClub } = await supabase.from('clubs').select('settings').eq('id', clubId).single();
+          const currentSettings = currentClub?.settings || {};
+
           await supabase
             .from('clubs')
             .update({
               stripe_subscription_id: subscriptionId,
               plan_tier: planTier,
+              settings: { ...currentSettings, has_used_trial: true }
             })
             .eq('id', clubId);
         }
@@ -278,7 +282,7 @@ export async function POST(req: Request) {
               .update({
                 plan_tier: planTier,
                 stripe_subscription_id: subscription.id,
-                settings: { ...currentSettings, cancel_at_period_end: subscription.cancel_at_period_end }
+                settings: { ...currentSettings, cancel_at_period_end: subscription.cancel_at_period_end, has_used_trial: true }
               })
               .eq('id', clubId);
           }
