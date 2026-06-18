@@ -155,6 +155,37 @@ export async function POST(request: Request) {
       throw new Error(`insertPaymentError: ${insertPaymentError.message} / ${insertPaymentError.details || ''} / ${insertPaymentError.hint || ''}`);
     }
 
+    // 3. Ensure a fee transaction exists for this fixture (to match cash/POS tracking logic)
+    if (transaction.fixture_id) {
+      const { data: existingFee } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('player_id', transaction.player_id)
+        .eq('fixture_id', transaction.fixture_id)
+        .eq('transaction_type', 'fee')
+        .limit(1)
+        .maybeSingle();
+        
+      if (!existingFee) {
+        // Find player's fee amount based on is_member
+        const { data: player } = await supabase.from('players').select('is_member').eq('id', transaction.player_id).maybeSingle();
+        const { data: team } = await supabase.from('teams').select('member_fee, casual_fee').eq('id', transaction.team_id).maybeSingle();
+        
+        const feeAmount = player?.is_member ? (team?.member_fee || 10) : (team?.casual_fee || 25);
+        
+        await supabase.from('transactions').insert({
+          club_id: transaction.club_id,
+          player_id: transaction.player_id,
+          team_id: transaction.team_id,
+          fixture_id: transaction.fixture_id,
+          amount: feeAmount,
+          transaction_type: 'fee',
+          status: 'paid', // Mark as paid so it doesn't show as unpaid debt
+          season_name: transaction.season_name || null
+        });
+      }
+    }
+
     return NextResponse.json({ success: true, paymentId: data.payment.id });
   } catch (error: any) {
     console.error("Checkout processing error:", error);
