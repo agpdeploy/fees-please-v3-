@@ -126,7 +126,7 @@ export default function Team() {
       today.setHours(0,0,0,0);
       const { data: dbFixtures } = await supabase
         .from("fixtures")
-        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at, is_active, season_name")
+        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at, is_active, season_name, start_time, location, opponent_logo_url")
         .eq("team_id", targetTeamId);
 
       let fixtures: any[] = [];
