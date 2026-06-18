@@ -1212,8 +1212,8 @@ export default function GameDay() {
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-colors">
           
           <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800" ref={manageTeamRef}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center flex-wrap gap-2">
+            <div className="flex items-start justify-between w-full">
+              <div className="flex flex-col items-start gap-1">
                 {(() => {
                   const matchD = new Date(activeFixture.match_date);
                   const today = new Date();
@@ -1238,7 +1238,7 @@ export default function GameDay() {
                     bg = "bg-amber-500 dark:bg-amber-600";
                   }
                   return (
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded text-white tracking-widest ${bg} leading-none shadow-sm`}>
+                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded text-white tracking-widest ${bg} leading-none shadow-sm`}>
                       {text}
                     </span>
                   );
@@ -1712,11 +1712,21 @@ export default function GameDay() {
                            onClick={() => togglePastFixtureForAi(pf)} 
                            className={`flex flex-col gap-2 p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-zinc-50 dark:bg-zinc-800/50' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}
                          >
-                           <div className="flex justify-between items-center w-full mb-1">
-                              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                                 {new Date(pf.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                                 <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
-                                 <span className={pf.status === 'completed' ? 'text-emerald-500' : pf.status === 'forfeited' ? 'text-orange-500' : 'text-red-500'}>{pf.status}</span>
+                           <div className="flex justify-between items-start w-full mb-1">
+                              <div className="flex flex-col items-start gap-1">
+                                 <span className={`text-[9px] font-black uppercase px-2 py-1 rounded text-white tracking-widest leading-none shadow-sm ${pf.status === 'completed' ? 'bg-zinc-500 dark:bg-zinc-600' : pf.status === 'forfeited' ? 'bg-orange-500 dark:bg-orange-600' : 'bg-red-500 dark:bg-red-600'}`}>
+                                   {pf.status}
+                                 </span>
+                                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                   {new Date(pf.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                                   {(pf.start_time || pf.location) && (
+                                     <>
+                                       <span className="mx-1.5">•</span>
+                                       {pf.start_time && `${pf.start_time} `}
+                                       {pf.location && `@ ${pf.location}`}
+                                     </>
+                                   )}
+                                 </span>
                               </div>
                               
                               <button 

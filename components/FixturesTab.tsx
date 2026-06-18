@@ -654,13 +654,20 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
     <div className={`bg-white dark:bg-zinc-900 border ${isActive ? 'border-zinc-200 dark:border-zinc-800' : 'border-zinc-200/50 dark:border-zinc-800/50 border-dashed'} rounded-xl shadow-sm overflow-hidden transition-all ${!isActive ? 'opacity-60 grayscale' : ''}`}>
       
       <div className="flex flex-col gap-2 p-4 border-b border-zinc-100 dark:border-zinc-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center flex-wrap gap-2">
-            <span className={`text-[10px] font-black uppercase px-2 py-1 rounded tracking-widest leading-none shadow-sm ${statusClasses}`}>
+        <div className="flex items-start justify-between w-full">
+          <div className="flex flex-col items-start gap-1">
+            <span className={`text-[9px] font-black uppercase px-2 py-1 rounded tracking-widest leading-none shadow-sm ${statusClasses}`}>
               {displayStatus}
             </span>
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-              {matchDateStr} {fixture.start_time && `• ${fixture.start_time}`} {fixture.location && `@ ${fixture.location}`}
+              {matchDateStr} 
+              {(fixture.start_time || fixture.location) && (
+                <>
+                  <span className="mx-1.5">•</span>
+                  {fixture.start_time && `${fixture.start_time} `}
+                  {fixture.location && `@ ${fixture.location}`}
+                </>
+              )}
             </span>
           </div>
           

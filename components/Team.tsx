@@ -640,10 +640,19 @@ export default function Team() {
                              onClick={() => handleExpandFixture(f.id)}
                              className="w-full text-left p-4 focus:outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
                           >
-                             <div className="flex justify-between items-center w-full mb-3">
-                                 <div className="flex items-center gap-2">
-                                   {badgeText && <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest leading-none ${badgeColor}`}>{badgeText}</span>}
-                                   <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
+                             <div className="flex justify-between items-start w-full mb-3">
+                                 <div className="flex flex-col items-start gap-1">
+                                   {badgeText && <span className={`text-[9px] font-black uppercase px-2 py-1 rounded tracking-widest leading-none shadow-sm ${badgeColor}`}>{badgeText}</span>}
+                                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                                     {date}
+                                     {(f.start_time || f.location) && (
+                                       <>
+                                         <span className="mx-1.5">•</span>
+                                         {f.start_time && `${f.start_time} `}
+                                         {f.location && `@ ${f.location}`}
+                                       </>
+                                     )}
+                                   </span>
                                  </div>
                               </div>
 
