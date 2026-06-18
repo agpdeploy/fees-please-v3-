@@ -1197,7 +1197,7 @@ export default function Team() {
                                                       const isSelected = squadEmailSelectedPlayerIds.includes(p.id);
                                                       const hasSent = emailLogDetails.some(log => log.email_type === 'squad_notification' && log.players?.id === p.id);
                                                       const isSuperAdmin = profile?.role === 'super_admin';
-                                                      const isLocked = hasSent && !isSuperAdmin;
+                                                      const isLocked = hasSent;
                                                       const isDisabled = !hasEmail || p.unsubscribed === true || isLocked;
                                                       
                                                       return (
