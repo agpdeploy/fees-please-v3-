@@ -12,6 +12,7 @@ export default function Team() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeSeasonName, setActiveSeasonName] = useState<string | null | undefined>(undefined);
   const [planTier, setPlanTier] = useState<string>('free');
+  const [clubInfo, setClubInfo] = useState<any>({ name: 'FP', logo_url: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [clubPlayers, setClubPlayers] = useState<any[]>([]);
@@ -86,10 +87,11 @@ export default function Team() {
 
       
       // Fetch club info to get season_name and plan_tier for filtering/features
-      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier').eq('id', activeClubId).single();
+      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier, name, logo_url').eq('id', activeClubId).single();
       const clubSeasonName = clubData?.season_name || null;
       setActiveSeasonName(clubSeasonName);
       setPlanTier(clubData?.plan_tier || 'free');
+      if (clubData) setClubInfo(clubData);
 
       // 1. Determine Teams
       let teamQuery = supabase.from("teams").select("id, name, slug").eq("club_id", activeClubId);
@@ -638,13 +640,44 @@ export default function Team() {
                              onClick={() => handleExpandFixture(f.id)}
                              className="w-full text-left p-4 focus:outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
                           >
-                             <div className="flex justify-between items-end mb-3">
-                                <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wide">VS {f.opponent}</span>
-                                <div className="flex items-center gap-2">
-                                  {badgeText && <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest leading-none ${badgeColor}`}>{badgeText}</span>}
-                                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
+                             <div className="flex justify-between items-center w-full mb-3">
+                                 <div className="flex items-center gap-2">
+                                   {badgeText && <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest leading-none ${badgeColor}`}>{badgeText}</span>}
+                                   <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{date}</span>
+                                 </div>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2 w-full mb-4">
+                                <div className="flex items-center gap-3 flex-1">
+                                  <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
+                                    {clubInfo?.logo_url ? (
+                                      <img src={clubInfo.logo_url} alt="Club Logo" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[10px] font-black text-zinc-500">{clubInfo?.name?.substring(0, 2).toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white leading-tight break-words text-left">
+                                    {teams.find(t => t.id === f.team_id)?.name || "Team"}
+                                  </span>
                                 </div>
-                             </div>
+
+                                <div className="shrink-0 px-2 text-center">
+                                  <span className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic uppercase tracking-widest">VS</span>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-3 flex-1">
+                                  <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
+                                    {f.opponent}
+                                  </span>
+                                  <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                    {f.opponent_logo_url ? (
+                                      <img src={f.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                           
                           <div className="w-full h-3.5 bg-zinc-200 dark:bg-zinc-900 rounded-full overflow-hidden flex shadow-inner">
                              <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 h-full transition-all"></div>

@@ -1708,34 +1708,61 @@ export default function GameDay() {
                     return (
                       <div key={pf.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm transition-colors overflow-hidden">
                          
-                         {/* Match Header (Clickable) */}
                          <div 
                            onClick={() => togglePastFixtureForAi(pf)} 
-                           className={`flex justify-between items-center p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-zinc-50 dark:bg-zinc-800/50' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}
+                           className={`flex flex-col gap-2 p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-zinc-50 dark:bg-zinc-800/50' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}
                          >
-                           <div className="flex-1 min-w-0 pr-4">
-                              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-0.5">
+                           <div className="flex justify-between items-center w-full mb-1">
+                              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
                                  {new Date(pf.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                                  <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
                                  <span className={pf.status === 'completed' ? 'text-emerald-500' : pf.status === 'forfeited' ? 'text-orange-500' : 'text-red-500'}>{pf.status}</span>
                               </div>
-                              <div className="font-bold text-sm text-zinc-900 dark:text-white uppercase tracking-wide leading-tight break-words">
-                                 VS {pf.opponent}
+                              
+                              <button 
+                                 disabled={isProcessing}
+                                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm shrink-0 disabled:opacity-50 ${isExpanded ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'}`}
+                                 title={isExpanded ? "Close Reporter" : "Generate Match Report"}
+                              >
+                                 {isProcessing && expandedPastFixtureId === pf.id ? (
+                                   <i className="fa-solid fa-circle-notch fa-spin text-emerald-600"></i>
+                                 ) : (
+                                   <i className={`fa-solid ${isExpanded ? 'fa-chevron-up text-xs' : 'fa-wand-magic-sparkles text-emerald-500'}`}></i>
+                                 )}
+                              </button>
+                           </div>
+
+                           <div className="flex items-center justify-between gap-2 w-full mt-1 border-t border-zinc-100 dark:border-zinc-800/50 pt-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
+                                  {clubInfo?.logo ? (
+                                    <img src={clubInfo.logo} alt="Club Logo" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-[10px] font-black text-zinc-500">{clubInfo?.name?.substring(0, 2).toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white leading-tight break-words">
+                                  {currentTeamName}
+                                </span>
+                              </div>
+
+                              <div className="shrink-0 px-2 text-center">
+                                <span className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic uppercase tracking-widest">VS</span>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-3 flex-1">
+                                <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
+                                  {pf.opponent}
+                                </span>
+                                <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                  {pf.opponent_logo_url ? (
+                                    <img src={pf.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <i className="fa-solid fa-shield text-zinc-300 dark:border-zinc-700 text-xs"></i>
+                                  )}
+                                </div>
                               </div>
                            </div>
-                           
-                           {/* Magic Wand Action Button */}
-                           <button 
-                              disabled={isProcessing}
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm shrink-0 disabled:opacity-50 ${isExpanded ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'}`}
-                              title={isExpanded ? "Close Reporter" : "Generate Match Report"}
-                           >
-                              {isProcessing && expandedPastFixtureId === pf.id ? (
-                                <i className="fa-solid fa-circle-notch fa-spin text-emerald-600"></i>
-                              ) : (
-                                <i className={`fa-solid ${isExpanded ? 'fa-chevron-up text-xs' : 'fa-wand-magic-sparkles text-emerald-500'}`}></i>
-                              )}
-                           </button>
                          </div>
 
                          {/* Inline AI Reporter Area */}
