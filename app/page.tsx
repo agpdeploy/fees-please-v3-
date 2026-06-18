@@ -208,6 +208,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (profileLoading) return;
+
     const savedClubId = typeof window !== 'undefined' ? localStorage.getItem('fp_active_club_id') : null;
 
     let targetClubId = activeClubId;
@@ -260,7 +262,7 @@ export default function Home() {
         localStorage.removeItem('fp_active_club_id');
       }
     }
-  }, [profile, roles, activeClubId, setActiveClubId, allClubs, creatingTeam]);
+  }, [profile, roles, activeClubId, setActiveClubId, allClubs, creatingTeam, profileLoading]);
 
   useEffect(() => {
     if (profile && !isAdmin && activeTab === 'setup') {
