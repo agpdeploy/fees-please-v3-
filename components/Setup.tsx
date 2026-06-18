@@ -1477,8 +1477,8 @@ export default function Setup({ activeTab }: SetupProps) {
                     <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-1">Active Season</h3>
                     <p className="text-lg font-black text-emerald-600 dark:text-emerald-500 tracking-tight">{clubRecord.season_name}</p>
                     {(clubRecord.season_start || clubRecord.season_end) && (
-                      <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-                        {clubRecord.season_start ? new Date(clubRecord.season_start).toLocaleDateString() : 'TBA'} - {clubRecord.season_end ? new Date(clubRecord.season_end).toLocaleDateString() : 'TBA'}
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1 tracking-wider">
+                        {clubRecord.season_start ? new Date(clubRecord.season_start).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : 'TBA'} - {clubRecord.season_end ? new Date(clubRecord.season_end).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : 'TBA'}
                       </p>
                     )}
                   </div>
