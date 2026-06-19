@@ -112,11 +112,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       setSeasonName(clubInfo.season_name || "");
       setSeasonStart(clubInfo.season_start || "");
       setSeasonEnd(clubInfo.season_end || "");
+      
+      // Keep showPlayhqBox synced with club updates to prevent stale state
+      setShowPlayhqBox(!isPlayhq);
 
-      if (activeClubId && setupPath === null) {
-        if (isPlayhq) {
+      if (activeClubId) {
+        if (isPlayhq && setupPath !== 'playhq') {
           setSetupPath('playhq');
-        } else {
+        } else if (!isPlayhq && setupPath === null) {
           setSetupPath('manual');
         }
       }
@@ -296,20 +299,22 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         }
       }
 
-      if (data.seasonName || data.seasonStart || data.seasonEnd) {
+      if (data.seasonName || data.seasonStart || data.seasonEnd || currentClubId) {
         const updatePayload: any = {};
         if (data.seasonName) updatePayload.season_name = data.seasonName;
         if (data.seasonStart) updatePayload.season_start = data.seasonStart;
         if (data.seasonEnd) updatePayload.season_end = data.seasonEnd;
         // Ensure default umpire fee is wiped if we are syncing PlayHQ
         updatePayload.default_umpire_fee = null;
+        updatePayload.club_cat = 'PlayHQ';
 
         await supabase.from('clubs').update(updatePayload).eq('id', currentClubId);
         
         if (onUpdateClubInfo) {
           onUpdateClubInfo({ 
             ...clubInfo, 
-            ...updatePayload
+            ...updatePayload,
+            club_cat: 'PlayHQ'
           });
         }
         if (data.seasonName) setSeasonName(data.seasonName);
@@ -886,7 +891,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       return;
     }
     
-    if (!clubData || clubData.length === 0) {
+    if (targetTeamId) { const t = teams.find(t => t.id === targetTeamId); if (t) { t.member_fee = memberFee !== "" ? memberFee : null; } }
+
+      if (!clubData || clubData.length === 0) {
       alert("Error: Database rejected the season update. Permission denied or club not found.");
       return;
     }

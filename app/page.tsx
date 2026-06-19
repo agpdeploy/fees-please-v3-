@@ -71,11 +71,17 @@ export default function Home() {
   // --- ROLE CHECKING LOGIC ---
   const isSuperAdmin = profile?.role === 'super_admin';
   const rolesForClub = roles?.filter((r: any) => r.club_id === activeClubId) || [];
-  const currentClubRole = isSuperAdmin ? 'super_admin' : (
-    rolesForClub.some((r: any) => r.role === 'club_admin') ? 'club_admin' :
-    rolesForClub.some((r: any) => r.role === 'team_admin') ? 'team_admin' :
-    rolesForClub[0]?.role
-  );
+    const currentClubRole = isSuperAdmin ? 'super_admin' : (
+      activeClubId ? (
+        rolesForClub.some((r: any) => r.role === 'club_admin') ? 'club_admin' :
+        rolesForClub.some((r: any) => r.role === 'team_admin') ? 'team_admin' :
+        rolesForClub[0]?.role
+      ) : (
+        roles?.some((r: any) => r.role === 'club_admin') ? 'club_admin' :
+        roles?.some((r: any) => r.role === 'team_admin') ? 'team_admin' :
+        profile?.role
+      )
+    );
   const isAdmin = isSuperAdmin || currentClubRole === 'club_admin';
   const isTeamAdmin = rolesForClub.some((r: any) => r.role === 'team_admin');
   const canManage = isAdmin || isTeamAdmin;
@@ -227,7 +233,7 @@ export default function Home() {
     }
 
     // Auto-correct if the targetClubId is no longer valid for this user
-    if (targetClubId && profile?.role !== 'super_admin') {
+    if (targetClubId && profile?.role !== 'super_admin' && !creatingTeam) {
       const isValid = roles && roles.some((r: any) => r.club_id === targetClubId);
       const isProfileClub = profile?.club_id === targetClubId;
       
@@ -236,9 +242,10 @@ export default function Home() {
       }
     }
 
-    if (creatingTeam) {
-      targetClubId = null;
-    }
+    // Allow the activeClubId to remain whatever it was set to by the club-created event
+    // if (creatingTeam) {
+    //   targetClubId = null;
+    // }
 
     if (targetClubId !== activeClubId) {
       setActiveClubId(targetClubId);
@@ -306,11 +313,20 @@ export default function Home() {
         handleTabChange(customEvent.detail); 
       }
     };
+    const handleClubCreated = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setActiveClubId(customEvent.detail);
+        localStorage.setItem('fp_active_club_id', customEvent.detail);
+      }
+    };
     window.addEventListener('navigate-setup', handleNavigateSetup);
     window.addEventListener('navigate-tab', handleNavigateTab);
+    window.addEventListener('club-created', handleClubCreated);
     return () => {
       window.removeEventListener('navigate-setup', handleNavigateSetup);
       window.removeEventListener('navigate-tab', handleNavigateTab);
+      window.removeEventListener('club-created', handleClubCreated);
     };
   }, []);
 
