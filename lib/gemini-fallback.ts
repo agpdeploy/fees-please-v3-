@@ -11,10 +11,10 @@ const google = createGoogleGenerativeAI({
  */
 export async function generateContentWithFallback(genAI: GoogleGenerativeAI, promptArr: any[], systemInstruction?: string, safetySettings?: any[]) {
   const fallbackModels = [
-    "gemini-flash-latest",
-    "gemini-pro-latest",
+    "gemini-1.5-flash",
     "gemini-2.5-flash",
-    "gemini-2.5-pro"
+    "gemini-2.5-pro",
+    "gemini-1.5-pro"
   ];
 
   let lastError: any = null;
@@ -42,10 +42,10 @@ export async function generateContentWithFallback(genAI: GoogleGenerativeAI, pro
  */
 export async function generateTextWithFallback(params: any) {
   const fallbackModels = [
-    "gemini-flash-latest",
-    "gemini-pro-latest",
+    "gemini-1.5-flash",
     "gemini-2.5-flash",
-    "gemini-2.5-pro"
+    "gemini-2.5-pro",
+    "gemini-1.5-pro"
   ];
   
   let lastError: any = null;
@@ -53,7 +53,8 @@ export async function generateTextWithFallback(params: any) {
     try {
       return await generateText({
         ...params,
-        model: google(modelName)
+        model: google(modelName),
+        maxRetries: 0
       });
     } catch (error: any) {
       console.warn(`[Fallback Warning] AI SDK Model ${modelName} failed:`, error.message);

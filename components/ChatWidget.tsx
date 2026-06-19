@@ -3,24 +3,21 @@
 import { useState, useRef, useEffect } from "react";
 import { useActiveClub } from "@/contexts/ClubContext";
 import { useProfile } from "@/lib/useProfile";
+import { supabase } from "@/lib/supabase";
 import ReactMarkdown from 'react-markdown';
 
-type Message = { id: string; role: 'user' | 'assistant'; content: string; logId?: string; rating?: 1 | -1 };
+type Attachment = { name: string; url: string; path: string };
+type Message = { id: string; role: 'user' | 'assistant'; content: string; logId?: string; rating?: 1 | -1; attachments?: Attachment[] };
 
-const INITIAL_MESSAGE: Message = {
-  id: 'welcome',
-  role: 'assistant',
-  content: "I'm **dAIve**. I can help you search the manual, check the ledger, and pull fixture data.\n\nWhat do you need a hand with?"
-};
 
 const QUICK_PROMPTS = ["Can you help me get started?", "How much money have we collected?", "When is our next game?"];
-const THINKING_STATES = ["Analyzing request...", "Searching the manual...", "Checking ledger...", "Formatting response..."];
 
 export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClose?: () => void }) {
   const [text, setText] = useState("");
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [thinkingText, setThinkingText] = useState(THINKING_STATES[0]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   
   const { activeClubId } = useActiveClub();
   const { profile } = useProfile();
@@ -28,42 +25,82 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const key = `daive_chat_${activeClubId || 'default'}`;
+    const key = `daive_chat_${activeClubId || 'default'}_${profile?.id || 'anon'}`;
     const saved = localStorage.getItem(key);
     if (saved) {
       try {
         setMessages(JSON.parse(saved));
       } catch (e) { }
+    } else {
+      setMessages([{ id: '1', role: 'assistant', content: 'Hey there! I’m dAIve, your team’s personal tactical support assistant. I’m here to help you navigate the system, set up your club, manage payments and ledger, and pull fixture data.\nWhat do you need a hand with?' }]);
     }
-  }, [activeClubId]);
+  }, [activeClubId, profile?.id]);
 
   useEffect(() => {
-    const key = `daive_chat_${activeClubId || 'default'}`;
+    const key = `daive_chat_${activeClubId || 'default'}_${profile?.id || 'anon'}`;
     if (messages.length > 1) {
       localStorage.setItem(key, JSON.stringify(messages));
     }
-  }, [messages, activeClubId]);
+  }, [messages, activeClubId, profile?.id]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, isLoading]);
 
-  useEffect(() => {
-    if (!isLoading) return;
-    let i = 0;
-    const interval = setInterval(() => {
-      i = (i + 1) % THINKING_STATES.length;
-      setThinkingText(THINKING_STATES[i]);
-    }, 1500);
-    return () => clearInterval(interval);
-  }, [isLoading]);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (activeClubId) formData.append('clubId', activeClubId);
+
+      const response = await fetch('/api/upload-attachment', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.path) {
+        setAttachments(prev => [...prev, { name: data.name, url: data.url, path: data.path }]);
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRate = async (msgId: string, logId: string | undefined, rating: 1 | -1) => {
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, rating } : m));
+    
+    if (!logId) return;
+    
+    try {
+      await fetch('/api/ai-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logId, rating })
+      });
+    } catch (error) {
+      console.error("Failed to submit rating", error);
+    }
+  };
 
   const sendMessage = async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
+    if ((!messageText.trim() && attachments.length === 0) || isLoading) return;
+    const messageAttachments = [...attachments];
     setText(""); 
+    setAttachments([]);
     setIsLoading(true);
 
-    const newMessages: Message[] = [...messages, { id: Date.now().toString(), role: 'user', content: messageText }];
+    const newMessages: Message[] = [...messages, { id: Date.now().toString(), role: 'user', content: messageText, attachments: messageAttachments }];
     setMessages(newMessages);
 
     const assistantMessageId = (Date.now() + 1).toString();
@@ -74,18 +111,30 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: newMessages.map(m => ({ role: m.role, content: m.content, attachments: m.attachments })),
           clubId: activeClubId || profile?.club_id || "Unknown",
           teamId: teamId || "Unknown",
           userId: profile?.id || "Unknown" 
         }),
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error("Parse error:", e);
+        throw new Error("Server returned an invalid response.");
+      }
+
+      if (!response.ok) {
+        throw new Error(data.text || data.error || "Server error");
+      }
+
       setMessages((prev) => prev.map((msg) => 
         msg.id === assistantMessageId ? { ...msg, content: data.text, logId: data.logId } : msg
       ));
-    } catch (err) {
-      setMessages((prev) => prev.map((msg) => msg.id === assistantMessageId ? { ...msg, content: "System error, mate." } : msg));
+    } catch (err: any) {
+      console.error("Chat error:", err);
+      setMessages((prev) => prev.map((msg) => msg.id === assistantMessageId ? { ...msg, content: `System error, mate: ${err.message}` } : msg));
     } finally {
       setIsLoading(false);
     }
@@ -109,8 +158,8 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
         <div className="flex items-center gap-1">
           <button 
             onClick={() => {
-              setMessages([INITIAL_MESSAGE]);
-              localStorage.removeItem(`daive_chat_${activeClubId || 'default'}`);
+              setMessages([{ id: '1', role: 'assistant', content: 'Hey there! I’m dAIve, your team’s personal tactical support assistant. I’m here to help you navigate the system, set up your account, manage payments and ledger, and pull fixture data. What do you need a hand with?' }]);
+              localStorage.removeItem(`daive_chat_${activeClubId || 'default'}_${profile?.id || 'anon'}`);
             }}
             title="Reset Chat"
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors text-emerald-100"
@@ -129,18 +178,38 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50 dark:bg-[#0a0a0a]">
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`px-4 py-3 max-w-[90%] text-sm rounded-2xl shadow-sm ${m.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-none'}`}>
+             <div className={m.content === '' ? 'py-2 px-1' : `px-4 py-3 max-w-[90%] text-sm rounded-2xl shadow-sm ${m.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-none'}`}>
                <div className={`prose prose-sm max-w-none ${m.role === 'user' ? 'text-white prose-headings:text-white prose-strong:text-white prose-a:text-white' : 'dark:prose-invert prose-emerald'}`}>
-                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                  {m.content === '' ? (
+                    <div className="flex items-center text-zinc-400">
+                      <i className="fa-solid fa-circle-notch fa-spin text-emerald-500 text-lg"></i>
+                    </div>
+                  ) : (
+                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                  )}
+                  {m.attachments && m.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {m.attachments.map((att, i) => (
+                        <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-black/20 rounded-md text-[10px] flex items-center gap-1 hover:bg-black/30 transition-colors">
+                          <i className="fa-solid fa-paperclip"></i> {att.name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                </div>
             </div>
+            {m.role === 'assistant' && m.content !== '' && m.id !== 'welcome' && (
+               <div className="flex gap-3 mt-1.5 px-2 text-zinc-400">
+                 <button onClick={() => handleRate(m.id, m.logId, 1)} className={`p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-emerald-500 transition-colors ${m.rating === 1 ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : ''}`}>
+                   <i className="fa-solid fa-thumbs-up text-sm"></i>
+                 </button>
+                 <button onClick={() => handleRate(m.id, m.logId, -1)} className={`p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-rose-500 transition-colors ${m.rating === -1 ? 'text-rose-500 bg-rose-50 dark:bg-rose-900/20' : ''}`}>
+                   <i className="fa-solid fa-thumbs-down text-sm"></i>
+                 </button>
+               </div>
+            )}
           </div>
         ))}
-        {isLoading && (
-          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 animate-pulse flex items-center gap-2">
-            <i className="fa-solid fa-circle-notch fa-spin"></i> {thinkingText}
-          </div>
-        )}
       </div>
 
       {/* QUICK PROMPTS */}
@@ -160,17 +229,32 @@ export default function ChatWidget({ teamId, onClose }: { teamId?: string; onClo
 
       {/* INPUT AREA */}
       <div className="p-3 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
-        <form onSubmit={(e) => { e.preventDefault(); sendMessage(text); }} className="flex gap-2">
-          <input
-            ref={inputRef}
-            value={text} 
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Ask dAIve..."
-            className="flex-1 min-w-0 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition-colors"
-          />
-          <button type="submit" disabled={isLoading || !text.trim()} className="w-12 shrink-0 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-            <i className="fa-solid fa-paper-plane text-sm"></i>
-          </button>
+        <form onSubmit={(e) => { e.preventDefault(); sendMessage(text); }} className="flex flex-col gap-2">
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 pb-1">
+              {attachments.map((att, i) => (
+                <div key={i} className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-md text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
+                  <i className="fa-solid fa-paperclip"></i> {att.name}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <label className={`w-12 shrink-0 flex items-center justify-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}>
+              {isUploading ? <i className="fa-solid fa-circle-notch fa-spin text-zinc-400"></i> : <i className="fa-solid fa-paperclip text-zinc-500"></i>}
+              <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+            </label>
+            <input
+              ref={inputRef}
+              value={text} 
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Get Help..."
+              className="flex-1 min-w-0 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition-colors"
+            />
+            <button type="submit" disabled={isLoading || (!text.trim() && attachments.length === 0)} className="w-12 shrink-0 py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+              <i className="fa-solid fa-paper-plane text-sm"></i>
+            </button>
+          </div>
         </form>
         <div className="text-center mt-2 text-[10px] text-zinc-500 dark:text-zinc-400">
           dAIve is an AI assistant and may make mistakes.

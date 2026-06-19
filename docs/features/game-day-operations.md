@@ -5,29 +5,58 @@ parent: User Documentation
 
 # Game Day Operations
 
-The **Game Day** portal is the central cockpit for team administrators on match day. It allows you to select matches, manage active lineups, log payments, and close out fixtures.
+The **Game Day** portal is your central cockpit on match day. It allows you to select matches, manage your active lineup, log payments, and close out fixtures.
 
-## 1. Lineup & Player Availability
+## 1. Accessing the Game Day Portal
 
-Before the match begins, you can organize your active team list:
-- **Availability Check-ins**: View pre-match check-ins to see who is available, tentative, or unavailable.
-- **Lineup Management**: Manage your active lineup. You can quickly add or remove players from the active list for the selected match.
-- **Roster Auto-Merge**: If casual or emergency players are added, they are automatically merged into the database to maintain ledger history.
+1. Log in to your Fees Please account.
+2. In the left navigation sidebar, click on **Game Day**.
+3. Select the team you are managing from the top dropdown menu (if you manage multiple teams).
+4. Click on the upcoming match from the **Fixtures** list to open the Game Day cockpit for that specific match.
 
----
+## 2. Managing the Lineup & Player Availability
 
-## 2. Logging Payments & Finalizing Matches
+Before the match begins, configure who is playing:
 
-During or after the match, you can log who has paid their fee:
-- **Payment Toggles**: Check off players as they pay. You can log payments using card (via Square), cash, or PayID.
-- **Umpire Return**: Log the umpire fee distributed for the match.
-- **Finalize Match**: Once all fees are logged, click **Finalize Match**. Finalizing locks the match state and posts the respective fees/payments to the ledger database, preventing future accidental alterations.
+1. **Review Availability:**
+   * Look at the **Pre-Match Check-ins** panel on the right side of the screen.
+   * This panel displays who has marked themselves as available, tentative, or unavailable for the current match.
+2. **Build the Lineup:**
+   * In the main **Active Lineup** panel, click the **+ Add Player** button.
+   * A modal will appear. Select players from your main roster by checking the box next to their names, or type a new name to add a casual/emergency player.
+   * Click **Save Lineup**.
+   * *Note: Any casual players added here are automatically merged into your database to ensure their ledger history is tracked.*
+3. **Remove Players:**
+   * If a player drops out, click the **X** (or trash can icon) next to their name in the Active Lineup panel.
 
----
+## 3. Logging Payments
 
-## 3. AI Game Reporter
+During or immediately after the match, you must track who has paid their fee:
 
-Create match summaries effortlessly:
-- Once a match is finalized, you can trigger the **AI Game Reporter**.
-- Using the roster, score, and match details, the integrated Gemini model auto-generates a match summary, game report, or WhatsApp-ready highlight update.
-- You can copy this directly to send to your group chat or post to social media.
+1. Under the **Match Fees** section of the Game Day cockpit, you will see a list of players currently in your Active Lineup.
+2. **Marking as Paid:**
+   * Next to each player's name, there is a payment status toggle.
+   * Click the toggle or the **Pay** button.
+   * A dropdown menu will appear. Select the payment method used: **Card (Square)**, **Cash**, or **PayID**.
+   * The player's row will turn green and be marked as "Paid".
+3. **Logging Umpire Fees:**
+   * Scroll down to the **Umpire Return** section.
+   * Enter the exact dollar amount distributed to the umpire/referee for this match.
+   * Click **Save Umpire Fee**.
+
+## 4. Finalizing the Match
+
+Once all payments are logged and the game concludes:
+
+1. Review the summary panel at the bottom of the screen to ensure the total collected matches your expectations.
+2. Click the large, green **Finalize Match** button at the bottom right.
+3. A confirmation popup will appear. Click **Confirm Finalize**.
+   * *Warning: Finalizing locks the match state and securely posts all fees and payments to the ledger database. You cannot accidentally alter the match once finalized.*
+
+## 5. Generating an AI Game Report
+
+1. After the match is finalized, a new button labeled **Generate AI Game Report** will appear on the match summary screen.
+2. Click this button.
+3. The integrated Gemini model will analyze the roster, logged payments, and match details to automatically generate a summary.
+4. Review the generated text in the text box.
+5. Click **Copy to Clipboard** and paste it directly into your WhatsApp group chat or social media to share the match highlights with your team!

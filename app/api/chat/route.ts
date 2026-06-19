@@ -5,14 +5,19 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js'; 
 import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
+  let reqData: any = {};
   try {
-    const { messages, clubId, userId } = await req.json();
+    reqData = await req.json();
+    const { messages, clubId, userId } = reqData;
     const activeClub = clubId && clubId !== "Unknown" ? clubId : null;
-    const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content || "";
+    const lastUserMsgObj = messages.filter((m: any) => m.role === 'user').pop();
+    const lastUserMessage = lastUserMsgObj?.content || "";
+    const lastUserAttachments = lastUserMsgObj?.attachments || [];
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -20,14 +25,32 @@ export async function POST(req: Request) {
     );
 
     let userRole = "Member";
+    let userEmail = "";
+    let userName = "Unknown User";
+    let clubName = "Unknown Club";
+    let planTier = "Free";
+    
+    if (activeClub) {
+      const { data: club } = await supabaseAdmin.from('clubs').select('name, plan_tier').eq('id', activeClub).single();
+      if (club) {
+        clubName = club.name;
+        planTier = club.plan_tier || "Free";
+      }
+    }
+
     if (userId !== "Unknown") {
-      const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
+      const { data: userAuth } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (userAuth?.user?.email) userEmail = userAuth.user.email;
+      const { data: profile } = await supabaseAdmin.from('profiles').select('first_name, last_name, role').eq('id', userId).single();
+      if (profile) userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User";
       if (profile?.role === 'super_admin') {
         userRole = "Super Admin";
       } else if (activeClub) {
-        const { data: roleData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', userId).eq('club_id', activeClub).single();
-        if (roleData) {
-          userRole = roleData.role === 'club_admin' ? 'Club Admin' : (roleData.role === 'team_admin' ? 'Team Admin' : 'Member');
+        const { data: rolesData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', userId).eq('club_id', activeClub);
+        if (rolesData && rolesData.length > 0) {
+          const isClubAdmin = rolesData.some((r: any) => r.role === 'club_admin');
+          const isTeamAdmin = rolesData.some((r: any) => r.role === 'team_admin');
+          userRole = isClubAdmin ? 'Account Admin' : (isTeamAdmin ? 'Team Admin' : 'Member');
         }
       }
     }
@@ -39,7 +62,8 @@ export async function POST(req: Request) {
       CORE IDENTITY & TONE:
       - You are a helpful, direct club mate. No robotic filler.
       - CONCISENESS IS MANDATORY: Keep responses under 3 sentences whenever possible. Never output large walls of text. 
-      - The user speaking to you has the role: ${userRole}. Tailor your advice to what this role can do (e.g. Club Admins manage global settings and all teams; Team Admins manage only their assigned teams).
+      - The user speaking to you is a ${userRole} for the club "${clubName}". Tailor your advice to what this role can do (e.g. Account Admins manage global settings and all teams; Team Admins manage only their assigned teams).
+      - The club "${clubName}" is currently on the ${planTier.toUpperCase()} plan. If they ask about features, keep their plan and access level in mind.
       
       SETUP & PROACTIVE HELP:
       - If the user asks for setup help, or asks general questions like "what's next?" or "getting started", ALWAYS use 'get_club_setup_status' to check their progress.
@@ -53,6 +77,7 @@ export async function POST(req: Request) {
       
       KNOWLEDGE & TOOLS:
       - "What is Fees Please?": Payment/roster app for grassroots clubs.
+      - "Plans & Pricing": Free (1 team limit, 2.5% fee), Plus (Unlimited teams, email reminders, game reports, 30c fee, billed per team), Pro (Flat rate for up to 5 teams, SMS coming soon).
       - "Next Game/Fixtures": You MUST use 'get_fixtures'.
       - "Ledger Totals": Use 'get_financial_summary'.
       - "How is that calculated?" or "Who owes what?": You MUST use 'get_ledger_breakdown'.
@@ -137,6 +162,171 @@ export async function POST(req: Request) {
             }).join('\n');
             return `Individual Player Breakdown:\n${breakdown}`;
           }
+        }),
+        raise_jsm_ticket: tool({
+          description: 'Raise a support ticket in Jira Service Management (JSM) when a problem cannot be resolved.',
+          parameters: z.object({
+            summary: z.string().optional().describe('A clear, human-readable title summarizing the user\'s issue.'),
+            description: z.string().optional().describe('A detailed, human-readable explanation of what is going wrong based on the conversation.')
+          }),
+          execute: async ({ summary, description }) => {
+            if (!activeClub) return "ERROR: No club selected. Cannot raise ticket.";
+            try {
+              const email = process.env.CONFLUENCE_USER_EMAIL;
+              const apiToken = process.env.CONFLUENCE_API_TOKEN;
+              const domain = process.env.CONFLUENCE_DOMAIN;
+              const serviceDeskId = process.env.JSM_SERVICE_DESK_ID || "1";
+              const requestTypeId = process.env.JSM_REQUEST_TYPE_ID || "1";
+
+              const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+              const finalSummary = summary || `Support request for ${clubName}`;
+              const finalDescription = description || 'No description provided by AI.';
+
+              // --- Handle JSM Organization ---
+              let orgId = null;
+              if (clubName !== "Unknown Club") {
+                const orgSearch = await fetch(`https://${domain}/rest/servicedeskapi/organization?searchTerm=${encodeURIComponent(clubName)}`, {
+                   headers: { 'Authorization': `Basic ${auth}`, 'Accept': 'application/json' }
+                });
+                const orgData = await orgSearch.json();
+                if (orgData.values && orgData.values.length > 0) {
+                  orgId = orgData.values[0].id;
+                } else {
+                  const orgCreate = await fetch(`https://${domain}/rest/servicedeskapi/organization`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ name: clubName })
+                  });
+                  if (orgCreate.ok) {
+                    const newOrg = await orgCreate.json();
+                    orgId = newOrg.id;
+                  }
+                }
+              }
+
+              // --- Create Ticket ---
+              const payload: any = {
+                serviceDeskId, requestTypeId,
+                requestFieldValues: { summary: finalSummary, description: finalDescription }
+              };
+              if (userEmail) {
+                payload.raiseOnBehalfOf = userEmail;
+              }
+
+              const response = await fetch(`https://${domain}/rest/servicedeskapi/request`, {
+                method: 'POST',
+                headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.errorMessage || 'JSM API failed');
+
+              const issueKey = data.issueKey;
+              const reporterAccountId = data.reporter?.accountId;
+
+              // --- Add user to Org ---
+              if (orgId && reporterAccountId) {
+                 await fetch(`https://${domain}/rest/servicedeskapi/organization/${orgId}/user`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ accountIds: [reporterAccountId] })
+                 });
+              }
+
+              // --- Add Internal Comment for Diagnostics ---
+              const posthogUrl = `https://us.posthog.com/project/415115/person/${userId}?activeTab=sessionRecordings`;
+              const conversationLog = messages.map((m: any) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+              const internalCommentBody = `--- Conversation Log ---\n${conversationLog}\n\n--- Diagnostic Context ---\nClub: ${clubName} (ID: ${activeClub})\nUser: ${userName} (ID: ${userId})\nUser Role: ${userRole}\nPostHog Replay: ${posthogUrl}`;
+              
+              await fetch(`https://${domain}/rest/servicedeskapi/request/${issueKey}/comment`, {
+                method: 'POST',
+                headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ body: internalCommentBody, public: false })
+              });
+
+              // --- Upload Attachments ---
+              if (lastUserAttachments.length > 0) {
+                for (const file of lastUserAttachments) {
+                  const { data: fileBlob } = await supabaseAdmin.storage.from('support-attachments').download(file.path);
+                  if (fileBlob) {
+                    const formData = new FormData();
+                    formData.append('file', fileBlob, file.name);
+                    await fetch(`https://${domain}/rest/servicedeskapi/request/${issueKey}/attachment`, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Basic ${auth}`, 'X-Atlassian-Token': 'no-check' },
+                      body: formData as any
+                    });
+                  }
+                }
+              }
+
+              // --- Send Initial Welcome Email via Resend ---
+              if (userEmail && process.env.RESEND_API_KEY) {
+                try {
+                  const resend = new Resend(process.env.RESEND_API_KEY);
+                  const { data: resendData, error: resendError } = await resend.emails.send({
+                    from: 'Fees Please Support <support@mail.feesplease.app>',
+                    to: userEmail,
+                    subject: `Support Request Logged - Ref: ${issueKey}`,
+                    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 0; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #f9fafb; padding: 40px 0; }
+    .main { background-color: #ffffff; margin: 0 auto; max-width: 500px; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
+    .header { padding: 32px 32px 20px 32px; text-align: center; }
+    .content { padding: 0 40px 40px 40px; text-align: left; }
+    h1 { color: #111827; font-size: 22px; font-weight: 700; margin-bottom: 24px; text-align: center; }
+    p { color: #4b5563; font-size: 16px; line-height: 24px; margin-bottom: 24px; }
+    .footer { text-align: center; font-size: 12px; color: #9ca3af; padding: 24px; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="main">
+      <div class="header">
+        <img src="https://joazqqkfqxaujebfhges.supabase.co/storage/v1/object/public/Logo/fees-please-email-1000x150.png" width="300" alt="Fees Please">
+      </div>
+      <div class="content">
+        <h1>Support Request Logged</h1>
+        <p>Hi${userName !== "Unknown User" ? ' ' + userName.split(' ')[0] : ''},</p>
+        <p>Thanks for reaching out. We've successfully logged a ticket with our engineering team.</p>
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
+            <p style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Your Reference</p>
+            <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: 900; color: #00B27A;">${issueKey}</p>
+        </div>
+        <p>Our team will investigate and if they need to respond, you'll receive an email notification directly from our ticketing system.</p>
+        <p style="margin-bottom: 0;">Cheers,<br><strong>The Fees Please Team</strong></p>
+      </div>
+    </div>
+    <div class="footer">
+      <strong>Fees Please</strong><br>
+      Less chasing. More playing.
+    </div>
+  </div>
+</body>
+</html>
+                    `
+                  });
+                  if (resendError) {
+                    console.error("Resend API error:", resendError);
+                  } else {
+                    console.log("Resend email sent successfully:", resendData);
+                  }
+                } catch (emailErr) {
+                  console.error("Failed to send Resend email:", emailErr);
+                }
+              }
+
+              return `Got it! I've logged a ticket with support for you. The reference number is ${issueKey}. We've emailed you with a reference and will get back to you as soon as we can. Is there anything else I can help you with today?`;
+            } catch (err) {
+              console.error("JSM ticket creation failed:", err);
+              return "I ran into an issue trying to submit the ticket, mate. Please try again shortly.";
+            }
+          }
         })
       }
     };
@@ -177,6 +367,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ text: finalText, logId });
   } catch (error) {
     console.error("CRITICAL ERROR:", error);
-    return NextResponse.json({ text: "Total stitch-up on the server, mate.", error: String(error) }, { status: 500 });
+    
+    // --- Auto Bug Reporting ---
+    try {
+      const domain = process.env.CONFLUENCE_DOMAIN;
+      const user = process.env.CONFLUENCE_USER_EMAIL;
+      const token = process.env.CONFLUENCE_API_TOKEN;
+      if (domain && user && token) {
+        const auth = Buffer.from(`${user}:${token}`).toString('base64');
+        const serviceDeskId = process.env.JSM_SERVICE_DESK_ID || '1';
+        const requestTypeId = process.env.JSM_REQUEST_TYPE_ID || '1';
+        
+        await fetch(`https://${domain}/rest/servicedeskapi/request`, {
+          method: 'POST',
+          headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            serviceDeskId,
+            requestTypeId,
+            requestFieldValues: {
+              summary: "CRITICAL: Automated Bug Report from AI Chat",
+              description: `An unhandled exception occurred in the AI Chat widget.\\n\\nError: ${String(error)}\\n\\nPayload context:\\n${JSON.stringify(reqData, null, 2)}`
+            }
+          })
+        });
+      }
+    } catch (bugErr) {
+      console.error("Failed to auto-report bug:", bugErr);
+    }
+
+    return NextResponse.json({ 
+      text: "I ran into a critical system error, but don't worry, I've automatically logged a bug report with our engineering team.", 
+      error: String(error) 
+    }, { status: 500 });
   }
 }

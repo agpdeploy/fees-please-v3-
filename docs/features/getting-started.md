@@ -5,34 +5,44 @@ parent: User Documentation
 
 # Getting Started & Onboarding Guide
 
-Welcome to Fees Please! This guide will walk you through setting up your account and getting ready for the season.
+Welcome to Fees Please! This guide provides a detailed, step-by-step walkthrough to help you set up your account and prepare for your first game day. 
 
-## Initial Account Setup
+## 1. Creating Your Account
 
-When you first sign up for Fees Please, you will be guided through an interactive onboarding checklist. This checklist is designed to configure your account step-by-step:
+When you first sign up, you will be taken through an onboarding checklist to configure the core settings of your account.
 
-### 1. Account Creation
-- Enter your account details (Name, Contact Email).
-- Set up a unique, friendly slug for your account. This slug is used in your public team and payment pages.
+1. Navigate to the registration page.
+2. Enter your account details (Name, Contact Email, Password).
+3. Set up a **Unique Slug**. 
+   * *Tip:* This slug creates the URL for your public team pages and payment portals (e.g., `feesplease.app/c/your-unique-slug`). Keep it short and recognizable.
+4. Click **Next** to proceed to Sport Selection.
 
-### 2. Sport Selection
-- Select the primary sport your teams play (e.g., Netball, Cricket, Basketball, Football, etc.).
-- You can search the sport database to find yours.
+## 2. Configuring Your Sport and Season
 
-### 3. Season Details & Configuration
-Define the core settings for the upcoming season:
-- **Match Fee Default**: The standard cost charged to a player per game.
-- **Umpire Fee Default**: The standard referee/umpire payment distributed for a match.
-- **Season Name**: Label your season (e.g., "Winter 2026", "Senior Summer Season").
+1. **Sport Selection:**
+   * On the sport selection screen, click the **Search** bar.
+   * Type in the primary sport your teams play (e.g., Netball, Cricket, Basketball, Football).
+   * Click on the correct sport from the dropdown list to select it.
+2. **Season Details:**
+   * **Match Fee Default:** Enter the standard dollar amount you charge each player per game.
+   * **Umpire Fee Default:** Enter the standard referee or umpire payment distributed for a match.
+   * **Season Name:** Type a label for your upcoming season (e.g., "Winter 2026" or "Senior Summer Season").
+3. Click **Save & Continue**.
 
-### 4. Logo Upload
-- Upload your account or team logo.
-- The app automatically performs client-side compression on the image to ensure fast load times and optimized storage.
+## 3. Uploading Your Logo
 
----
+1. On the Logo Upload screen, click the **Upload Image** area.
+2. Select your account or team logo from your device.
+3. The app will automatically optimize and compress your image for fast loading.
+4. Click **Complete Setup**.
 
-## Interactive Setup Checklist
+## 4. Using the Interactive Setup Checklist
 
-If you miss any steps during onboarding, don't worry! An **Interactive Setup Checklist** will appear directly on your dashboard. 
+If you exit the onboarding early, don't worry!
 
-* ℹ️ **Note:** The onboarding gatekeeper ensures that new accounts cannot access the full Game Day portal until the baseline setup is completed. This prevents issues with missing configurations during game day.
+1. Log in to your account to view the main **Dashboard**.
+2. Locate the **Interactive Setup Checklist** widget on the dashboard.
+3. The checklist will display any remaining tasks (e.g., "Connect Stripe", "Add Your First Team").
+4. Click on any unchecked item to be taken directly to the corresponding settings page.
+
+*ℹ️ **Note:** The onboarding gatekeeper ensures that your account cannot access the full Game Day portal until this baseline setup is completed, preventing missing configurations on game day.*

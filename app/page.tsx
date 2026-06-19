@@ -560,6 +560,12 @@ export default function Home() {
             </div>
 
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
+              <div>
+                <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                  <i className="fa-solid fa-life-ring w-5 text-center text-emerald-500"></i> Get Help
+                </button>
+              </div>
+
               {isAdmin && (
                 <div>
                   {/* APP MANAGEMENT SECTION */}
@@ -640,9 +646,7 @@ export default function Home() {
                     <i className="fa-solid fa-house w-5 text-center text-emerald-500"></i> Dashboard
                   </button>
                 )}
-                <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                  <i className="fa-solid fa-robot w-5 text-center text-emerald-500"></i> Ask dAIve
-                </button>
+
                 <button onClick={() => { setIsSidebarOpen(false); handleTabChange('referral'); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
                   <i className="fa-solid fa-gift w-5 text-center text-emerald-500"></i> Refer a Friend
                 </button>
