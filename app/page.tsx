@@ -282,6 +282,17 @@ export default function Home() {
   // Auto-redirect logic
   useEffect(() => {
     if (!profileLoading && profile && !creatingTeam) {
+      // Brand new accounts (no roles, no onboarding) should stay on gameday to complete setup
+      // unless they explicitly arrived on the referral tab (e.g. via /affiliates).
+      if ((!roles || roles.length === 0) && !profile.onboarding_completed) {
+        if (activeTab !== 'referral' && activeTab !== 'gameday') {
+          setActiveTab('gameday');
+        }
+        if (activeTab === 'gameday') {
+          return; // Stop further redirects so they stay on the onboarding checklist
+        }
+      }
+
       // Auto-redirect pure affiliates to partner portal
       const hasActiveTeam = profile.team_id || profile.club_id;
       if (!roles || roles.length === 0) {
