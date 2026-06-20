@@ -15,6 +15,7 @@ export default function Ledger() {
   const [allPlayers, setAllPlayers] = useState<any[]>([]); 
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
   
   const [seasonAudit, setSeasonAudit] = useState<any[]>([]);
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
@@ -115,7 +116,7 @@ export default function Ledger() {
     // 🔥 FIX: Fetch transactions and players at the CLUB level so balances track across multiple teams
     const [fixRes, txRes, playersRes, clubRes] = await Promise.all([
       supabase.from("fixtures").select("*").eq("team_id", activeTeamId).order("match_date", { ascending: false }),
-      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname, is_active ), fixtures ( opponent )`).eq("club_id", activeClubId).order("created_at", { ascending: false }),
+      supabase.from("transactions").select(`*, players ( id, first_name, last_name, nickname, is_active ), fixtures ( opponent ), teams ( name )`).eq("club_id", activeClubId).order("created_at", { ascending: false }),
       supabase.from("players").select('id, first_name, last_name, nickname, is_active').eq("club_id", activeClubId),
       supabase.from("clubs").select("season_name").eq("id", activeClubId).single()
     ]);
@@ -153,6 +154,7 @@ export default function Ledger() {
     const fixData = allFixtures.filter(f => !clubSeason || f.season_name === clubSeason);
     const txData = allTx.filter(t => !clubSeason || t.season_name === clubSeason);
 
+    setAllTransactions(txData);
     setFixtures(fixData);
     
     // Only display transactions in the feed if they belong to this team, OR if they are a club-wide player payment
@@ -260,7 +262,47 @@ export default function Ledger() {
 
   useEffect(() => { fetchLedger(); }, [activeTeamId, activeClubId]); // Re-fetch if either changes
 
-  // --- DERIVED GROUPED FEED ---
+  // --- DERIVED PLAYER GROUPED FEED (Cross-Team) ---
+  const playerGroupedFeed = useMemo(() => {
+    const map = new Map();
+    const groups: any[] = [];
+    
+    allTransactions.forEach(tx => {
+      if (!tx.player_id) return; // Only for player ledger
+      const dateObj = new Date(tx.created_at);
+      const dateKey = dateObj.toLocaleDateString('en-GB'); 
+      const groupKey = `${dateKey}_${tx.player_id}_${tx.team_id || 'global'}`;
+
+      if (!map.has(groupKey)) {
+        const newGroup = {
+          id: groupKey,
+          date: dateObj,
+          dateString: dateKey,
+          player_id: tx.player_id,
+          team_id: tx.team_id,
+          team_name: tx.teams?.name,
+          player_name: tx.players ? (tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim()) : 'Unknown',
+          paid: 0,
+          fee: 0,
+          expense: 0,
+          isPlayer: true,
+          raw_transactions: [],
+        };
+        map.set(groupKey, newGroup);
+        groups.push(newGroup);
+      }
+
+      const g = map.get(groupKey);
+      g.raw_transactions.push(tx);
+      if (tx.transaction_type === 'payment') g.paid += Number(tx.amount);
+      if (tx.transaction_type === 'fee') g.fee += Number(tx.amount);
+      if (tx.transaction_type === 'expense') g.expense += Number(tx.amount);
+    });
+
+    return groups.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [allTransactions]);
+
+  // --- DERIVED GROUPED FEED (Current Team Only) ---
   const groupedFeed = useMemo(() => {
     const map = new Map();
     const groups: any[] = [];
@@ -791,14 +833,19 @@ export default function Ledger() {
                                 <i className="fa-solid fa-plus text-sm"></i> Add Manual Transaction
                               </button>
                               
-                              {groupedFeed.filter(g => g.player_id === player.id).map(group => {
+                              {playerGroupedFeed.filter(g => g.player_id === player.id).map(group => {
                                 const net = group.paid - group.fee;
                                 return (
                                   <div key={group.id} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-3.5 rounded-xl flex flex-col gap-3 transition-colors">
                                     <div className="flex justify-between items-center">
                                       <div className="flex-1">
-                                        <div className="text-[10px] font-black uppercase text-zinc-900 dark:text-white">
-                                            {group.dateString}
+                                        <div className="text-[10px] font-black uppercase text-zinc-900 dark:text-white flex items-center gap-2">
+                                            <span>{group.dateString}</span>
+                                            {group.team_id && group.team_id !== activeTeamId && group.team_name && (
+                                                <span className="bg-zinc-200 dark:bg-zinc-700 text-[8px] px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-300">
+                                                   {group.team_name}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex gap-2">
                                            <span className="text-emerald-500">Paid: ${group.paid}</span>
@@ -834,7 +881,7 @@ export default function Ledger() {
                                 );
                               })}
 
-                              {groupedFeed.filter(g => g.player_id === player.id).length === 0 && (
+                              {playerGroupedFeed.filter(g => g.player_id === player.id).length === 0 && (
                                   <p className="text-center text-zinc-400 dark:text-zinc-600 text-[10px] uppercase font-black py-6 transition-colors">No history found.</p>
                               )}
                               
