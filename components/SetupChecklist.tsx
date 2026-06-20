@@ -160,7 +160,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     checkStatus();
   }, [activeClubId]);
 
-  const hasSeason = !!clubInfo?.season_name && !!clubInfo?.season_start && !!clubInfo?.season_end && clubInfo?.default_umpire_fee != null && teamsCount > 0 && memberFee !== "";
+  const hasSeason = !!clubInfo?.season_name && teamsCount > 0 && memberFee !== "";
   const hasLogo = !!clubInfo?.logo;
   const hasTeams = teamsCount > 0;
   const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
@@ -173,24 +173,6 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     { id: 'fixtures', title: 'Add Fixtures', icon: 'fa-list-ol', completed: hasFixtures, required: false },
     { id: 'financials', title: 'Payment Methods', icon: 'fa-sack-dollar', completed: hasFinancials, required: true }
   ];
-
-  const advanceToNextUncompleted = (afterStepId: string) => {
-    const startIndex = steps.findIndex(s => s.id === afterStepId);
-    if (startIndex === -1) return;
-    for (let i = startIndex + 1; i < steps.length; i++) {
-      if (!steps[i].completed && steps[i].id !== afterStepId) {
-        setExpandedStep(steps[i].id);
-        return;
-      }
-    }
-    for (let i = 0; i < startIndex; i++) {
-      if (!steps[i].completed && steps[i].id !== afterStepId) {
-        setExpandedStep(steps[i].id);
-        return;
-      }
-    }
-    setExpandedStep(null);
-  };
 
   const visibleSteps = steps.filter(s => {
     if (isPlayhqImported || isPlayhq) {
@@ -206,6 +188,24 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
        return true;
     }
   });
+
+  const advanceToNextUncompleted = (afterStepId: string) => {
+    const startIndex = visibleSteps.findIndex(s => s.id === afterStepId);
+    if (startIndex === -1) return;
+    for (let i = startIndex + 1; i < visibleSteps.length; i++) {
+      if (!visibleSteps[i].completed && visibleSteps[i].id !== afterStepId) {
+        setExpandedStep(visibleSteps[i].id);
+        return;
+      }
+    }
+    for (let i = 0; i < startIndex; i++) {
+      if (!visibleSteps[i].completed && visibleSteps[i].id !== afterStepId) {
+        setExpandedStep(visibleSteps[i].id);
+        return;
+      }
+    }
+    setExpandedStep(null);
+  };
   
   const allCompleted = visibleSteps.every(s => s.completed) && visibleSteps.length > 0;
 
@@ -884,28 +884,32 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       default_umpire_fee: defaultUmpireFee !== "" ? defaultUmpireFee : null
     }).eq('id', activeClubId).select();
     
-    setIsSavingSeason(false);
-    
     if (clubError) {
+      setIsSavingSeason(false);
       alert("Failed to save club season settings: " + clubError.message);
       return;
     }
     
-    if (targetTeamId) { const t = teams.find(t => t.id === targetTeamId); if (t) { t.member_fee = memberFee !== "" ? memberFee : null; } }
-
-      if (!clubData || clubData.length === 0) {
-      alert("Error: Database rejected the season update. Permission denied or club not found.");
+    if (!clubData || clubData.length === 0) {
+      setIsSavingSeason(false);
+      console.error("Database rejected the season update. Permission denied or club not found.", { activeClubId });
+      alert("Permission Error: You do not have the club_admin role for this club in the database. Please contact support or run the database migration.");
       return;
     }
 
     if (seasonName) {
       // Run background update queries to backfill any existing untagged fixtures/transactions
-      await Promise.all([
-        supabase.from('fixtures').update({ season_name: seasonName }).in('team_id', teams.map(t => t.id)).is('season_name', null),
+      const teamIds = teams && Array.isArray(teams) ? teams.map(t => t.id).filter(Boolean) : [];
+      const queries = [
         supabase.from('transactions').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null)
-      ]);
+      ];
+      if (teamIds.length > 0) {
+        queries.push(supabase.from('fixtures').update({ season_name: seasonName }).in('team_id', teamIds).is('season_name', null));
+      }
+      await Promise.all(queries);
     }
     
+    // Update the parent component's state so the UI reflects the completion
     if (onUpdateClubInfo) {
       onUpdateClubInfo({ 
         ...clubInfo, 
@@ -915,10 +919,6 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         expense_label: expenseLabel || null,
         default_umpire_fee: defaultUmpireFee !== "" ? defaultUmpireFee : null
       });
-    } else {
-      clubInfo.season_name = seasonName || null;
-      clubInfo.expense_label = expenseLabel || null;
-      clubInfo.default_umpire_fee = defaultUmpireFee !== "" ? defaultUmpireFee : null;
     }
     
     setIsSavingSeason(false);
@@ -951,21 +951,17 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       return;
     }
     
-    // Mutate local object so it checks off
+    // Update the parent component's state so the UI reflects the completion
     if (onUpdateClubInfo) {
       onUpdateClubInfo({ 
         ...clubInfo, 
         pay_id_value: payId || null, 
-
         pay_id_type: payIdType,
         square_access_token: squareToken || null,
-        square_location_id: squareLocationId || null
+        square_location_id: squareLocationId || null,
+        accepts_cash: acceptsCash,
+        accepts_card: acceptsCard
       });
-    } else {
-      clubInfo.pay_id_type = payIdType;
-      clubInfo.pay_id_value = payId || null;
-      clubInfo.accepts_cash = acceptsCash;
-      clubInfo.accepts_card = acceptsCard;
     }
     
     setIsSavingFinancials(false);
