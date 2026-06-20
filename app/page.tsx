@@ -234,11 +234,14 @@ export default function Home() {
 
     // Auto-correct if the targetClubId is no longer valid for this user
     if (targetClubId && profile?.role !== 'super_admin' && !creatingTeam) {
-      const isValid = roles && roles.some((r: any) => r.club_id === targetClubId);
-      const isProfileClub = profile?.club_id === targetClubId;
-      
-      if (!isValid && !isProfileClub) {
-        targetClubId = roles && roles.length > 0 ? roles[0].club_id : null;
+      const justCreatedClub = typeof window !== 'undefined' ? sessionStorage.getItem('creating_team') : null;
+      if (targetClubId !== justCreatedClub) {
+        const isValid = roles && roles.some((r: any) => r.club_id === targetClubId);
+        const isProfileClub = profile?.club_id === targetClubId;
+        
+        if (!isValid && !isProfileClub) {
+          targetClubId = roles && roles.length > 0 ? roles[0].club_id : null;
+        }
       }
     }
 
