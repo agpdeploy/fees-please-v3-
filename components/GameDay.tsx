@@ -647,9 +647,9 @@ export default function GameDay() {
               if (!playersWithExistingFees.includes(player.id)) {
                 batchTxPayload.push({
                   player_id: player.id,
-                  team_id: selectedTeamId,
+                  team_id: activeFixture.team_id || selectedTeamId,
                   fixture_id: activeFixture.id,
-                  club_id: resolvedClubId,
+                  club_id: activeFixture.club_id || resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
                   transaction_type: 'fee',
                   status: 'unpaid',
@@ -660,9 +660,9 @@ export default function GameDay() {
               if (!playersWithExistingFees.includes(player.id)) {
                 batchTxPayload.push({
                   player_id: player.id,
-                  team_id: selectedTeamId,
+                  team_id: activeFixture.team_id || selectedTeamId,
                   fixture_id: activeFixture.id,
-                  club_id: resolvedClubId,
+                  club_id: activeFixture.club_id || resolvedClubId,
                   amount: player.is_member ? teamFees.member : teamFees.casual,
                   transaction_type: 'fee',
                   status: 'paid',
@@ -671,9 +671,9 @@ export default function GameDay() {
               }
               batchTxPayload.push({
                 player_id: player.id,
-                team_id: selectedTeamId,
+                team_id: activeFixture.team_id || selectedTeamId,
                 fixture_id: activeFixture.id,
-                club_id: resolvedClubId,
+                club_id: activeFixture.club_id || resolvedClubId,
                 amount: player.is_member ? teamFees.member : teamFees.casual,
                 transaction_type: 'payment',
                 payment_method: 'cash',
@@ -691,9 +691,9 @@ export default function GameDay() {
       // 2. Process Umpire Fee (if toggled and unpaid)
       if (payUmpire && (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0) > 0 && !isUmpirePaid) {
         batchTxPayload.push({
-          team_id: selectedTeamId, 
+          team_id: activeFixture.team_id || selectedTeamId, 
           fixture_id: activeFixture.id, 
-          club_id: resolvedClubId, 
+          club_id: activeFixture.club_id || resolvedClubId, 
           amount: (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0), 
           transaction_type: 'expense', 
           payment_method: 'cash', 
@@ -765,9 +765,9 @@ export default function GameDay() {
     try {
       const matchNotes = `Combined Payment (${activeFixture?.opponent || 'TBA'})`;
       const { data: newTx, error: txError } = await supabase.from('transactions').insert({
-        club_id: resolvedClubId,
+        club_id: activeFixture?.club_id || resolvedClubId,
         player_id: player.id,
-        team_id: selectedTeamId,
+        team_id: activeFixture?.team_id || selectedTeamId,
         fixture_id: activeFixture?.id,
         amount: netAmount,
         transaction_type: 'checkout_link',
@@ -877,18 +877,18 @@ export default function GameDay() {
 
       // Only charge the match fee if it hasn't already been charged (e.g. during Match Finalization)
       if (!playersWithExistingFees.includes(player.id)) {
-        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: fee, transaction_type: 'fee', season_name: clubInfo.season_name || null });
+        offlinePayload.push({ player_id: player.id, team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, amount: fee, transaction_type: 'fee', season_name: clubInfo.season_name || null });
       }
       
       // Only log a payment if they actually handed over cash/card today
       if (amount > 0) {
-        offlinePayload.push({ player_id: player.id, team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method, season_name: clubInfo.season_name || null });
+        offlinePayload.push({ player_id: player.id, team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method, season_name: clubInfo.season_name || null });
       }
     }
     
     if (umpirePaidNow) {
       offlinePayload.push({ 
-        team_id: selectedTeamId, fixture_id: activeFixture.id, club_id: resolvedClubId, 
+        team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, 
         amount: (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0), transaction_type: 'expense', 
         payment_method: 'cash', description: clubInfo.expense_label || 'Match Expense',
         season_name: clubInfo.season_name || null 
