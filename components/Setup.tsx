@@ -7,6 +7,7 @@ import { useActiveClub } from "@/contexts/ClubContext";
 import PlayersTab from "@/components/PlayersTab";
 import FixturesTab from "@/components/FixturesTab"; 
 import AutomationsTab from "@/components/AutomationsTab";
+import TeamWalletTab from "@/components/TeamWalletTab";
 import PlayHQSeasonAlert from "@/components/PlayHQSeasonAlert";
 import FinaliseSeasonView from "@/components/FinaliseSeasonView";
 import { loadStripe } from '@stripe/stripe-js';
@@ -16,7 +17,7 @@ import { hasFeature } from "@/lib/features";
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string);
 
 interface SetupProps {
-  activeTab: 'config' | 'billing' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments' | 'sponsors';
+  activeTab: 'config' | 'billing' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'wallet' | 'payments' | 'sponsors';
 }
 
 interface UserRole {
@@ -1989,6 +1990,16 @@ export default function Setup({ activeTab }: SetupProps) {
           teams={teams} 
           showToast={showToast} 
           clubUsers={clubUsers}
+          planTier={clubRecord?.plan_tier || 'free'}
+        />
+      )}
+
+      {/* --- TEAM WALLET TAB --- */}
+      {clubId && clubId !== 'new' && activeTab === 'wallet' && (
+        <TeamWalletTab 
+          clubId={clubId} 
+          teams={teams} 
+          showToast={showToast} 
           planTier={clubRecord?.plan_tier || 'free'}
         />
       )}

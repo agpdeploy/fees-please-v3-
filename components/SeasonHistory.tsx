@@ -343,6 +343,11 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
                   <div className="text-[10px] text-zinc-500 font-bold mt-1">${seasonWallet.cash.toFixed(0)} Cash | ${seasonWallet.card.toFixed(0)} Card</div>
                </div>
                <div className="flex-1 text-center py-4 sm:py-0">
+                  <div className="text-4xl font-black text-amber-500 mb-1">${overallNet.toFixed(0)}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500">Team Kitty Balance</div>
+                  <div className="text-[10px] text-zinc-500 font-bold mt-1">Available for expenses</div>
+               </div>
+               <div className="flex-1 text-center py-4 sm:py-0">
                   <div className="text-4xl font-black text-red-500 mb-1">${totalOutstanding.toFixed(0)}</div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-500">Outstanding Debts</div>
                   <div className="text-[10px] text-zinc-500 font-bold mt-1">{playerBalances.filter(p => p.owed > 0).length} Players Owe</div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
+import TeamListGraphicBuilder from "./TeamListGraphicBuilder";
 
 export default function Team() {
   const { profile, roles } = useProfile();
@@ -48,6 +49,7 @@ export default function Team() {
   
   const [availabilityMode, setAvailabilityMode] = useState<'menu' | 'email_players' | 'email_stats'>('menu');
   const [emailSelectedPlayerIds, setEmailSelectedPlayerIds] = useState<string[]>([]);
+  const [activeGraphicFixtureId, setActiveGraphicFixtureId] = useState<string | null>(null);
   const [availabilityEmailNote, setAvailabilityEmailNote] = useState("");
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
@@ -126,7 +128,7 @@ export default function Team() {
       today.setHours(0,0,0,0);
       const { data: dbFixtures } = await supabase
         .from("fixtures")
-        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at, is_active, season_name, start_time, location, opponent_logo_url")
+        .select("id, opponent, match_date, team_id, status, reminder_sent, created_at, is_active, season_name, start_time, location, opponent_logo_url, notes")
         .eq("team_id", targetTeamId);
 
       let fixtures: any[] = [];
@@ -1121,6 +1123,26 @@ export default function Team() {
                                                </div>
                                              </button>
                                              
+                                             <button 
+                                               onClick={() => {
+                                                 if (planTier === 'free') {
+                                                   window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }));
+                                                   return;
+                                                 }
+                                                 setActiveGraphicFixtureId(f.id);
+                                               }}
+                                               className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left shadow-sm"
+                                             >
+                                               <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500 shrink-0">
+                                                 <i className="fa-solid fa-share-nodes"></i>
+                                               </div>
+                                               <div>
+                                                 <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                                   Generate a Team List {planTier === 'free' && <i className="fa-solid fa-lock text-amber-500 text-[10px]"></i>}
+                                                 </h4>
+                                                 <p className="text-[10px] font-medium text-zinc-500">Create a social media share graphic.</p>
+                                               </div>
+                                             </button>
                                            </div>
                                          )}
                                        </div>
@@ -1288,9 +1310,19 @@ export default function Team() {
                   <i className="fa-solid fa-chevron-down mr-2"></i> Show More Fixtures
                 </button>
               )}
-            </>
-         )}
-      </div>
-    </div>
-  );
+             </>
+          )}
+       </div>
+
+       {/* Team List Graphic Modal */}
+       <TeamListGraphicBuilder 
+         isOpen={activeGraphicFixtureId !== null}
+         onClose={() => setActiveGraphicFixtureId(null)}
+         fixture={fixtureAvail.find(f => f.id === activeGraphicFixtureId)}
+         clubPlayers={clubPlayers}
+         team={teams.find(t => t.id === selectedTeamId)}
+         clubId={activeClubId}
+       />
+     </div>
+   );
 }

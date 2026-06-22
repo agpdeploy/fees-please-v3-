@@ -570,6 +570,43 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
     else { showToast("Match hard deleted."); loadClubData(); }
   }
 
+  async function handleDuplicate() {
+    if (!window.confirm(`Duplicate this match to next week (for a 2-day game)?`)) return;
+    setIsSaving(true);
+    
+    const originalDate = new Date(fixture.match_date);
+    const nextWeekDate = new Date(originalDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const newMatchDate = nextWeekDate.toISOString().split('T')[0];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isPast = nextWeekDate < today;
+
+    const payload = {
+      team_id: fixture.team_id,
+      opponent: fixture.opponent,
+      match_date: newMatchDate,
+      start_time: fixture.start_time,
+      location: fixture.location,
+      notes: fixture.notes ? `${fixture.notes} (Day 2)` : "Day 2",
+      umpire_fee: fixture.umpire_fee,
+      status: isPast ? 'completed' : 'upcoming',
+      is_active: true,
+      season_name: fixture.season_name,
+      opponent_logo_url: fixture.opponent_logo_url
+    };
+
+    const { error } = await supabase.from("fixtures").insert([payload]);
+    setIsSaving(false);
+    
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Match duplicated to next week!");
+      loadClubData();
+    }
+  }
+
   async function fetchSquadData() {
     setIsLoadingSquad(true);
     const { data: squadData } = await supabase.from("match_squads").select("player_id").eq("fixture_id", fixture.id); 
@@ -672,7 +709,10 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
           </div>
           
           <div className="flex gap-1 shrink-0">
-            <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center"><i className="fa-solid fa-pen text-[10px]"></i></button>
+            <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center" title="Edit Match"><i className="fa-solid fa-pen text-[10px]"></i></button>
+            <button onClick={handleDuplicate} disabled={isSaving} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors flex items-center justify-center" title="Duplicate Match (Next Week)">
+              <i className="fa-solid fa-copy text-[10px]"></i>
+            </button>
             <button onClick={handleToggleActive} disabled={isSaving} className={`w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 ${isActive ? 'text-zinc-500 hover:text-amber-500' : 'text-zinc-500 hover:text-emerald-500'} dark:text-zinc-400 transition-colors flex items-center justify-center`} title={isActive ? "Deactivate Match" : "Reactivate Match"}>
               <i className={`fa-solid ${isActive ? 'fa-power-off' : 'fa-rotate-left'} text-[10px]`}></i>
             </button>

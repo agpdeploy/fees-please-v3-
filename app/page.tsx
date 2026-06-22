@@ -37,7 +37,7 @@ export default function Home() {
     return false;
   });
 
-  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'payments' | 'billing' | 'sponsors'>(() => {
+  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'wallet' | 'payments' | 'billing' | 'sponsors'>(() => {
     if (typeof window !== 'undefined') {
       return (sessionStorage.getItem('setupTab') as any) || 'config';
     }
@@ -607,6 +607,9 @@ export default function Home() {
                       </button>
                       <button onClick={() => { handleTabChange('setup'); setSetupTab('reports'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'reports' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
                         <i className="fa-solid fa-chart-pie w-5 text-center"></i> Reports
+                      </button>
+                      <button onClick={() => { handleTabChange('setup'); setSetupTab('wallet'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'wallet' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        <i className="fa-solid fa-wallet w-5 text-center"></i> Team Wallet
                       </button>
                     </>
                   )}
