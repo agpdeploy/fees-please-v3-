@@ -17,10 +17,11 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [playerContributions, setPlayerContributions] = useState<any[]>([]);
   const [teamWalletInfo, setTeamWalletInfo] = useState({ totalKitty: 0, totalDebts: 0, netBalance: 0 });
-  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ name: 'Team Jerseys', costPerPlayer: 25, type: 'expense' as 'expense' | 'reward' });
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [inlineAction, setInlineAction] = useState<{ playerId: string, type: 'expense' | 'reward' } | null>(null);
+  const [inlineForm, setInlineForm] = useState<{ name: string, amount: string }>({ name: '', amount: '' });
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc'|'desc' }>({ key: 'nkc', direction: 'desc' });
 
   // Role Checks
   const isSuperAdmin = profile?.role === 'super_admin';
@@ -33,9 +34,9 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
     }
   }, [manageableTeams]);
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     if (!clubId || !selectedTeamId) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
 
     const [txRes, playersRes] = await Promise.all([
       supabase.from("transactions").select("*, players(first_name, last_name, nickname, is_active)").eq("club_id", clubId).eq("team_id", selectedTeamId),
@@ -45,103 +46,140 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
     const txs = txRes.data || [];
     const players = playersRes.data || [];
 
+    // 1. Calculate Match Costs
+    // Map of fixture_id -> { expense: number, player_count: number }
+    const fixtureStats: Record<string, { expense: number, player_count: number }> = {};
+    
+    txs.forEach(tx => {
+      if (tx.fixture_id) {
+        if (!fixtureStats[tx.fixture_id]) fixtureStats[tx.fixture_id] = { expense: 0, player_count: 0 };
+        if (tx.transaction_type === 'expense') fixtureStats[tx.fixture_id].expense += Number(tx.amount);
+        if (tx.transaction_type === 'fee' && Number(tx.amount) >= 0) fixtureStats[tx.fixture_id].player_count += 1;
+      }
+    });
+
     const balances: Record<string, any> = {};
     players.forEach(p => {
       balances[p.id] = { 
         id: p.id, 
         name: p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`.trim(), 
-        total_paid: 0, 
+        real_paid: 0, 
         expected_cost: 0,
-        surplus: 0
+        games_played: 0,
+        match_cost_share: 0,
+        kitty_expenses: 0,
+        kitty_rewards: 0,
+        surplus: 0,
+        nkc: 0
       };
     });
 
-    let totalCashIn = 0;
-    let totalCardIn = 0;
-    let totalExpenses = 0;
+    let totalRealIncome = 0;
+    let totalAllExpenses = 0;
 
     txs.forEach(tx => {
-      if (tx.transaction_type === 'payment') {
-        if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
-        else totalCashIn += Number(tx.amount);
-      }
-      if (tx.transaction_type === 'expense') {
-        totalExpenses += Number(tx.amount);
-      }
+      if (tx.transaction_type === 'payment' && tx.payment_method !== 'kitty') totalRealIncome += Number(tx.amount);
+      if (tx.transaction_type === 'expense') totalAllExpenses += Number(tx.amount);
 
       if (tx.player_id && tx.players) {
         if (!balances[tx.player_id]) {
           balances[tx.player_id] = { 
             id: tx.player_id, 
             name: tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim(), 
-            total_paid: 0, 
-            expected_cost: 0,
-            surplus: 0
+            real_paid: 0, expected_cost: 0, games_played: 0, match_cost_share: 0, kitty_expenses: 0, kitty_rewards: 0, surplus: 0, nkc: 0
           };
         }
-        if (tx.transaction_type === 'fee') balances[tx.player_id].expected_cost += Number(tx.amount);
-        if (tx.transaction_type === 'payment') balances[tx.player_id].total_paid += Number(tx.amount);
+        
+        const b = balances[tx.player_id];
+        
+        if (tx.transaction_type === 'fee') {
+            b.expected_cost += Number(tx.amount);
+            if (tx.fixture_id && Number(tx.amount) >= 0) {
+                b.games_played += 1;
+                const stats = fixtureStats[tx.fixture_id];
+                if (stats && stats.player_count > 0) {
+                    b.match_cost_share += (stats.expense / stats.player_count);
+                }
+            }
+        }
+        
+        if (tx.transaction_type === 'payment') {
+            if (tx.payment_method === 'kitty') b.kitty_rewards += Number(tx.amount);
+            else b.real_paid += Number(tx.amount);
+        }
+
+        if (tx.transaction_type === 'expense' && tx.payment_method === 'kitty') {
+            b.kitty_expenses += Number(tx.amount);
+        }
       }
     });
 
     let totalDebts = 0;
     Object.values(balances).forEach(b => {
-      b.surplus = b.total_paid - b.expected_cost;
+      b.surplus = (b.real_paid + b.kitty_rewards) - b.expected_cost;
+      b.nkc = b.real_paid - b.match_cost_share - b.kitty_expenses;
       if (b.surplus < 0) totalDebts += Math.abs(b.surplus);
     });
 
-    const sortedBalances = Object.values(balances).sort((a: any, b: any) => b.surplus - a.surplus);
-    setPlayerContributions(sortedBalances);
-    setSelectedPlayerIds(sortedBalances.map(p => p.id));
+    const dataArr = Object.values(balances);
+    setPlayerContributions(dataArr);
 
-    const totalKitty = (totalCashIn + totalCardIn) - totalExpenses;
+    const totalKitty = totalRealIncome - totalAllExpenses;
     setTeamWalletInfo({ totalKitty, totalDebts, netBalance: totalKitty });
     
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
   };
 
   useEffect(() => {
     fetchData();
   }, [clubId, selectedTeamId]);
 
-  const handleLogExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedPlayerIds.length === 0) return showToast("Select at least one player.", "error");
+  const handleSaveInlineAction = async (playerId: string) => {
+    if (!inlineForm.name || !inlineForm.amount) return showToast("Please fill in all fields", "error");
     setIsSaving(true);
 
     try {
-      const totalExpenseCost = expenseForm.costPerPlayer * selectedPlayerIds.length;
       const txsToInsert: any[] = [];
+      const amount = parseFloat(inlineForm.amount.toString());
       
-      // 1. Log the team expense to reduce the Kitty
-      txsToInsert.push({
-        club_id: clubId,
-        team_id: selectedTeamId,
-        amount: totalExpenseCost,
-        transaction_type: 'expense',
-        description: expenseForm.name,
-        payment_method: 'kitty'
-      });
-
-      // 2. Add individual transactions for players
-      selectedPlayerIds.forEach(playerId => {
-         txsToInsert.push({
-            club_id: clubId,
-            team_id: selectedTeamId,
-            player_id: playerId,
-            amount: expenseForm.costPerPlayer,
-            transaction_type: expenseForm.type === 'expense' ? 'fee' : 'payment',
-            payment_method: expenseForm.type === 'expense' ? null : 'kitty',
-            description: expenseForm.name
-         });
-      });
+      if (inlineAction?.type === 'expense') {
+          txsToInsert.push({
+              club_id: clubId,
+              team_id: selectedTeamId,
+              player_id: playerId,
+              amount: amount,
+              transaction_type: 'expense',
+              payment_method: 'kitty',
+              description: inlineForm.name
+          });
+      } else if (inlineAction?.type === 'reward') {
+          const descName = inlineForm.name || 'Reward';
+          txsToInsert.push({
+              club_id: clubId,
+              team_id: selectedTeamId,
+              player_id: playerId,
+              amount: amount,
+              transaction_type: 'expense',
+              payment_method: 'kitty',
+              description: `${descName} (Cost)`
+          });
+          txsToInsert.push({
+              club_id: clubId,
+              team_id: selectedTeamId,
+              player_id: playerId,
+              amount: amount,
+              transaction_type: 'payment',
+              payment_method: 'kitty',
+              description: `${descName} (Credit)`
+          });
+      }
 
       const { error } = await supabase.from('transactions').insert(txsToInsert);
       if (error) throw error;
       
-      showToast("Expense logged successfully! Balances updated.");
-      setIsExpenseModalOpen(false);
-      fetchData(); // Reload data
+      showToast("Logged successfully! Balances updated.");
+      setInlineAction(null);
+      fetchData(true);
     } catch(err: any) {
       showToast(err.message, "error");
     } finally {
@@ -149,11 +187,25 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
     }
   };
 
-  const togglePlayerSelection = (id: string) => {
-    setSelectedPlayerIds(prev => 
-      prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]
-    );
+  const handleSort = (key: string) => {
+      if (sortConfig.key === key) {
+          setSortConfig({ key, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' });
+      } else {
+          setSortConfig({ key, direction: 'desc' });
+      }
   };
+
+  const sortedContributions = [...playerContributions].sort((a, b) => {
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+    if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+    }
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   if (planTier === 'free') {
     return (
@@ -221,143 +273,175 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <button 
-              onClick={() => { setExpenseForm({ name: 'Team Jerseys', costPerPlayer: 25, type: 'expense' }); setIsExpenseModalOpen(true); }}
-              className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white bg-zinc-900 dark:bg-white dark:text-zinc-900 shadow-md hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all flex items-center justify-center gap-2"
-            >
-              <i className="fa-solid fa-shirt"></i> Log Team Expense
-            </button>
-            <button 
-              onClick={() => { setExpenseForm({ name: 'Free Game Reward', costPerPlayer: 20, type: 'reward' }); setIsExpenseModalOpen(true); }}
-              className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-emerald-900 bg-emerald-400 shadow-md hover:bg-emerald-300 transition-all flex items-center justify-center gap-2"
-            >
-              <i className="fa-solid fa-gift"></i> Reward Player
-            </button>
-          </div>
-
           {/* Middle Section: Player Contribution Breakdown */}
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800/50">
-              <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white">Player Contribution Breakdown</h3>
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50">
+              <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white">Player Breakdown</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-bold whitespace-nowrap">
-                <thead>
-                  <tr className="text-[10px] text-zinc-500 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800/50 bg-zinc-50 dark:bg-zinc-900/50">
-                    <th className="px-5 py-3">Player</th>
-                    <th className="px-5 py-3 text-center">Total Paid</th>
-                    <th className="px-5 py-3 text-center">Expected Cost</th>
-                    <th className="px-5 py-3 text-center">Net Contribution</th>
-                    <th className="px-5 py-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                  {playerContributions.map(p => (
-                    <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                      <td className="px-5 py-4 text-zinc-900 dark:text-white">{p.name}</td>
-                      <td className="px-5 py-4 text-center text-zinc-600 dark:text-zinc-400">${p.total_paid.toFixed(0)}</td>
-                      <td className="px-5 py-4 text-center text-zinc-600 dark:text-zinc-400">${p.expected_cost.toFixed(0)}</td>
-                      <td className={`px-5 py-4 text-center font-black ${p.surplus > 0 ? 'text-emerald-500' : p.surplus < 0 ? 'text-red-500' : 'text-zinc-500'}`}>
-                        {p.surplus > 0 ? '+' : ''}{p.surplus === 0 ? '$0' : `$${p.surplus.toFixed(0)}`}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        {p.surplus >= 0 ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 text-[10px] uppercase tracking-widest">
-                            <i className="fa-solid fa-circle-check text-[8px]"></i> Surplus
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 text-[10px] uppercase tracking-widest">
-                            <i className="fa-solid fa-circle-exclamation text-[8px]"></i> Owes ${Math.abs(p.surplus).toFixed(0)}
-                          </span>
+
+            {/* Sort Headers */}
+            <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/50 bg-white dark:bg-[#111] flex text-[10px] uppercase font-black tracking-widest text-zinc-500 overflow-x-auto hide-scrollbar">
+                <div className="flex-1 min-w-[100px] flex items-center gap-1 cursor-pointer hover:text-zinc-900 dark:hover:text-white" onClick={() => handleSort('name')}>
+                    Player {sortConfig.key === 'name' && <i className={`fa-solid fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}></i>}
+                </div>
+                <div className="w-16 text-center flex items-center justify-center gap-1 cursor-pointer hover:text-zinc-900 dark:hover:text-white" onClick={() => handleSort('games_played')}>
+                    Games {sortConfig.key === 'games_played' && <i className={`fa-solid fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}></i>}
+                </div>
+                <div className="w-20 text-center flex items-center justify-center gap-1 cursor-pointer hover:text-zinc-900 dark:hover:text-white" onClick={() => handleSort('real_paid')}>
+                    Paid {sortConfig.key === 'real_paid' && <i className={`fa-solid fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}></i>}
+                </div>
+                <div className="w-20 text-center flex items-center justify-center gap-1 cursor-pointer hover:text-zinc-900 dark:hover:text-white" onClick={() => handleSort('nkc')}>
+                    NKC {sortConfig.key === 'nkc' && <i className={`fa-solid fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}></i>}
+                </div>
+                <div className="w-24 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-zinc-900 dark:hover:text-white" onClick={() => handleSort('surplus')}>
+                    Status {sortConfig.key === 'surplus' && <i className={`fa-solid fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'}`}></i>}
+                </div>
+            </div>
+
+            {/* Player Rows */}
+            <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+                {sortedContributions.map(p => (
+                    <div key={p.id} className="flex flex-col hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                        <div 
+                            className="px-4 py-4 flex items-center cursor-pointer select-none"
+                            onClick={() => setExpandedPlayerId(expandedPlayerId === p.id ? null : p.id)}
+                        >
+                            <div className="flex-1 min-w-[100px] text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                <i className={`fa-solid fa-chevron-${expandedPlayerId === p.id ? 'down' : 'right'} text-[10px] text-zinc-400 w-3`}></i>
+                                <span className="truncate">{p.name}</span>
+                            </div>
+                            <div className="w-16 text-center text-xs text-zinc-500 font-bold">{p.games_played}</div>
+                            <div className="w-20 text-center text-xs text-zinc-600 dark:text-zinc-400 font-bold">${p.real_paid.toFixed(0)}</div>
+                            <div className={`w-20 text-center text-xs font-black ${p.nkc > 0 ? 'text-emerald-500' : p.nkc < 0 ? 'text-red-500' : 'text-zinc-500'}`}>
+                                {p.nkc > 0 ? '+' : ''}{p.nkc === 0 ? '$0' : `$${p.nkc.toFixed(2)}`}
+                            </div>
+                            <div className="w-24 text-right flex justify-end">
+                              {p.surplus >= 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 text-[9px] uppercase font-black tracking-widest">
+                                      Surplus
+                                  </span>
+                              ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 text-[9px] uppercase font-black tracking-widest">
+                                      Owes ${Math.abs(p.surplus).toFixed(0)}
+                                  </span>
+                              )}
+                            </div>
+                        </div>
+
+                        {expandedPlayerId === p.id && (
+                            <div className="px-10 pb-5 pt-1 text-xs animate-in slide-in-from-top-2 duration-200">
+                                <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 space-y-2 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                    <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
+                                        <span>Real Money Paid</span>
+                                        <span className="text-zinc-900 dark:text-white">${p.real_paid.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
+                                        <span>Match Cost Share</span>
+                                        <span className="text-zinc-900 dark:text-white">-${p.match_cost_share.toFixed(2)}</span>
+                                    </div>
+                                    {p.kitty_rewards > 0 && (
+                                      <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
+                                          <span>Kitty Rewards (Credit)</span>
+                                          <span className="text-emerald-500">+${p.kitty_rewards.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {p.kitty_expenses > 0 && (
+                                      <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
+                                          <span>Kitty Expenses (Cost)</span>
+                                          <span className="text-red-500">-${p.kitty_expenses.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-2"></div>
+                                    <div className="flex justify-between text-[11px] font-black uppercase tracking-widest mb-4">
+                                        <span className="text-zinc-500">Net Contribution</span>
+                                        <span className={`${p.nkc > 0 ? 'text-emerald-500' : p.nkc < 0 ? 'text-red-500' : 'text-zinc-500'}`}>
+                                            {p.nkc > 0 ? '+' : ''}${p.nkc.toFixed(2)}
+                                        </span>
+                                    </div>
+
+                                    {inlineAction?.playerId === p.id ? (
+                                      <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 border border-zinc-200 dark:border-zinc-700 animate-in fade-in slide-in-from-top-1">
+                                        <p className="text-[10px] font-bold text-zinc-500 mb-3 leading-relaxed">
+                                          {inlineAction.type === 'expense' 
+                                            ? 'Deducts from kitty and lowers net contribution. Does not increase personal debt.'
+                                            : 'Deducts from kitty and credits player. Lowers net contribution, raises personal surplus.'}
+                                        </p>
+                                        <div className="flex flex-col gap-3">
+                                          <div className="flex gap-2">
+                                            <input 
+                                              type="text" 
+                                              placeholder={inlineAction.type === 'expense' ? "e.g. Team Jerseys" : "e.g. Free Game"}
+                                              value={inlineForm.name}
+                                              onChange={e => setInlineForm({...inlineForm, name: e.target.value})}
+                                              className="flex-1 min-w-0 bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs outline-none font-bold"
+                                            />
+                                            <div className="relative w-24 shrink-0">
+                                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs font-bold">$</span>
+                                              <input 
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={inlineForm.amount}
+                                                onChange={e => setInlineForm({...inlineForm, amount: e.target.value})}
+                                                className="w-full bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-lg pl-6 pr-3 py-2 text-xs outline-none font-bold"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <button 
+                                              onClick={() => handleSaveInlineAction(p.id)}
+                                              disabled={isSaving || !inlineForm.name || !inlineForm.amount}
+                                              className="flex-1 bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-emerald-600 disabled:opacity-50 transition-colors flex justify-center items-center h-9"
+                                            >
+                                              {isSaving ? <i className="fa-solid fa-spinner fa-spin"></i> : "Save"}
+                                            </button>
+                                            <button 
+                                              onClick={() => setInlineAction(null)}
+                                              className="flex-1 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-lg text-xs font-bold hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors flex justify-center items-center h-9"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex gap-2">
+                                        <button 
+                                          onClick={() => {
+                                            setInlineAction({ playerId: p.id, type: 'expense' });
+                                            setInlineForm({ name: '', amount: '' });
+                                          }}
+                                          className="flex-1 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-widest text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                          <i className="fa-solid fa-shirt"></i> Log Team Expense
+                                        </button>
+                                        <button 
+                                          onClick={() => {
+                                            setInlineAction({ playerId: p.id, type: 'reward' });
+                                            const avgCost = p.games_played > 0 ? Math.floor(p.match_cost_share / p.games_played).toString() : '';
+                                            setInlineForm({ name: '', amount: avgCost });
+                                          }}
+                                          className="flex-1 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                          <i className="fa-solid fa-gift"></i> Reward Player
+                                        </button>
+                                      </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                  {playerContributions.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-zinc-500 uppercase tracking-widest text-[10px]">No players found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    </div>
+                ))}
+                {sortedContributions.length === 0 && (
+                    <div className="px-5 py-8 text-center text-zinc-500 uppercase font-black tracking-widest text-[10px]">No players found.</div>
+                )}
             </div>
           </div>
         </>
       )}
 
-      {/* Expense Modal */}
-      {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
-            <h3 className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-white mb-1">
-              {expenseForm.type === 'expense' ? 'Log Team Expense' : 'Reward Player'}
-            </h3>
-            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-6 leading-relaxed">
-              {expenseForm.type === 'expense' 
-                ? 'This will deduct from the team kitty and assign the cost to selected players. Players with a surplus will have their surplus reduced.' 
-                : 'This will deduct from the team kitty and CREDIT the selected players, effectively paying for their next game in advance.'}
-            </p>
 
-            <form onSubmit={handleLogExpense} className="space-y-4">
-              <div>
-                <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-1.5 ml-1">Expense Name</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="e.g. Team Jerseys"
-                  value={expenseForm.name}
-                  onChange={(e) => setExpenseForm({...expenseForm, name: e.target.value})}
-                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold"
-                />
-              </div>
-              
-              <div>
-                <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-1.5 ml-1">Cost Per Player ($)</label>
-                <input 
-                  type="number" 
-                  required
-                  min="0"
-                  step="0.01"
-                  value={expenseForm.costPerPlayer}
-                  onChange={(e) => setExpenseForm({...expenseForm, costPerPlayer: parseFloat(e.target.value) || 0})}
-                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Included Players</label>
-                <div className="max-h-40 overflow-y-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 space-y-1">
-                  {playerContributions.map(p => (
-                    <label key={p.id} className="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedPlayerIds.includes(p.id)}
-                        onChange={() => togglePlayerSelection(p.id)}
-                        className="w-4 h-4 rounded border-zinc-300 text-emerald-500 focus:ring-emerald-500"
-                      />
-                      <span className="text-xs font-bold text-zinc-900 dark:text-white flex-1">{p.name}</span>
-                      <span className={`text-[10px] font-black ${p.surplus > 0 ? 'text-emerald-500' : 'text-zinc-500'}`}>
-                        {p.surplus > 0 ? `Surplus: $${p.surplus}` : ''}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="flex-1 py-3.5 rounded-xl font-black uppercase tracking-widest text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" disabled={isSaving} className="flex-1 py-3.5 rounded-xl font-black uppercase tracking-widest text-[11px] bg-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-500 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {isSaving ? <i className="fa-solid fa-spinner fa-spin"></i> : "Log Expense"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

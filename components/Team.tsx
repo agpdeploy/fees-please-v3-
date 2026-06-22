@@ -1125,10 +1125,6 @@ export default function Team() {
                                              
                                              <button 
                                                onClick={() => {
-                                                 if (planTier === 'free') {
-                                                   window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }));
-                                                   return;
-                                                 }
                                                  setActiveGraphicFixtureId(f.id);
                                                }}
                                                className="w-full bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex items-center gap-4 hover:border-emerald-300 transition-colors text-left shadow-sm"
@@ -1322,6 +1318,7 @@ export default function Team() {
          clubPlayers={clubPlayers}
          team={teams.find(t => t.id === selectedTeamId)}
          clubId={activeClubId}
+         planTier={planTier}
        />
      </div>
    );

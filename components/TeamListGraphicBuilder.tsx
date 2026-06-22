@@ -12,6 +12,7 @@ interface TeamListGraphicBuilderProps {
   team: any;
   clubPlayers: any[];
   clubId: string;
+  planTier?: string;
 }
 
 const COMMON_GOOGLE_FONTS = [
@@ -27,7 +28,8 @@ export default function TeamListGraphicBuilder({
   fixture,
   team,
   clubPlayers,
-  clubId
+  clubId,
+  planTier
 }: TeamListGraphicBuilderProps) {
   const [mounted, setMounted] = useState(false);
   
@@ -282,9 +284,11 @@ export default function TeamListGraphicBuilder({
       {/* Header Bar */}
       <div className="p-4 border-b border-zinc-800 flex items-center justify-end bg-black shrink-0 z-10">
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsExpanded(!isExpanded)} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${isExpanded ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>
-            {isExpanded ? <><i className="fa-solid fa-compress mr-2"></i> Show Controls</> : <><i className="fa-solid fa-expand mr-2"></i> Full Screen Preview</>}
-          </button>
+          {planTier !== 'free' && (
+            <button onClick={() => setIsExpanded(!isExpanded)} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${isExpanded ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>
+              {isExpanded ? <><i className="fa-solid fa-compress mr-2"></i> Show Controls</> : <><i className="fa-solid fa-expand mr-2"></i> Full Screen Preview</>}
+            </button>
+          )}
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
             <i className="fa-solid fa-times"></i>
           </button>
@@ -728,13 +732,22 @@ export default function TeamListGraphicBuilder({
 
           {/* Generate Button Footer */}
           <div className="p-4 border-t border-zinc-800 bg-[#111]">
-            <button 
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
-            >
-              {isGenerating ? <><i className="fa-solid fa-spinner fa-spin"></i> Generating...</> : <><i className="fa-solid fa-share-nodes"></i> Share / Download</>}
-            </button>
+            {planTier === 'free' ? (
+              <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
+                className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-amber-900 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-wand-magic-sparkles"></i> Upgrade to Generate
+              </button>
+            ) : (
+              <button 
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
+              >
+                {isGenerating ? <><i className="fa-solid fa-spinner fa-spin"></i> Generating...</> : <><i className="fa-solid fa-share-nodes"></i> Share / Download</>}
+              </button>
+            )}
           </div>
         </div>
       )}
