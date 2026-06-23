@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/useProfile";
+import { supabase } from "@/lib/supabase";
 import Login from "@/components/Login";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -12,7 +13,14 @@ export default function AffiliatesPage() {
 
   useEffect(() => {
     if (!loading && profile) {
-      router.replace("/?tab=referral");
+      if (!profile.onboarding_completed) {
+        // Mark as onboarding completed so they permanently default to affiliate dashboard
+        supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then(() => {
+          router.replace("/?tab=referral");
+        });
+      } else {
+        router.replace("/?tab=referral");
+      }
     }
   }, [profile, loading, router]);
 
@@ -33,7 +41,7 @@ export default function AffiliatesPage() {
         <div className="absolute top-4 left-0 right-0 z-50 text-center pointer-events-none">
           <p className="text-emerald-400 font-black tracking-widest uppercase text-xs">Affiliate Portal</p>
         </div>
-        <Login redirectTo="/?tab=referral" />
+        <Login redirectTo="/affiliates" />
       </div>
     );
   }

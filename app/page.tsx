@@ -658,7 +658,7 @@ export default function Home() {
               )}
 
               <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
-                {currentClubRole === 'player' && activeTab !== 'player_hub' && (
+                {currentClubRole === 'player' && (roles && roles.length > 0) && activeTab !== 'player_hub' && (
                   <button onClick={() => { setIsSidebarOpen(false); handleTabChange('player_hub'); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
                     <i className="fa-solid fa-house w-5 text-center text-emerald-500"></i> Dashboard
                   </button>

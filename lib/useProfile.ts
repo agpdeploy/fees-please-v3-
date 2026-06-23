@@ -6,13 +6,14 @@ export function useProfile() {
   const [profile, setProfile] = useState<any>(null)
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     let isMounted = true;
     let rolesSubscription: any = null;
     const uniqueChannelName = `roles-${Math.random().toString(36).substring(2, 9)}`;
 
-    async function getProfile() {
+    async function getProfile(retryCount = 0) {
       try {
         console.log("📡 useProfile: Fetching session...");
         const { data: { session } } = await supabase.auth.getSession();
@@ -42,6 +43,18 @@ export function useProfile() {
             .select('*, clubs(id, name, logo_url, is_active, plan_tier)')
             .or(`user_id.eq.${user.id},email.eq.${user.email}`) 
         ]);
+
+        if (profileRes.error || rolesRes.error) {
+          console.error("❌ Profile Sync Error from DB:", profileRes.error, rolesRes.error);
+          if (retryCount < 3) {
+            console.log(`📡 useProfile: Retrying... (${retryCount + 1}/3)`);
+            setTimeout(() => {
+              if (isMounted) getProfile(retryCount + 1);
+            }, 2000);
+            return;
+          }
+          throw new Error("Failed to load profile from database after multiple attempts.");
+        }
 
         const profileData = profileRes.data;
         let rolesData = rolesRes.data || [];
@@ -148,15 +161,19 @@ export function useProfile() {
               }, () => fetchRolesSilently(user.id, profileData, isSuper, user.email))
               .subscribe();
           }
+          setLoading(false);
+          setError(null);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Profile Sync Error:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setError(err);
+          setLoading(false);
+        }
       }
     }
 
-    async function fetchRolesSilently(userId: string, baseProfileData: any, isSuper: boolean, email: string | undefined) {
+    async function fetchRolesSilently(userId: string, baseProfileData: any, isSuper: boolean, email: string | undefined, retryCount = 0) {
       if (!isMounted) return;
       
       // Also updated to use the OR logic just in case
@@ -164,8 +181,17 @@ export function useProfile() {
         ? `user_id.eq.${userId},email.eq.${email}` 
         : `user_id.eq.${userId}`;
         
-      const { data: rolesRes } = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active)').or(query);
-      let rolesData = rolesRes || [];
+      const res = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active)').or(query);
+      if (res.error) {
+        console.error("❌ Silently fetch roles error:", res.error);
+        if (retryCount < 3) {
+          setTimeout(() => {
+            if (isMounted) fetchRolesSilently(userId, baseProfileData, isSuper, email, retryCount + 1);
+          }, 2000);
+        }
+        return;
+      }
+      let rolesData = res.data || [];
       const adminRole = rolesData?.find((r: any) => r.role === 'club_admin');
       const teamRole = rolesData?.find((r: any) => r.role === 'team_admin');
 
@@ -249,5 +275,5 @@ export function useProfile() {
     };
   }, []);
 
-  return { profile, roles, loading }
+  return { profile, roles, loading, error }
 }
