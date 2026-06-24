@@ -91,7 +91,7 @@ export async function POST(req: Request) {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'subscription',
-      ui_mode: 'embedded',
+      ui_mode: 'embedded' as any,
       allow_promotion_codes: true, // Allow promo codes / referral discounts
       return_url: `${origin}/?session_id={CHECKOUT_SESSION_ID}`,
       metadata: {

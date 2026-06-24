@@ -214,7 +214,7 @@ export default function GameDay() {
 
   useEffect(() => {
     // Clear cross-account state immediately
-    setTeamFees(null);
+    setTeamFees({ member: 10, casual: 25 });
     setIsSquareEnabled(false);
     setNewSeasons([]);
     setSelectedTeamId("");

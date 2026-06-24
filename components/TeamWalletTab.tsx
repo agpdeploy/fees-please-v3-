@@ -359,7 +359,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
                                         </span>
                                     </div>
 
-                                    {inlineAction?.playerId === p.id ? (
+                                    {inlineAction && inlineAction.playerId === p.id ? (
                                       <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 border border-zinc-200 dark:border-zinc-700 animate-in fade-in slide-in-from-top-1">
                                         <p className="text-[10px] font-bold text-zinc-500 mb-3 leading-relaxed">
                                           {inlineAction.type === 'expense' 

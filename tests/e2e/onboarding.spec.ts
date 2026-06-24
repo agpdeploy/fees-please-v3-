@@ -11,6 +11,15 @@ test.describe('Account Setup and Onboarding Flow', () => {
       });
     });
 
+    // 1.5. Intercept check-email API request
+    await page.route('**/api/auth/check-email', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ exists: true }),
+      });
+    });
+
     // 2. Go to home page
     await page.goto('/');
 
@@ -22,10 +31,13 @@ test.describe('Account Setup and Onboarding Flow', () => {
     await expect(googleBtn).toBeVisible();
 
     // 4. Enter email and submit
+    const continueEmailBtn = page.getByRole('button', { name: 'Continue with Email' });
+    await continueEmailBtn.click();
+
     const emailInput = page.getByPlaceholder('name@example.com');
     await emailInput.fill('newuser@example.com');
 
-    const submitBtn = page.getByRole('button', { name: 'Send Magic Link' });
+    const submitBtn = page.getByRole('button', { name: 'Continue', exact: true });
     await submitBtn.click();
 
     // 5. Verify email sent success box is visible
