@@ -56,3 +56,14 @@ Once Square is connected, you can process card payments:
 3. Select **Card (Square)** from the dropdown.
 4. This will trigger the Square Point of Sale app or Tap-to-Pay on your device.
 5. The player taps their card. Once Square approves the transaction, Fees Please automatically updates the player's status to "Paid".
+
+## 5. Pre-paying Match Fees Online (Square Checkout)
+
+With the Square integration, you can also offer players the ability to **pre-pay** for their match fees online before game day, reducing the hassle of tracking down payments at the venue.
+
+1. Once Square is connected to your club, navigate to the specific **Fixture** page.
+2. The system generates unique **Prepay Links** for each player scheduled for the match.
+3. These links can be sent out to the players (via WhatsApp or SMS). 
+4. When a player clicks their prepay link, they will be taken to a secure **Square Online Checkout** page.
+5. They can check out instantly using **Apple Pay**, **Google Pay**, or by entering their credit/debit card details.
+6. Once the payment is successful, the transaction is automatically recorded in Fees Please, and their status for that fixture is updated to "Paid".

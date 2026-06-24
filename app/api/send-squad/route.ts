@@ -98,7 +98,15 @@ export async function POST(req: Request) {
         ? `
             <div style="padding: 24px; text-align: center; border-top: 1px solid #f4f4f5;">
               <p style="margin-top: 0; font-size: 14px; font-weight: bold; color: #52525b; margin-bottom: 16px;">Pre-pay your Match Fees online:</p>
-              <a href="${prePayUrl}" style="display: inline-block; padding: 12px 24px; background-color: ${themeColor}; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 14px; text-transform: uppercase;">Pay with Square</a>
+              <a href="${prePayUrl}" style="display: inline-block; padding: 12px 24px; background-color: ${themeColor}; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 14px; text-transform: uppercase;">Pay Securely</a>
+              
+              <div style="margin-top: 16px; margin-bottom: 8px; text-align: center;">
+                <img src="https://img.icons8.com/color/48/000000/visa.png" height="24" alt="Visa" style="display: inline-block; vertical-align: middle; margin: 0 4px;" />
+                <img src="https://img.icons8.com/color/48/000000/mastercard.png" height="24" alt="Mastercard" style="display: inline-block; vertical-align: middle; margin: 0 4px;" />
+                <img src="https://img.icons8.com/color/48/000000/apple-pay.png" height="24" alt="Apple Pay" style="display: inline-block; vertical-align: middle; margin: 0 4px;" />
+                <img src="https://img.icons8.com/color/48/000000/google-pay.png" height="24" alt="Google Pay" style="display: inline-block; vertical-align: middle; margin: 0 4px;" />
+              </div>
+              <p style="margin: 0; font-size: 11px; color: #a1a1aa;">Payments processed securely by Square</p>
             </div>
         ` 
         : (club.pay_id_value ? `

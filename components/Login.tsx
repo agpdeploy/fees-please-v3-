@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Inter, Roboto_Mono } from 'next/font/google';
 
@@ -9,9 +9,20 @@ const robotoMono = Roboto_Mono({ subsets: ['latin'] });
 
 export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [needsName, setNeedsName] = useState(false);
   const [error, setError] = useState("");
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  useEffect(() => {
+    setIsLocalhost(
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1'
+    );
+  }, []);
 
   const handleGoogleLogin = async () => {
     document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
@@ -29,17 +40,56 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
     if (error) setError(error.message);
   };
 
+  const handleFacebookLogin = async () => {
+    document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) setError(error.message);
+  };
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email) return;
+
     setLoading(true);
     setError("");
 
+    // Step 1: If we haven't asked for a name yet, check if the user exists
+    if (!needsName) {
+      const { data } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+      
+      if (!data) {
+        // User does not exist, ask for name
+        setNeedsName(true);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Step 2: If we need a name and it's missing, show error
+    if (needsName && !fullName.trim()) {
+      setError("Please provide your full name.");
+      setLoading(false);
+      return;
+    }
+
     document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
+
+    const options: any = { 
+      emailRedirectTo: `${window.location.origin}/auth/callback` 
+    };
+
+    if (needsName && fullName.trim()) {
+      options.data = { full_name: fullName.trim() };
+    }
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { 
-        emailRedirectTo: `${window.location.origin}/auth/callback` 
-      },
+      options,
     });
 
     if (error) setError(error.message);
@@ -70,15 +120,20 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
           <p className="text-zinc-500 text-sm mb-6 leading-relaxed">
             We sent a magic sign-in link to <br/><span className="text-emerald-500 font-bold">{email}</span>
           </p>
-          <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-6">
+          <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2">
             You can close this window.
           </p>
-          <button 
-            onClick={() => setSubmitted(false)}
-            className="text-[10px] text-zinc-500 hover:text-white uppercase font-black tracking-widest underline decoration-zinc-800 underline-offset-4 transition-colors"
-          >
-            Try a different email
-          </button>
+          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-6 bg-emerald-500/10 inline-block px-3 py-1.5 rounded-lg border border-emerald-500/20">
+            <i className="fa-solid fa-triangle-exclamation mr-1"></i> Don't forget to check your junk/spam folder!
+          </p>
+          <div className="block">
+            <button 
+              onClick={() => { setSubmitted(false); setShowEmailForm(false); setNeedsName(false); setFullName(""); }}
+              className="text-[10px] text-zinc-500 hover:text-white uppercase font-black tracking-widest underline decoration-zinc-800 underline-offset-4 transition-colors"
+            >
+              Try a different email
+            </button>
+          </div>
         </div>
 
         {/* Login Form State */}
@@ -92,18 +147,52 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
               Continue with Google
             </button>
 
+            {isLocalhost && (
+              <button
+                onClick={handleFacebookLogin}
+                className="w-full bg-[#1877F2] hover:bg-[#166fe5] text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-lg flex items-center justify-center gap-3"
+              >
+                <i className="fa-brands fa-facebook text-base"></i>
+                Continue with Facebook
+              </button>
+            )}
+
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-zinc-800"></div></div>
               <div className="relative flex justify-center"><span className="bg-zinc-900 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-600">Or use email</span></div>
             </div>
 
-            <form onSubmit={handleEmailLogin} className="space-y-4">
+            {!showEmailForm ? (
+              <button
+                onClick={() => setShowEmailForm(true)}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-lg flex items-center justify-center gap-3"
+              >
+                <i className="fa-regular fa-envelope text-base"></i>
+                Continue with Email
+              </button>
+            ) : (
+              <form onSubmit={handleEmailLogin} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                {needsName && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1.5 ml-1 text-center">
+                      Looks like you're new! What's your name?
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Full Name (e.g. Ashley Pitt)"
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-sm text-white outline-none focus:border-emerald-500 transition-colors text-center"
+                    />
+                  </div>
+                )}
               <div>
                 <input
                   type="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setNeedsName(false); setFullName(""); }}
                   placeholder="name@example.com"
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-sm text-white outline-none focus:border-emerald-500 transition-colors text-center"
                 />
@@ -117,12 +206,20 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
 
               <button
                 type="submit"
-                disabled={loading || !email}
+                disabled={loading || !email || (needsName && !fullName.trim())}
                 className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all disabled:opacity-50"
               >
-                {loading ? "Sending..." : "Send Magic Link"}
+                {loading ? (needsName ? "Sending..." : "Checking...") : "Continue"}
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setShowEmailForm(false); setNeedsName(false); setFullName(""); }}
+                className="w-full py-2 text-[10px] text-zinc-500 hover:text-white uppercase font-black tracking-widest transition-colors"
+              >
+                Cancel
               </button>
             </form>
+            )}
           </div>
           
           <div className="mt-8 text-center">

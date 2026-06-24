@@ -15,6 +15,7 @@ import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
 import PlayerHub from "../components/PlayerHub";
 import Referral from "../components/Referral";
+import ProfileSettings from "../components/ProfileSettings";
 import { APP_VERSION } from "../lib/version";
 import ChatWidget from "../components/ChatWidget";
 import { useOfflineSync } from "../lib/useOfflineSync";
@@ -300,7 +301,9 @@ export default function Home() {
       const hasActiveTeam = profile.team_id || profile.club_id;
       if (!roles || roles.length === 0) {
         if (profile.onboarding_completed && !hasActiveTeam) {
-          setActiveTab('referral');
+          if (activeTab !== 'referral' && activeTab !== 'profile') {
+            setActiveTab('referral');
+          }
         }
       }
 
@@ -378,7 +381,7 @@ export default function Home() {
                       currentClubRole === 'player' ? 'Player' : 'Unknown';
 
   const userMeta = session?.user?.user_metadata || {};
-  const avatarUrl = userMeta?.avatar_url;
+  const avatarUrl = profile?.avatar_url || userMeta?.avatar_url;
   const fullName = userMeta?.full_name;
   const emailStr = profile?.email || session?.user?.email;
   
@@ -397,7 +400,7 @@ export default function Home() {
     userInitials = 'U'; 
   }
   
-  const displayFirstName = profile?.first_name || fullName?.split(' ')?.[0] || emailStr?.split('@')?.[0] || 'User';
+  const displayFirstName = profile?.nickname || profile?.full_name || fullName || emailStr?.split('@')?.[0] || 'User';
 
   return (
     <div className="flex flex-col h-screen max-w-[480px] mx-auto bg-zinc-50 dark:bg-zinc-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
@@ -496,6 +499,7 @@ export default function Home() {
           {activeTab === "history" && <div className="p-4"><SeasonHistory planTier={activeClub?.plan_tier} /></div>}
           {activeTab === "setup" && isAdmin && <div className="p-4"><Setup activeTab={setupTab} /></div>}
           {activeTab === "referral" && <div className="p-4"><Referral /></div>}
+          {activeTab === "profile" && <div className="p-4"><ProfileSettings /></div>}
         </div>
 
         {isDaiveOpen && (
@@ -571,9 +575,26 @@ export default function Home() {
                   </div>
                 )}
               </div>
+
+              <div className="mt-4 px-6">
+                <button 
+                  onClick={() => { setIsSidebarOpen(false); handleTabChange('profile'); }}
+                  className={`w-full py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border flex items-center justify-center gap-2 ${activeTab === 'profile' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}`}
+                >
+                  <i className="fa-solid fa-user-gear"></i> Profile Settings
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
+              {(!roles || roles.length === 0) && profile && !profile.onboarding_completed && (
+                <div>
+                  <button onClick={() => { setIsSidebarOpen(false); handleTabChange('gameday'); }} className="w-full text-left px-6 py-3 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">
+                    <i className="fa-solid fa-play w-5 text-center"></i> Resume Setup
+                  </button>
+                </div>
+              )}
+
               <div>
                 <button onClick={() => { setIsDaiveOpen(true); setIsSidebarOpen(false); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
                   <i className="fa-solid fa-life-ring w-5 text-center text-emerald-500"></i> Get Help

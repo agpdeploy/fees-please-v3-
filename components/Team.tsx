@@ -82,6 +82,15 @@ export default function Team() {
 
   const formatName = (p: any) => p.nickname ? p.nickname : `${p.first_name} ${p.last_name?.charAt(0) || ''}.`;
 
+  // Clear state on club change to prevent data bleed between accounts
+  useEffect(() => {
+    setSelectedTeamId("");
+    setTeams([]);
+    setFixtureAvail([]);
+    setClubPlayers([]);
+    setPlayerStats({});
+  }, [activeClubId]);
+
   useEffect(() => {
     async function fetchDashboardData() {
       if (!profile || !activeClubId) return;
