@@ -897,19 +897,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       return;
     }
 
-    if (seasonName) {
-      // Run background update queries to backfill any existing untagged fixtures/transactions
-      const teamIds = teams && Array.isArray(teams) ? teams.map(t => t.id).filter(Boolean) : [];
-      const queries = [
-        supabase.from('transactions').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null)
-      ];
-      if (teamIds.length > 0) {
-        queries.push(supabase.from('fixtures').update({ season_name: seasonName }).in('team_id', teamIds).is('season_name', null));
-      }
-      await Promise.all(queries);
-    }
-    
-    // Update the parent component's state so the UI reflects the completion
+    // Update the parent component's state so the UI reflects the completion INSTANTLY
     if (onUpdateClubInfo) {
       onUpdateClubInfo({ 
         ...clubInfo, 
@@ -923,6 +911,18 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     
     setIsSavingSeason(false);
     advanceToNextUncompleted('season');
+
+    if (seasonName) {
+      // Run background update queries to backfill any existing untagged fixtures/transactions
+      const teamIds = teams && Array.isArray(teams) ? teams.map(t => t.id).filter(Boolean) : [];
+      const queries = [
+        supabase.from('transactions').update({ season_name: seasonName }).eq('club_id', activeClubId).is('season_name', null)
+      ];
+      if (teamIds.length > 0) {
+        queries.push(supabase.from('fixtures').update({ season_name: seasonName }).in('team_id', teamIds).is('season_name', null));
+      }
+      Promise.all(queries).catch(console.error);
+    }
   };
 
   // --- FINANCIALS ---

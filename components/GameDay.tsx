@@ -213,9 +213,18 @@ export default function GameDay() {
   }, []);
 
   useEffect(() => {
+    // Clear cross-account state immediately
+    setTeamFees(null);
+    setIsSquareEnabled(false);
+    setNewSeasons([]);
+    setSelectedTeamId("");
+    setActiveFixture(null);
+    setPastFixtures([]);
+    setSquad([]);
+    setAvailabilityData([]);
+
     if (activeClubId) {
       setClubInfo({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
-      setTeamFees(null);
       supabase.from('clubs')
         .select('*')
         .eq('id', activeClubId)
@@ -237,6 +246,7 @@ export default function GameDay() {
               
               square_access_token: data.square_access_token,
               square_location_id: data.square_location_id,
+              slug: data.slug,
               club_cat: data.club_cat
             });
             setIsSquareEnabled(!!data.square_access_token);
@@ -244,14 +254,6 @@ export default function GameDay() {
       });
     } else {
       setClubInfo({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
-      setTeamFees(null);
-      setIsSquareEnabled(false);
-      setNewSeasons([]);
-      setSelectedTeamId("");
-      setActiveFixture(null);
-      setPastFixtures([]);
-      setSquad([]);
-      setAvailabilityData([]);
     }
   }, [activeClubId]);
 
@@ -263,7 +265,7 @@ export default function GameDay() {
       
       let query = supabase.from("teams").select("*");
       
-      if (profile.role === 'club_admin' || profile.role === 'super_admin') {
+      if (currentClubRole === 'club_admin' || profile.role === 'super_admin') {
         if (activeClubId) {
           query = query.eq('club_id', activeClubId);
         } else if (profile.role !== 'super_admin') {
@@ -1195,7 +1197,7 @@ export default function GameDay() {
 
       {(!profile || (profile.role === 'super_admin' && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId))) || ((profile.onboarding_completed === true || (roles && roles.length > 0 && !isClubAdmin)) && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId)))) && (
         <>
-          {(profile?.role === 'club_admin' || profile?.role === 'super_admin') && teams.filter(t => t.is_active !== false).length > 1 && (
+          {isClubOrSuperAdmin && teams.filter(t => t.is_active !== false).length > 1 && (
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Manager View</label>
           <select value={selectedTeamId || ""} onChange={(e) => { setSelectedTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
