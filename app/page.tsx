@@ -385,6 +385,7 @@ export default function Home() {
   if (!session) return <Login />;
 
   const displayRole = profile?.role === 'super_admin' ? 'Super Admin' : 
+                      profile?.role === 'affiliate' ? 'Affiliate' :
                       currentClubRole === 'club_admin' ? 'Account Admin' : 
                       currentClubRole === 'team_admin' ? 'Team Admin' : 
                       (!roles || roles.length === 0) ? (activeTab === 'referral' ? 'Affiliate' : 'Account Admin') : 
