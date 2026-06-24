@@ -468,7 +468,7 @@ export default function Setup({ activeTab }: SetupProps) {
       const response = await fetch('/api/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole, club_id: clubId, team_id: inviteRole === 'team_admin' ? inviteTeamId : null }),
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole, club_id: clubId, team_id: inviteRole === 'team_admin' ? inviteTeamId : null, inviter_name: profile?.first_name }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to invite user');
@@ -1963,6 +1963,7 @@ export default function Setup({ activeTab }: SetupProps) {
           isSuperAdmin={profile?.role === 'super_admin'}
           loadClubData={loadClubData} 
           showToast={showToast} 
+          profile={profile}
         />
       )}
 

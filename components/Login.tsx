@@ -60,10 +60,25 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
 
     // Step 1: If we haven't asked for a name yet, check if the user exists
     if (!needsName) {
-      const { data } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
-      
-      if (!data) {
-        // User does not exist, ask for name
+      try {
+        const res = await fetch("/api/auth/check-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        
+        if (res.ok) {
+          const { exists } = await res.json();
+          if (!exists) {
+            // User does not exist, ask for name
+            setNeedsName(true);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Error checking email:", err);
+        // Fall back to asking for name if we can't verify
         setNeedsName(true);
         setLoading(false);
         return;

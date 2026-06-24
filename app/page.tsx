@@ -14,6 +14,7 @@ import SeasonHistory from "../components/SeasonHistory";
 import Login from "../components/Login";
 import ThemeToggle from "../components/ThemeToggle"; 
 import PlayerHub from "../components/PlayerHub";
+import PlayerTransactions from "../components/PlayerTransactions";
 import Referral from "../components/Referral";
 import ProfileSettings from "../components/ProfileSettings";
 import { APP_VERSION } from "../lib/version";
@@ -503,6 +504,7 @@ export default function Home() {
       <main className="flex-1 relative z-30 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {activeTab === "player_hub" && <div className="p-0"><PlayerHub /></div>}
+          {activeTab === "player_transactions" && <div className="p-0"><PlayerTransactions /></div>}
           {activeTab === "gameday" && <div className="p-4"><GameDay /></div>}
           {activeTab === "ledger" && <div className="p-4"><Ledger /></div>}
           {activeTab === "team" && <div className="p-4"><Team /></div>}
@@ -690,9 +692,16 @@ export default function Home() {
               )}
 
               <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2">
-                {currentClubRole === 'player' && (roles && roles.length > 0) && activeTab !== 'player_hub' && (
-                  <button onClick={() => { setIsSidebarOpen(false); handleTabChange('player_hub'); }} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                    <i className="fa-solid fa-house w-5 text-center text-emerald-500"></i> Dashboard
+                {currentClubRole === 'player' && (roles && roles.length > 0) && (
+                  <button onClick={() => { setIsSidebarOpen(false); handleTabChange('player_hub'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'player_hub' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                    <i className="fa-solid fa-house w-5 text-center text-emerald-500"></i> Availability Hub
+                  </button>
+                )}
+                
+                {/* My Transactions Link - available to all roles in the club since admins can be players too */}
+                {roles && roles.length > 0 && (
+                  <button onClick={() => { setIsSidebarOpen(false); handleTabChange('player_transactions'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'player_transactions' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                    <i className="fa-solid fa-receipt w-5 text-center text-emerald-500"></i> My Transactions
                   </button>
                 )}
 

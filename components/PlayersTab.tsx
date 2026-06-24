@@ -11,6 +11,7 @@ interface PlayersTabProps {
   isSuperAdmin?: boolean;
   loadClubData: () => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  profile?: any;
 }
 
 interface DraftPlayer {
@@ -22,7 +23,7 @@ interface DraftPlayer {
   is_member: boolean;
 }
 
-export default function PlayersTab({ clubId, teams, players, clubUsers = [], isSuperAdmin = false, loadClubData, showToast }: PlayersTabProps) {
+export default function PlayersTab({ clubId, teams, players, clubUsers = [], isSuperAdmin = false, loadClubData, showToast, profile }: PlayersTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeactivated, setShowDeactivated] = useState(false);
@@ -452,6 +453,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
             isSuperAdmin={isSuperAdmin}
             loadClubData={loadClubData} 
             showToast={showToast} 
+            inviterName={profile?.first_name || "An Admin"}
           />
         ))}
       </div>
@@ -466,14 +468,16 @@ function PlayerRow({
   clubUsers, 
   isSuperAdmin = false,
   loadClubData, 
-  showToast 
+  showToast,
+  inviterName
 }: { 
-  player: any, 
-  teams: any[], 
-  clubUsers: any[], 
-  isSuperAdmin?: boolean,
-  loadClubData: () => Promise<void>, 
-  showToast: (msg: string, type?: 'success'|'error') => void 
+  player: any; 
+  teams: any[]; 
+  clubUsers: any[]; 
+  isSuperAdmin?: boolean;
+  loadClubData: () => Promise<void>; 
+  showToast: (msg: string, type?: 'success' | 'error') => void;
+  inviterName?: string;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -538,6 +542,30 @@ function PlayerRow({
       if (!res.ok) throw new Error(data.error);
       showToast("Player resubscribed successfully!");
       loadClubData();
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleInvitePlayer() {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: player.email, 
+          role: 'player', 
+          club_id: player.club_id, 
+          team_id: player.default_team_id,
+          inviter_name: inviterName
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast("Invite sent successfully!");
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {
@@ -644,6 +672,11 @@ function PlayerRow({
         </div>
       </div>
       <div className="flex gap-2 shrink-0 ml-4 items-center">
+        {player.email && (
+          <button onClick={handleInvitePlayer} disabled={isSaving} className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors flex items-center justify-center shadow-sm" title="Send App Invite">
+            <i className="fa-solid fa-paper-plane text-xs"></i>
+          </button>
+        )}
         {player.unsubscribed && (
           <button onClick={handleResubscribe} disabled={isSaving} className="px-3 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors shadow-sm whitespace-nowrap">Resubscribe</button>
         )}
