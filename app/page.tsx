@@ -363,7 +363,17 @@ export default function Home() {
 
   if (isCheckingAuth || profileLoading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center relative">
+        {/* UPDATE TOASTER - ensure it shows even if stuck authenticating */}
+        {updateAvailable && (
+          <div 
+            onClick={applyUpdate}
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-[300] bg-emerald-600 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 cursor-pointer animate-in slide-in-from-top-4"
+          >
+             <i className="fa-solid fa-arrows-rotate animate-spin-slow"></i>
+             <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Update Available - Click to Refresh</span>
+          </div>
+        )}
         <i className="fa-solid fa-circle-notch animate-spin text-emerald-500 text-3xl mb-4"></i>
         <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">
           {isCheckingAuth ? 'Authenticating...' : 'Loading...'}
