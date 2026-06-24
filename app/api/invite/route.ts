@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     });
 
     const body = await req.json();
-    const { email, role, club_id, team_id } = body;
+    const { email, role, club_id, team_id, inviter_name } = body;
 
     if (!email || !role || !club_id) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -37,7 +37,33 @@ export async function POST(req: Request) {
       userId = existingProfile.id;
     } else {
       // User is brand new. Fire the welcome/invite email.
-      const { data: authData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(cleanEmail);
+      // Fetch club name for the email template
+      const { data: club } = await supabaseAdmin.from('clubs').select('name').eq('id', club_id).single();
+      const club_name = club?.name || 'Fees Please';
+      const friendly_role = role === 'club_admin' ? 'Account Admin' : (role === 'team_admin' ? 'Team Admin' : 'Player');
+
+      let invitee_name = 'there';
+      const { data: inviteePlayer } = await supabaseAdmin.from('players').select('first_name, nickname').eq('club_id', club_id).eq('email', cleanEmail).maybeSingle();
+      if (inviteePlayer) {
+         invitee_name = inviteePlayer.nickname || inviteePlayer.first_name || 'there';
+      }
+
+      let role_description = "manage your availability, view your transactions, and more";
+      if (role === 'club_admin') {
+         role_description = "manage game day payments, availability selections, and manage the entire account including billing";
+      } else if (role === 'team_admin') {
+         role_description = "manage game day payments, availability selections, and more";
+      }
+
+      const { data: authData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(cleanEmail, {
+        data: {
+          club_name: club_name,
+          role_name: friendly_role,
+          inviter_name: inviter_name || 'An Admin',
+          invitee_name: invitee_name,
+          role_description: role_description
+        }
+      });
       if (inviteError) return NextResponse.json({ error: inviteError.message }, { status: 400 });
       
       userId = authData.user.id;
