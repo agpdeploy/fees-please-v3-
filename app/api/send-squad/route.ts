@@ -89,9 +89,10 @@ export async function POST(req: Request) {
 
     const teamLogoUrl = tp?.club_logo_url;
 
-    for (const player of players) {
-      if (!player.email || player.email.trim() === '') continue;
+    const validPlayers = players.filter(p => p.email && p.email.trim() !== '');
+    const emailPayloads = [];
 
+    for (const player of validPlayers) {
       const prePayUrl = `${baseUrl}/t/${teamSlug}/prepay?f=${fixture.id}&p=${player.id}`;
       
       const paymentSection = (club.is_square_enabled && club.square_location_id) 
@@ -205,35 +206,46 @@ export async function POST(req: Request) {
         </div>
       `;
 
+      emailPayloads.push({
+        from: `${club.name} <reminders@mail.feesplease.app>`,
+        reply_to: 'noreply@mail.feesplease.app',
+        to: isTestingEnv ? 'emailtesting@feesplease.app' : player.email,
+        subject: `You're in! ${fixture.opponent} (${matchDate})`,
+        html: htmlContent
+      });
+    }
+
+    if (emailPayloads.length === 0) {
+      return NextResponse.json({ sentCount: 0, message: 'No valid emails to send.' });
+    }
+
+    const { data, error } = await resend.batch.send(emailPayloads);
+
+    if (error) {
+      console.error('Resend Error:', error);
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (data && data.data) {
       try {
-        const { data: resendData, error: resendError } = await resend.emails.send({
-          from: `${club.name} <reminders@mail.feesplease.app>`,
-          replyTo: 'noreply@mail.feesplease.app',
-          to: isTestingEnv ? 'emailtesting@feesplease.app' : player.email,
-          subject: `You're in! ${fixture.opponent} (${matchDate})`,
-          html: htmlContent
-        });
+        const emailLogs = validPlayers.map((player, index) => ({
+          resend_id: data.data[index]?.id,
+          fixture_id: fixtureId,
+          player_id: player.id,
+          team_id: teamId,
+          status: 'sent',
+          email_type: 'squad_notification'
+        })).filter(log => log.resend_id);
         
-        if (resendError) throw resendError;
-        
-        if (resendData) {
-           await supabaseAdmin.from('email_logs').insert([{
-             resend_id: resendData.id,
-             fixture_id: fixtureId,
-             player_id: player.id,
-             team_id: teamId,
-             status: 'sent',
-             email_type: 'squad_notification'
-           }]);
+        if (emailLogs.length > 0) {
+          await supabaseAdmin.from('email_logs').insert(emailLogs);
         }
-        
-        emailsSent++;
-      } catch (e) {
-        console.error("Failed to send email to", player.email, e);
+      } catch (logErr) {
+        console.error('Failed to log emails to DB:', logErr);
       }
     }
 
-    return NextResponse.json({ sentCount: emailsSent });
+    return NextResponse.json({ sentCount: emailPayloads.length, data });
   } catch (error: any) {
     console.error("Squad Notify Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
