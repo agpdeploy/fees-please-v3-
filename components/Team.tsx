@@ -1108,12 +1108,11 @@ export default function Team() {
                                                onClick={async () => {
                                                  setIsStatsLoading(true);
                                                  const logs = await fetchEmailLogs(f.id);
-                                                 const isSuperAdmin = profile?.role === 'super_admin';
                                                  const eligible = f.lists.squadIds.filter((pid: string) => {
                                                    const p = clubPlayers.find(cp => cp.id === pid);
                                                    if (!p) return false;
                                                    const hasSent = logs.some(log => log.email_type === 'squad_notification' && (log as any).players?.id === p.id);
-                                                   return p.email && p.email.trim() !== '' && p.unsubscribed !== true && (!hasSent || isSuperAdmin);
+                                                   return p.email && p.email.trim() !== '' && p.unsubscribed !== true && !hasSent;
                                                  });
                                                  
                                                  setSquadEmailSelectedPlayerIds(eligible);
@@ -1163,12 +1162,11 @@ export default function Team() {
                                         </button>
                                         <button 
                                           onClick={() => {
-                                            const isSuperAdmin = profile?.role === 'super_admin';
                                             const eligible = f.lists.squadIds.filter((pid: string) => {
                                               const p = clubPlayers.find(cp => cp.id === pid);
                                               if (!p) return false;
                                               const hasSent = emailLogDetails.some(log => log.email_type === 'squad_notification' && log.players?.id === p.id);
-                                              return p.email && p.email.trim() !== '' && p.unsubscribed !== true && (!hasSent || isSuperAdmin);
+                                              return p.email && p.email.trim() !== '' && p.unsubscribed !== true && !hasSent;
                                             });
                                             if (squadEmailSelectedPlayerIds.length === eligible.length && eligible.length > 0) {
                                                setSquadEmailSelectedPlayerIds([]);
@@ -1223,7 +1221,6 @@ export default function Team() {
                                                       const hasEmail = !!p.email;
                                                       const isSelected = squadEmailSelectedPlayerIds.includes(p.id);
                                                       const hasSent = emailLogDetails.some(log => log.email_type === 'squad_notification' && log.players?.id === p.id);
-                                                      const isSuperAdmin = profile?.role === 'super_admin';
                                                       const isLocked = hasSent;
                                                       const isDisabled = !hasEmail || p.unsubscribed === true || isLocked;
                                                       
