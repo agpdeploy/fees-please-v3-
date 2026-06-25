@@ -73,10 +73,13 @@ export default function Ledger() {
       setIsLoading(true);
       let query = supabase.from("teams").select("*");
       
-      if (profile.role === 'club_admin' || profile.role === 'super_admin') {
+      const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
+      const isSuperAdmin = profile?.role === 'super_admin';
+
+      if (currentClubRole === 'club_admin' || isSuperAdmin) {
         if (activeClubId) {
           query = query.eq('club_id', activeClubId);
-        } else if (profile.role !== 'super_admin') {
+        } else if (!isSuperAdmin) {
           setTeams([]);
           setIsLoading(false);
           return;
