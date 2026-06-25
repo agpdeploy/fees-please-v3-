@@ -16,6 +16,7 @@ interface SetupChecklistProps {
 }
 
 export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateClubInfo, teamFees, teamsCount, teams, onDismiss, onClubCreated }: SetupChecklistProps) {
+  const [localTeamCreated, setLocalTeamCreated] = useState(false);
   const [hasPlayers, setHasPlayers] = useState(false);
   const [hasFixtures, setHasFixtures] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -537,6 +538,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           { user_id: user.id, email: user.email, club_id: activeClubId, team_id: teamData.id, role: 'team_admin' }
        ]);
        
+       setLocalTeamCreated(true);
        return teamData.id;
     } catch (err) {
        console.error("Failed to auto-create team", err);
