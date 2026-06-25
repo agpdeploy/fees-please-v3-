@@ -172,9 +172,9 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     checkStatus();
   }, [activeClubId, teams]);
 
-  const hasSeason = !!clubInfo?.season_name && teamsCount > 0 && memberFee !== "";
+  const hasSeason = !!clubInfo?.season_name && (teamsCount > 0 || localTeamCreated) && memberFee !== "";
   const hasLogo = !!clubInfo?.logo;
-  const hasTeams = teamsCount > 0;
+  const hasTeams = teamsCount > 0 || localTeamCreated;
   const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
 
   const steps = [
