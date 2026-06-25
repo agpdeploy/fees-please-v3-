@@ -151,14 +151,25 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         return;
       }
       const { count: playerCount } = await supabase.from('players').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
-      const { count: fixtureCount } = await supabase.from('fixtures').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
+      
+      let fCount = 0;
+      const teamIds = teams?.map((t: any) => t.id) || [];
+      if (teamIds.length > 0) {
+        const { count } = await supabase.from('fixtures')
+          .select('*', { count: 'exact', head: true })
+          .or(`club_id.eq.${activeClubId},team_id.in.(${teamIds.join(',')})`);
+        fCount = count || 0;
+      } else {
+        const { count } = await supabase.from('fixtures').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
+        fCount = count || 0;
+      }
       
       setHasPlayers((playerCount || 0) > 0);
-      setHasFixtures((fixtureCount || 0) > 0);
+      setHasFixtures(fCount > 0);
       setLoading(false);
     }
     checkStatus();
-  }, [activeClubId]);
+  }, [activeClubId, teams]);
 
   const hasSeason = !!clubInfo?.season_name && teamsCount > 0 && memberFee !== "";
   const hasLogo = !!clubInfo?.logo;
@@ -1617,6 +1628,18 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-3 font-medium">
             Continue to Match Day to assign players from your teams to your matches
           </p>
+        </div>
+      )}
+
+      {!allCompleted && visibleSteps.filter(s => s.required).every(s => s.completed) && activeClubId && (
+        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-bottom-4">
+          <button 
+            onClick={() => onDismiss()}
+            className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800/50 rounded-xl transition-all shadow-sm"
+          >
+            Skip Optional Steps & Continue
+            <i className="fa-solid fa-arrow-right"></i>
+          </button>
         </div>
       )}
     </div>

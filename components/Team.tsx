@@ -1323,7 +1323,7 @@ export default function Team() {
          fixture={fixtureAvail.find(f => f.id === activeGraphicFixtureId)}
          clubPlayers={clubPlayers}
          team={teams.find(t => t.id === selectedTeamId)}
-         clubId={activeClubId}
+         clubId={activeClubId || ''}
          planTier={planTier}
        />
      </div>

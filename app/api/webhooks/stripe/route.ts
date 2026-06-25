@@ -70,7 +70,7 @@ export async function POST(req: Request) {
           invoice.billing_reason === 'subscription_cycle' ||
           invoice.billing_reason === 'subscription_update'
         ) {
-          const subscriptionId = invoice.subscription as string;
+          const subscriptionId = (invoice as any).subscription as string;
           
           if (subscriptionId) {
             // Retrieve subscription to get metadata (club_id)
