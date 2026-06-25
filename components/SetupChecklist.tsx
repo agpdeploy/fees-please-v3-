@@ -17,6 +17,7 @@ interface SetupChecklistProps {
 
 export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateClubInfo, teamFees, teamsCount, teams, onDismiss, onClubCreated }: SetupChecklistProps) {
   const [localTeamCreated, setLocalTeamCreated] = useState(false);
+  const [isSeasonSaved, setIsSeasonSaved] = useState(false);
   const [hasPlayers, setHasPlayers] = useState(false);
   const [hasFixtures, setHasFixtures] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -172,7 +173,8 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     checkStatus();
   }, [activeClubId, teams]);
 
-  const hasSeason = !!clubInfo?.season_name && (teamsCount > 0 || localTeamCreated) && memberFee !== "";
+  const hasInitialMemberFee = (teams && teams.length > 0 && teams[0].member_fee != null && teams[0].member_fee !== 0 && teams[0].member_fee !== "");
+  const hasSeason = !!clubInfo?.season_name && (teamsCount > 0 || localTeamCreated) && memberFee !== "" && (hasInitialMemberFee || isSeasonSaved);
   const hasLogo = !!clubInfo?.logo;
   const hasTeams = teamsCount > 0 || localTeamCreated;
   const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
@@ -924,6 +926,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
     
     setIsSavingSeason(false);
+    setIsSeasonSaved(true);
     advanceToNextUncompleted('season');
 
     if (seasonName) {
