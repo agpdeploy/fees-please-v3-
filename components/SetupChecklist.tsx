@@ -519,6 +519,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     // First, fallback to query
     const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
     if (data && data.length > 0) {
+      setLocalTeamCreated(true);
       return data[0].id;
     }
 
