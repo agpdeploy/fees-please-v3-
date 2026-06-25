@@ -16,6 +16,8 @@ interface SetupChecklistProps {
 }
 
 export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateClubInfo, teamFees, teamsCount, teams, onDismiss, onClubCreated }: SetupChecklistProps) {
+  const [localTeamCreated, setLocalTeamCreated] = useState(false);
+  const [isSeasonSaved, setIsSeasonSaved] = useState(false);
   const [hasPlayers, setHasPlayers] = useState(false);
   const [hasFixtures, setHasFixtures] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -171,9 +173,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     checkStatus();
   }, [activeClubId, teams]);
 
-  const hasSeason = !!clubInfo?.season_name && teamsCount > 0 && memberFee !== "";
+  const hasInitialMemberFee = (teams && teams.length > 0 && teams[0].member_fee != null && teams[0].member_fee !== 0 && teams[0].member_fee !== "");
+  const hasSeason = !!clubInfo?.season_name && (teamsCount > 0 || localTeamCreated) && memberFee !== "" && (hasInitialMemberFee || isSeasonSaved);
   const hasLogo = !!clubInfo?.logo;
-  const hasTeams = teamsCount > 0;
+  const hasTeams = teamsCount > 0 || localTeamCreated;
   const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
 
   const steps = [
@@ -518,6 +521,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     // First, fallback to query
     const { data } = await supabase.from('teams').select('id').eq('club_id', activeClubId).limit(1);
     if (data && data.length > 0) {
+      setLocalTeamCreated(true);
       return data[0].id;
     }
 
@@ -537,6 +541,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           { user_id: user.id, email: user.email, club_id: activeClubId, team_id: teamData.id, role: 'team_admin' }
        ]);
        
+       setLocalTeamCreated(true);
        return teamData.id;
     } catch (err) {
        console.error("Failed to auto-create team", err);
@@ -921,6 +926,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
     }
     
     setIsSavingSeason(false);
+    setIsSeasonSaved(true);
     advanceToNextUncompleted('season');
 
     if (seasonName) {
