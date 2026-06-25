@@ -1619,6 +1619,18 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
           </p>
         </div>
       )}
+
+      {!allCompleted && visibleSteps.filter(s => s.required).every(s => s.completed) && activeClubId && (
+        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-bottom-4">
+          <button 
+            onClick={() => onDismiss()}
+            className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800/50 rounded-xl transition-all shadow-sm"
+          >
+            Skip Optional Steps & Continue
+            <i className="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
