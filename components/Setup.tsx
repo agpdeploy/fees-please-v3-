@@ -205,8 +205,13 @@ export default function Setup({ activeTab }: SetupProps) {
           }
         }
       });
-    } else if (profile.club_id) {
-      setClubId(profile.club_id);
+    } else {
+      if (activeClubId) {
+        setClubId(activeClubId);
+      } else if (profile.club_id) {
+        setClubId(profile.club_id);
+        setActiveClubId(profile.club_id);
+      }
     }
   }, [profile, activeClubId, setActiveClubId]);
 
