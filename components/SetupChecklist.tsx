@@ -151,14 +151,25 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         return;
       }
       const { count: playerCount } = await supabase.from('players').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
-      const { count: fixtureCount } = await supabase.from('fixtures').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
+      
+      let fCount = 0;
+      const teamIds = teams?.map((t: any) => t.id) || [];
+      if (teamIds.length > 0) {
+        const { count } = await supabase.from('fixtures')
+          .select('*', { count: 'exact', head: true })
+          .or(`club_id.eq.${activeClubId},team_id.in.(${teamIds.join(',')})`);
+        fCount = count || 0;
+      } else {
+        const { count } = await supabase.from('fixtures').select('*', { count: 'exact', head: true }).eq('club_id', activeClubId);
+        fCount = count || 0;
+      }
       
       setHasPlayers((playerCount || 0) > 0);
-      setHasFixtures((fixtureCount || 0) > 0);
+      setHasFixtures(fCount > 0);
       setLoading(false);
     }
     checkStatus();
-  }, [activeClubId]);
+  }, [activeClubId, teams]);
 
   const hasSeason = !!clubInfo?.season_name && teamsCount > 0 && memberFee !== "";
   const hasLogo = !!clubInfo?.logo;
