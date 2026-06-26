@@ -782,7 +782,11 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       return;
     }
 
-    const teamName = teams.find(t => t.id === targetTeamId)?.name || "";
+    let teamName = teams.find(t => t.id === targetTeamId)?.name;
+    if (!teamName) {
+      const { data: teamData } = await supabase.from('teams').select('name').eq('id', targetTeamId).single();
+      teamName = teamData?.name || clubInfo?.name || "";
+    }
 
     try {
       let payload: any = {};
@@ -801,6 +805,13 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       }
       
       setFixtureCachedUpload(payload);
+      
+      if (!teamName || teamName.trim() === "") {
+        setFixtureNeedsAlias(true);
+        setIsExtractingFixture(false);
+        return;
+      }
+      
       await runFixtureExtraction(payload, teamName);
 
     } catch (error: any) {
