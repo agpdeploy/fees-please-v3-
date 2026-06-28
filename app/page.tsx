@@ -144,7 +144,7 @@ export default function Home() {
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
-      supabase.from('clubs').select('id, name, logo_url, is_active, plan_tier').order('name').then(({ data }) => {
+      supabase.from('clubs').select('id, name, logo_url, is_active, plan_tier, trial_ends_at, has_had_trial').order('name').then(({ data }) => {
         if (data) setAllClubs(data.filter((c: any) => c.is_active !== false));
       });
     }
@@ -573,18 +573,15 @@ export default function Home() {
                 <div className="inline-block px-3 py-1 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
                   {displayRole}
                 </div>
-                {activeClub && activeClub.plan_tier && activeClub.plan_tier !== 'free' && currentClubRole !== 'player' && (
+                {activeClub && currentClubRole !== 'player' && (
                   <div className={`inline-block px-3 py-1 border rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${
                     activeClub.plan_tier === 'pro' 
                       ? 'bg-amber-100 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400'
-                      : 'bg-indigo-100 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-400'
+                      : (activeClub.plan_tier === 'plus' || (activeClub.trial_ends_at && new Date(activeClub.trial_ends_at) > new Date() && activeClub.plan_tier === 'free'))
+                      ? 'bg-indigo-100 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-400'
+                      : 'bg-zinc-100 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'
                   }`}>
-                    {activeClub.plan_tier} PLAN
-                  </div>
-                )}
-                {activeClub && (!activeClub.plan_tier || activeClub.plan_tier === 'free') && currentClubRole !== 'player' && (
-                  <div className="inline-block px-3 py-1 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
-                    FREE PLAN
+                    {activeClub.plan_tier === 'pro' ? 'PRO PLAN' : (activeClub.plan_tier === 'plus' ? 'PLUS PLAN' : ((activeClub.trial_ends_at && new Date(activeClub.trial_ends_at) > new Date() && activeClub.plan_tier === 'free') ? 'PLUS (TRIAL)' : 'FREE PLAN'))}
                   </div>
                 )}
               </div>

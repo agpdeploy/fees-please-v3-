@@ -57,7 +57,7 @@ export default function ClubSwitcher() {
         )}
         <div className="text-left flex-1">
           <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">Active Workspace</div>
-          <div className="font-black text-white text-sm uppercase tracking-wide leading-none">{activeClub?.name || "Select Club"}</div>
+          <div className="font-black text-white text-sm uppercase tracking-wide leading-none">{activeClub?.name || "Select Account"}</div>
         </div>
         <i className={`fa-solid fa-chevron-down text-zinc-500 text-xs transition-transform ${isOpen ? 'rotate-180' : ''}`}></i>
       </button>

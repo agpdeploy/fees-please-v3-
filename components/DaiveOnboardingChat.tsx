@@ -102,7 +102,7 @@ export default function DaiveOnboardingChat({ onComplete }: { onComplete?: (club
             if (roleError) {
               console.error("Handshake Error: Could not assign admin role", roleError);
             } else {
-              console.log("✅ Handshake complete: You are now the Club Admin!");
+              console.log("✅ Handshake complete: You are now the Account Admin!");
             }
           }
         }

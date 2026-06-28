@@ -336,7 +336,7 @@ export default function DynamicDashboardTable({ activeView, onResetView }: Dynam
                       </td>
                       <td className="p-4 text-center">
                         <div className="inline-flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 px-3 py-1 rounded-full text-[10px] font-black text-zinc-600 dark:text-zinc-400">
-                          <span title="Club Admins"><i className="fa-solid fa-building mr-1"></i>{row.club_admins ?? 0}</span>
+                          <span title="Account Admins"><i className="fa-solid fa-building mr-1"></i>{row.club_admins ?? 0}</span>
                           <span className="text-zinc-300 dark:text-zinc-700">|</span>
                           <span title="Team Admins"><i className="fa-solid fa-users-gear mr-1"></i>{row.team_admins ?? 0}</span>
                         </div>

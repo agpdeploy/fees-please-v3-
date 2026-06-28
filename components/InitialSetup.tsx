@@ -61,7 +61,7 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
 
       if (profileError) throw profileError;
 
-      // 2. Create Club
+      // 2. Create Account
       const baseSlug = teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       const clubSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
       
@@ -95,7 +95,7 @@ export default function InitialSetup({ user, onComplete }: { user: any, onComple
 
       if (teamError) throw teamError;
 
-      // 4. Create Role (Club Admin & Team Admin)
+      // 4. Create Role (Account Admin & Team Admin)
       const { error: rolesError } = await supabase
         .from('user_roles') // <-- Wait, is the table 'roles' or 'user_roles'? In useProfile it's 'user_roles'
         .insert([

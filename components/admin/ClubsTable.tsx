@@ -52,7 +52,7 @@ export default function ClubsTable() {
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
       <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
         <h2 className="font-black uppercase tracking-widest text-sm text-zinc-900 dark:text-white">
-          Active Clubs
+          Active Accounts
         </h2>
         <div className="flex gap-2">
           <button 
@@ -76,7 +76,7 @@ export default function ClubsTable() {
         <table className="w-full text-left text-sm">
           <thead className="bg-zinc-50 dark:bg-zinc-950/50 text-[10px] font-black uppercase tracking-widest text-zinc-500">
             <tr>
-              <th className="px-5 py-3">Club Name</th>
+              <th className="px-5 py-3">Account Name</th>
               <th className="px-5 py-3">Created</th>
               <th className="px-5 py-3 text-center">Teams</th>
               <th className="px-5 py-3 text-center">Players</th>

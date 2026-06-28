@@ -266,6 +266,11 @@ export async function GET(req: Request) {
         recipientEmails.push(...superAdmins.map(p => p.email).filter(Boolean));
       }
 
+      if (report.recipient_emails) {
+        const customEmails = report.recipient_emails.split(',').map((e: string) => e.trim()).filter(Boolean);
+        recipientEmails.push(...customEmails);
+      }
+
       recipientEmails = Array.from(new Set(recipientEmails));
       if (recipientEmails.length === 0) continue;
 

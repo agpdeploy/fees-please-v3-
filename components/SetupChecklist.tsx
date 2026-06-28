@@ -181,7 +181,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
 
   const steps = [
     { id: 'club', title: 'Create Your Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
-    { id: 'logo', title: 'Upload Club Logo', icon: 'fa-image', completed: !!clubInfo?.logo, required: false },
+    { id: 'logo', title: 'Upload Account Logo', icon: 'fa-image', completed: !!clubInfo?.logo, required: false },
     { id: 'players', title: 'Add Players', icon: 'fa-users', completed: hasPlayers, required: true },
     { id: 'season', title: 'Season Setup', icon: 'fa-calendar', completed: hasSeason, required: true },
     { id: 'fixtures', title: 'Add Fixtures', icon: 'fa-list-ol', completed: hasFixtures, required: false },
@@ -280,7 +280,13 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
             default_umpire_fee: null,
             expense_label: null,
             income_label: null,
-            settings: { playhq_tenant: playhqTenant, playhq_org_id: playhqOrgId }
+            settings: { 
+              playhq_tenant: playhqTenant, 
+              playhq_org_id: playhqOrgId,
+              public_email: data.orgDetails?.email || null,
+              public_website: data.orgDetails?.website || null,
+              public_address: data.orgDetails?.address || null
+            }
           }]).select().single();
         if (clubError) throw clubError;
         currentClubId = clubData.id;

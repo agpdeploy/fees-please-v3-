@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         .single();
         
       if (!superAdminRole) {
-         return NextResponse.json({ error: "Forbidden: You must be a Club Admin or Super Admin to process refunds." }, { status: 403 });
+         return NextResponse.json({ error: "Forbidden: You must be a Account Admin or Super Admin to process refunds." }, { status: 403 });
       }
     }
 

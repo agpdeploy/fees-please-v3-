@@ -98,10 +98,11 @@ export default function Team() {
 
       
       // Fetch club info to get season_name and plan_tier for filtering/features
-      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier, name, logo_url').eq('id', activeClubId).single();
+      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier, name, logo_url, trial_ends_at, has_had_trial').eq('id', activeClubId).single();
       const clubSeasonName = clubData?.season_name || null;
       setActiveSeasonName(clubSeasonName);
-      setPlanTier(clubData?.plan_tier || 'free');
+      const isTrial = clubData?.trial_ends_at && new Date(clubData.trial_ends_at) > new Date() && clubData?.plan_tier === 'free';
+      setPlanTier(isTrial ? 'plus' : (clubData?.plan_tier || 'free'));
       if (clubData) setClubInfo(clubData);
 
       // 1. Determine Teams
@@ -671,7 +672,7 @@ export default function Team() {
                                 <div className="flex items-center gap-3 flex-1">
                                   <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
                                     {clubInfo?.logo_url ? (
-                                      <img src={clubInfo.logo_url} alt="Club Logo" className="w-full h-full object-cover" />
+                                      <img src={clubInfo.logo_url} alt="Account Logo" className="w-full h-full object-cover" />
                                     ) : (
                                       <span className="text-[10px] font-black text-zinc-500">{clubInfo?.name?.substring(0, 2).toUpperCase()}</span>
                                     )}

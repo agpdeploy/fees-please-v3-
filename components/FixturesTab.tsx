@@ -730,7 +730,7 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
         <div className="flex items-center gap-3 flex-1">
           <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
             {clubLogoUrl ? (
-              <img src={clubLogoUrl} alt="Club Logo" className="w-full h-full object-cover" />
+              <img src={clubLogoUrl} alt="Account Logo" className="w-full h-full object-cover" />
             ) : (
               <span className="text-[10px] font-black text-zinc-500">{teamName?.substring(0, 2).toUpperCase()}</span>
             )}

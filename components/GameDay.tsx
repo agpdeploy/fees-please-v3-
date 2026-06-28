@@ -1228,7 +1228,7 @@ export default function GameDay() {
             </>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-              Waiting for your Club Admin to start a new season.
+              Waiting for your Account Admin to start a new season.
             </p>
           )}
         </div>
@@ -1286,7 +1286,7 @@ export default function GameDay() {
             <div className="flex items-center gap-3 flex-1">
               <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
                 {clubInfo.logo ? (
-                  <img src={clubInfo.logo} alt="Club Logo" className="w-full h-full object-cover" />
+                  <img src={clubInfo.logo} alt="Account Logo" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-[10px] font-black text-zinc-500">{clubInfo.name?.substring(0, 2).toUpperCase()}</span>
                 )}
@@ -1345,11 +1345,11 @@ export default function GameDay() {
             </>
           ) : isTeamCaptain ? (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[300px] leading-relaxed">
-              You've reached the end of your scheduled games. Please contact your Club Admin to add more matches or wrap up the season.
+              You've reached the end of your scheduled games. Please contact your Account Admin to add more matches or wrap up the season.
             </p>
           ) : (
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 max-w-[250px] leading-relaxed">
-              Waiting for your Club Admin to add the schedule.
+              Waiting for your Account Admin to add the schedule.
             </p>
           )}
         </div>
@@ -1770,7 +1770,7 @@ export default function GameDay() {
                               <div className="flex items-center gap-3 flex-1">
                                 <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
                                   {clubInfo?.logo ? (
-                                    <img src={clubInfo.logo} alt="Club Logo" className="w-full h-full object-cover" />
+                                    <img src={clubInfo.logo} alt="Account Logo" className="w-full h-full object-cover" />
                                   ) : (
                                     <span className="text-[10px] font-black text-zinc-500">{clubInfo?.name?.substring(0, 2).toUpperCase()}</span>
                                   )}

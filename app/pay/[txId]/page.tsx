@@ -110,12 +110,15 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
     );
   }
 
-  if (!club?.is_square_enabled || !club?.square_location_id) {
-    return <div className="p-8 text-center text-zinc-500 font-bold">This club is not fully configured for online payments.</div>;
+  const hasSquare = club?.is_square_enabled && club?.square_location_id;
+  const hasFallback = club?.pay_id_value && (club?.plan_tier === 'plus' || club?.plan_tier === 'pro');
+
+  if (!hasSquare && !hasFallback) {
+    return <div className="p-8 text-center text-zinc-500 font-bold">This account is not fully configured for online payments.</div>;
   }
 
   const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
-  if (!appId) {
+  if (hasSquare && !appId) {
     return <div className="p-8 text-center text-red-500 font-bold">Square configuration error on server.</div>;
   }
 

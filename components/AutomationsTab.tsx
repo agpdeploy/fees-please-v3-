@@ -18,9 +18,9 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingId, setIsSendingId] = useState<string | null>(null);
 
-  // Form State for editing
   const [editingReport, setEditingReport] = useState<any | null>(null);
-  const [sponsorStats, setSponsorStats] = useState({ impressions: 0, clicks: 0, ctr: 0 });
+  const [recipientEmails, setRecipientEmails] = useState("");
+
   
   const [frequency, setFrequency] = useState<"weekly" | "fortnightly">("weekly");
   const [scheduleDay, setScheduleDay] = useState<string>("monday");
@@ -62,22 +62,6 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
       setReportsConfig(data);
     }
     
-    // Fetch Sponsor Analytics
-    let sponsorQuery = supabase.from("sponsor_analytics").select("event_type").eq("club_id", clubId);
-    if (!isClubAdmin) {
-       const teamIds = manageableTeams.map(t => t.id);
-       if (teamIds.length > 0) sponsorQuery = sponsorQuery.in("team_id", teamIds);
-    }
-    const { data: sponsorData } = await sponsorQuery;
-    let imp = 0, clk = 0;
-    if (sponsorData) {
-      sponsorData.forEach(s => {
-        if (s.event_type === 'impression') imp++;
-        if (s.event_type === 'click') clk++;
-      });
-    }
-    setSponsorStats({ impressions: imp, clicks: clk, ctr: imp > 0 ? (clk / imp) * 100 : 0 });
-
     setIsLoading(false);
   };
 
@@ -174,6 +158,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
     setFrequency(report.frequency);
     setScheduleDay(report.schedule_day);
     setScheduleTime(report.schedule_time);
+    setRecipientEmails(report.recipient_emails || "");
   };
 
   const handleScheduleClick = (report: any) => {
@@ -194,6 +179,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
         frequency,
         schedule_day: scheduleDay,
         schedule_time: scheduleTime,
+        recipient_emails: recipientEmails,
         is_active: true // Always activate when they submit a new schedule
       };
       
@@ -229,6 +215,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
       frequency: 'weekly',
       schedule_day: 'monday',
       schedule_time: '08:00',
+      recipient_emails: '',
       is_active: false
     });
   }
@@ -244,6 +231,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
       frequency: 'weekly',
       schedule_day: 'monday',
       schedule_time: '08:00',
+      recipient_emails: '',
       is_active: false,
       _teamName: team.name // helper for UI
     });
@@ -253,29 +241,7 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
       
-      {/* SPONSOR IMPACT */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm">
-        <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-4">
-          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 flex items-center justify-center">
-             <i className="fa-solid fa-bullhorn text-sm"></i>
-          </div>
-          <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Sponsorship Impact</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.impressions}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Impressions</p>
-          </div>
-          <div>
-            <p className="text-2xl font-black text-blue-600 dark:text-blue-500">{sponsorStats.clicks}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-blue-600/70 mt-1">Clicks</p>
-          </div>
-          <div>
-            <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.ctr.toFixed(1)}%</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Click Rate</p>
-          </div>
-        </div>
-      </div>
+
       
       {/* Confirmation Modal */}
       {confirmSendReport && (
@@ -364,6 +330,11 @@ export default function AutomationsTab({ clubId, teams, clubUsers, showToast, pl
             <div>
               <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Time of Day (Local)</label>
               <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none" required />
+            </div>
+
+            <div>
+              <label className="text-[9px] text-zinc-500 uppercase font-black ml-1 block mb-1">Additional Recipients (Comma Separated)</label>
+              <input type="text" placeholder="e.g. coach@team.com, treasurer@club.com" value={recipientEmails} onChange={(e) => setRecipientEmails(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none" />
             </div>
 
             <div className="flex gap-3 pt-2">

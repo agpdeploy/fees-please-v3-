@@ -68,6 +68,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [sponsor2Url, setSponsor2Url] = useState("");
   const [sponsor3Logo, setSponsor3Logo] = useState("");
   const [sponsor3Url, setSponsor3Url] = useState("");
+  const [sponsorStats, setSponsorStats] = useState({ impressions: 0, clicks: 0, ctr: 0 });
   const [isUploadingSponsor, setIsUploadingSponsor] = useState(false);
 
   const [seasonName, setSeasonName] = useState("");
@@ -269,6 +270,16 @@ export default function Setup({ activeTab }: SetupProps) {
       }
     }
 
+    const { data: sponsorAnalytics } = await supabase.from("sponsor_analytics").select("event_type").eq("club_id", clubId);
+    let imp = 0, clk = 0;
+    if (sponsorAnalytics) {
+      sponsorAnalytics.forEach((s: any) => {
+        if (s.event_type === 'impression') imp++;
+        if (s.event_type === 'click') clk++;
+      });
+    }
+    setSponsorStats({ impressions: imp, clicks: clk, ctr: imp > 0 ? (clk / imp) * 100 : 0 });
+
     const { data: fixData } = await supabase.from("fixtures").select("*, teams(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
     if (fixData) {
       const filteredFix = fixData.filter(f => !clubData?.season_name || f.season_name === clubData.season_name || !f.season_name);
@@ -354,6 +365,24 @@ export default function Setup({ activeTab }: SetupProps) {
     } catch (err: any) { showToast(err.message || "Upload failed", "error"); } 
     finally { setIsUploadingLogo(false); setIsUploadingSponsor(false); }
   }
+
+  const handleStartTrial = async () => {
+    try {
+      setIsSaving(true);
+      const res = await fetch('/api/club/start-trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clubId })
+      });
+      if (!res.ok) throw new Error("Failed to start trial");
+      await loadClubData(); // refresh data
+      showToast("14-Day Free Trial Started! Enjoy Plus features.");
+    } catch (e: any) {
+      showToast(e.message, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   async function handleHardDeleteClub() {
     if (!clubId || clubId === 'new') return;
@@ -766,7 +795,7 @@ export default function Setup({ activeTab }: SetupProps) {
         </div>
         <h1 className="text-2xl font-black italic uppercase tracking-tighter text-zinc-900 dark:text-white mb-2">Welcome!</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm text-center mb-8 max-w-xs">
-          It looks like you don't belong to a club yet. What would you like to do?
+          It looks like you don't belong to an account yet. What would you like to do?
         </p>
         
         <div className="w-full max-w-sm space-y-4">
@@ -942,7 +971,7 @@ export default function Setup({ activeTab }: SetupProps) {
               <div className="flex flex-col items-start mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4 gap-4">
                 <div>
                   <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-1">Subscription Plan</h2>
-                  <p className="text-zinc-500 text-xs">Choose the right plan based on your needs. All paid plans include a 14-day free trial. Current plan: <strong className="text-zinc-900 dark:text-white uppercase">{clubRecord?.plan_tier} {clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}</strong></p>
+                  <p className="text-zinc-500 text-xs">Choose the right plan based on your needs. All paid plans include a 14-day free trial. Current plan: <strong className="text-zinc-900 dark:text-white uppercase">{clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === 'free' ? 'PLUS (TRIAL ACTIVE)' : `${clubRecord?.plan_tier} ${clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}`}</strong></p>
                 </div>
                 
                 {clubRecord?.plan_tier !== 'free' && clubRecord?.settings?.cancel_at_period_end && (
@@ -951,6 +980,16 @@ export default function Setup({ activeTab }: SetupProps) {
                     <div>
                       <h3 className="text-xs font-black uppercase tracking-widest text-amber-900 dark:text-amber-400 mb-1">Pending Cancellation</h3>
                       <p className="text-xs text-amber-700 dark:text-amber-500">Your subscription has been canceled and will not renew. You will retain your current plan features until the end of the billing period, after which you will be downgraded to the Free plan.</p>
+                    </div>
+                  </div>
+                )}
+
+                {clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === 'free' && (
+                  <div className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-3 items-start animate-in fade-in zoom-in-95">
+                    <i className="fa-solid fa-clock text-amber-500 mt-0.5"></i>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-amber-900 dark:text-amber-400 mb-1">Trial Active</h3>
+                      <p className="text-xs text-amber-700 dark:text-amber-500">Your Plus trial expires in {Math.ceil((new Date(clubRecord.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} days. Upgrade now to avoid losing access to Plus features.</p>
                     </div>
                   </div>
                 )}
@@ -993,9 +1032,10 @@ export default function Setup({ activeTab }: SetupProps) {
                 </div>
 
                 {/* Plus Plan */}
-                <div className={`relative bg-white dark:bg-zinc-900 border-2 rounded-2xl p-5 sm:p-6 transition-all ${clubRecord?.plan_tier === 'plus' ? 'border-emerald-500 shadow-md' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                <div className={`relative bg-white dark:bg-zinc-900 border-2 rounded-2xl p-5 sm:p-6 transition-all ${(clubRecord?.plan_tier === 'plus' || (clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === 'free')) ? 'border-emerald-500 shadow-md' : 'border-zinc-200 dark:border-zinc-800'}`}>
                   {clubRecord?.plan_tier === 'plus' && <div className="absolute -top-2.5 left-5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Current {clubRecord?.plan_interval ? `(${clubRecord.plan_interval})` : ''}</div>}
-                  {clubRecord?.plan_tier !== 'plus' && <div className="absolute -top-2.5 left-5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Recommended</div>}
+                  {clubRecord?.plan_tier === 'free' && clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && <div className="absolute -top-2.5 left-5 bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Trial Active</div>}
+                  {clubRecord?.plan_tier !== 'plus' && !(clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === 'free') && <div className="absolute -top-2.5 left-5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Recommended</div>}
                   
                   <h3 className="text-xl font-black text-emerald-600 dark:text-emerald-400 mb-2">Plus</h3>
                   <p className="text-xs text-zinc-500 mb-4">Unlimited teams with reduced transaction fees and email capability.</p>
@@ -1013,7 +1053,12 @@ export default function Setup({ activeTab }: SetupProps) {
                   {clubRecord?.plan_tier === 'plus' ? (
                      <button onClick={handleStripePortal} disabled={isSaving} className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors">Manage</button>
                   ) : (
-                     <button onClick={() => handleStripeCheckout('plus')} disabled={isSaving || clubRecord?.plan_tier === 'pro'} className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors disabled:opacity-50">Upgrade</button>
+                     <>
+                       {(!clubRecord?.has_had_trial && clubRecord?.plan_tier === 'free') && (
+                         <button onClick={handleStartTrial} disabled={isSaving} className="w-full mt-3 py-2 bg-amber-500 hover:bg-amber-400 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors mb-2">Start 14-Day Free Trial (No Card Required)</button>
+                       )}
+                       <button onClick={() => handleStripeCheckout('plus')} disabled={isSaving || clubRecord?.plan_tier === 'pro'} className="w-full mt-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-colors disabled:opacity-50">Upgrade</button>
+                     </>
                   )}
 
                   <ul className="mt-6 space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
@@ -1066,7 +1111,7 @@ export default function Setup({ activeTab }: SetupProps) {
       {activeTab === 'sponsors' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm relative overflow-hidden transition-colors">
-            {!hasFeature(clubRecord?.plan_tier, 'SPONSORS') && (
+            {!hasFeature(clubRecord, 'SPONSORS') && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 dark:bg-zinc-900/70 backdrop-blur-[2px]">
                 <div className="text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-2xl shadow-xl max-w-xs mx-auto">
                    <div className="w-12 h-12 mx-auto bg-amber-100 dark:bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-4">
@@ -1084,7 +1129,31 @@ export default function Setup({ activeTab }: SetupProps) {
                 </div>
               </div>
             )}
-            <div className={`p-5 transition-all duration-300 ${!hasFeature(clubRecord?.plan_tier, 'SPONSORS') ? 'opacity-30 pointer-events-none blur-[1px]' : ''}`}>
+            <div className={`p-5 transition-all duration-300 ${!hasFeature(clubRecord, 'SPONSORS') ? 'opacity-30 pointer-events-none blur-[1px]' : ''}`}>
+              
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 mb-6">
+                <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800/50 pb-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 flex items-center justify-center">
+                     <i className="fa-solid fa-chart-simple text-sm"></i>
+                  </div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Sponsorship Impact</h2>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.impressions}</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Impressions</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-black text-blue-600 dark:text-blue-500">{sponsorStats.clicks}</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-600/70 mt-1">Clicks</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.ctr.toFixed(1)}%</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Click Rate</p>
+                  </div>
+                </div>
+              </div>
+
               <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Sponsors</h2>
               <div className="space-y-4">
                    {(!clubId || clubId === 'new') ? (
@@ -1123,7 +1192,7 @@ export default function Setup({ activeTab }: SetupProps) {
               </div>
             </div>
           </div>
-          {hasFeature(clubRecord?.plan_tier, 'SPONSORS') && (
+          {hasFeature(clubRecord, 'SPONSORS') && (
             <button onClick={saveConfig} disabled={isSaving || !clubName} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
               {isSaving ? "Saving Sponsors..." : "Save Sponsors"}
             </button>

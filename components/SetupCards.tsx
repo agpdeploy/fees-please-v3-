@@ -78,7 +78,7 @@ export function SetupLogoCard({ clubId, onDismiss, onSuccess }: { clubId: string
           <i className="fa-solid fa-camera"></i>
         </div>
         <div>
-          <h3 className="font-black text-sm text-zinc-900 dark:text-white">Add Club Logo</h3>
+          <h3 className="font-black text-sm text-zinc-900 dark:text-white">Add Account Logo</h3>
           <p className="text-xs text-zinc-500">Make it feel like home.</p>
         </div>
       </div>

@@ -8,8 +8,24 @@ export const FEATURES = {
 
 export type FeatureName = keyof typeof FEATURES;
 
-export function hasFeature(tier: string | undefined | null, feature: FeatureName): boolean {
-  // Default to free if tier is undefined/null
-  const activeTier = tier ? tier.toLowerCase() : 'free';
+export function hasFeature(tierOrClub: string | any | undefined | null, feature: FeatureName): boolean {
+  if (!tierOrClub) return FEATURES[feature].includes('free');
+  
+  let activeTier = 'free';
+  
+  if (typeof tierOrClub === 'string') {
+    activeTier = tierOrClub.toLowerCase();
+  } else {
+    activeTier = tierOrClub.plan_tier ? tierOrClub.plan_tier.toLowerCase() : 'free';
+    
+    // Evaluate Trial Status
+    if (tierOrClub.trial_ends_at && activeTier === 'free') {
+      const trialEnd = new Date(tierOrClub.trial_ends_at);
+      if (trialEnd > new Date()) {
+        activeTier = 'plus';
+      }
+    }
+  }
+
   return FEATURES[feature].includes(activeTier);
 }

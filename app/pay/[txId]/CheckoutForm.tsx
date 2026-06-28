@@ -142,52 +142,69 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
           )}
 
           <div className="square-payment-wrapper relative min-h-[150px]">
-            {(isProcessing || isSuccess) && (
-              <div className="absolute inset-0 bg-white/80 dark:bg-[#111]/80 z-10 flex items-center justify-center rounded-xl backdrop-blur-sm">
-                <div className="font-bold text-emerald-600 animate-pulse flex items-center gap-2 uppercase tracking-widest text-xs">
-                  {isSuccess ? <><i className="fa-solid fa-circle-check"></i> Success! Reloading...</> : <><i className="fa-solid fa-spinner fa-spin"></i> Processing...</>}
+            {club?.is_square_enabled && appId && locationId ? (
+              <>
+                {(isProcessing || isSuccess) && (
+                  <div className="absolute inset-0 bg-white/80 dark:bg-[#111]/80 z-10 flex items-center justify-center rounded-xl backdrop-blur-sm">
+                    <div className="font-bold text-emerald-600 animate-pulse flex items-center gap-2 uppercase tracking-widest text-xs">
+                      {isSuccess ? <><i className="fa-solid fa-circle-check"></i> Success! Reloading...</> : <><i className="fa-solid fa-spinner fa-spin"></i> Processing...</>}
+                    </div>
+                  </div>
+                )}
+                <PaymentForm
+                  applicationId={appId}
+                  locationId={locationId}
+                  cardTokenizeResponseReceived={handlePayment}
+                  createPaymentRequest={() => ({
+                    countryCode: 'AU',
+                    currencyCode: 'AUD',
+                    total: {
+                      amount: grossAmount.toFixed(2),
+                      label: team?.name || club?.name || 'Match Fees',
+                    },
+                  })}
+                >
+                  <div className="flex flex-col gap-3">
+                    <ApplePay />
+                    <GooglePay />
+                    <div className="relative flex py-2 items-center">
+                      <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                      <span className="flex-shrink mx-4 text-[10px] font-black uppercase tracking-widest text-zinc-400">Or Pay with Card</span>
+                      <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                    </div>
+                    <CreditCard 
+                      buttonProps={{
+                        css: {
+                          backgroundColor: '#10b981',
+                          fontSize: '12px',
+                          fontWeight: '900',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.1em',
+                          color: '#fff',
+                          borderRadius: '0.75rem',
+                          '&:hover': {
+                            backgroundColor: '#059669'
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </PaymentForm>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+                <i className="fa-solid fa-building-columns text-4xl text-zinc-300 dark:text-zinc-700"></i>
+                <div>
+                  <h3 className="font-black uppercase tracking-widest text-sm text-zinc-800 dark:text-zinc-200">Manual Transfer Required</h3>
+                  <p className="text-xs text-zinc-500 mt-2">Please transfer <strong className="text-zinc-800 dark:text-zinc-200">${totalToCollect.toFixed(2)}</strong> to the following account:</p>
                 </div>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl w-full">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">{club.pay_id_type === 'bank_account' ? 'Bank Details' : 'PayID'}</p>
+                  <p className="font-mono font-bold text-sm text-zinc-800 dark:text-zinc-200">{club.pay_id_value}</p>
+                </div>
+                <p className="text-[10px] uppercase font-bold text-zinc-400">Please use <span className="text-zinc-600 dark:text-zinc-300">"{player.first_name} Match"</span> as the reference.</p>
               </div>
             )}
-            <PaymentForm
-              applicationId={appId}
-              locationId={locationId}
-              cardTokenizeResponseReceived={handlePayment}
-              createPaymentRequest={() => ({
-                countryCode: 'AU',
-                currencyCode: 'AUD',
-                total: {
-                  amount: grossAmount.toFixed(2),
-                  label: team?.name || club?.name || 'Match Fees',
-                },
-              })}
-            >
-              <div className="flex flex-col gap-3">
-                <ApplePay />
-                <GooglePay />
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-                  <span className="flex-shrink mx-4 text-[10px] font-black uppercase tracking-widest text-zinc-400">Or Pay with Card</span>
-                  <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-                </div>
-                <CreditCard 
-                  buttonProps={{
-                    css: {
-                      backgroundColor: '#10b981',
-                      fontSize: '12px',
-                      fontWeight: '900',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.1em',
-                      color: '#fff',
-                      borderRadius: '0.75rem',
-                      '&:hover': {
-                        backgroundColor: '#059669'
-                      }
-                    }
-                  }}
-                />
-              </div>
-            </PaymentForm>
           </div>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { Resend } from 'resend';
 
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2023-10-16' as any,
 });
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
             console.error("Failed to retrieve subscription for interval:", e);
           }
 
-          const { data: currentClub } = await supabase.from('clubs').select('settings').eq('id', clubId).single();
+          const { data: currentClub } = await supabase.from('clubs').select('settings, name').eq('id', clubId).single();
           const currentSettings = currentClub?.settings || {};
 
           await supabase
@@ -57,6 +59,62 @@ export async function POST(req: Request) {
               settings: { ...currentSettings, has_used_trial: true, cancel_at_period_end: false }
             })
             .eq('id', clubId);
+
+          // SEND ONBOARDING EMAIL
+          const { data: admins } = await supabase.from('user_roles')
+            .select('email, profiles(first_name)')
+            .eq('club_id', clubId)
+            .eq('role', 'club_admin');
+          
+          if (admins && admins.length > 0) {
+            const isPro = planTier === 'pro';
+            const planName = isPro ? 'Pro' : 'Plus';
+            const headline = `Welcome to Fees Please ${planName}!`;
+            
+            let bodyText = `Your account **{clubName}** is now officially on the ${planName} plan! Your account has been upgraded and you have full access to all premium features.`;
+            
+            if (isPro) {
+              bodyText += ` With Pro, you now have access to advanced reporting and deeper insights.`;
+            } else {
+              bodyText += ` Start taking advantage of unlimited teams and automated summaries today!`;
+            }
+
+            const isTestingEnv = process.env.NODE_ENV !== 'production' || 
+                                 process.env.VERCEL_ENV === 'preview' || 
+                                 process.env.NEXT_PUBLIC_SITE_URL?.includes('localhost');
+
+            const emailsToSend = [];
+            for (const admin of admins) {
+              if (!admin.email) continue;
+              
+              const firstName = admin.profiles?.first_name || 'there';
+              const clubName = currentClub?.name || 'your club';
+              const personalizedBody = bodyText.replace('{clubName}', clubName);
+
+              const htmlContent = `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <h2 style="color: #10b981; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">${headline}</h2>
+                  <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">Hi ${firstName},</p>
+                  <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">${personalizedBody}</p>
+                  <br/>
+                  <a href="https://app.feesplease.app/login" style="display: inline-block; background-color: #10b981; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 12px;">Log in to your account</a>
+                </div>
+              `;
+
+              emailsToSend.push({
+                from: 'Fees Please <hello@mail.feesplease.app>',
+                to: isTestingEnv ? 'emailtesting@feesplease.app' : admin.email,
+                subject: `Welcome to ${planName}!`,
+                html: htmlContent
+              });
+            }
+
+            try {
+              await resend.batch.send(emailsToSend);
+            } catch (err) {
+              console.error("Failed to send onboarding email:", err);
+            }
+          }
         }
         break;
       }

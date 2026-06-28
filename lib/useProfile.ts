@@ -40,7 +40,7 @@ export function useProfile() {
         const [profileRes, rolesRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
           supabase.from('user_roles')
-            .select('*, clubs(id, name, logo_url, is_active, plan_tier)')
+            .select('*, clubs(id, name, logo_url, is_active, plan_tier, trial_ends_at, has_had_trial)')
             .or(`user_id.eq.${user.id},email.eq.${user.email}`) 
         ]);
 
@@ -90,7 +90,7 @@ export function useProfile() {
           const clubIds = [...new Set(playerMatches.map((p: any) => p.club_id).filter(Boolean))];
           const { data: clubsData } = await supabase
             .from('clubs')
-            .select('id, name, logo_url, is_active, plan_tier')
+            .select('id, name, logo_url, is_active, plan_tier, trial_ends_at, has_had_trial')
             .in('id', clubIds);
           const clubMap = new Map(clubsData?.map((c: any) => [c.id, c]) || []);
 
@@ -181,7 +181,7 @@ export function useProfile() {
         ? `user_id.eq.${userId},email.eq.${email}` 
         : `user_id.eq.${userId}`;
         
-      const res = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active)').or(query);
+      const res = await supabase.from('user_roles').select('*, clubs(id, name, logo_url, is_active, plan_tier, trial_ends_at, has_had_trial)').or(query);
       if (res.error) {
         console.error("❌ Silently fetch roles error:", res.error);
         if (retryCount < 3) {
@@ -210,7 +210,7 @@ export function useProfile() {
           const clubIds = [...new Set(playerMatches.map((p: any) => p.club_id).filter(Boolean))];
           const { data: clubsData } = await supabase
             .from('clubs')
-            .select('id, name, logo_url, is_active, plan_tier')
+            .select('id, name, logo_url, is_active, plan_tier, trial_ends_at, has_had_trial')
             .in('id', clubIds);
           const clubMap = new Map(clubsData?.map((c: any) => [c.id, c]) || []);
 
