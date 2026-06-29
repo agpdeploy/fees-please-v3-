@@ -45,8 +45,8 @@ export async function POST(request: Request) {
     const grossAmount = calculateSquareOnlineGross(transaction.amount, club);
     const amountCents = Math.round(grossAmount * 100);
     
-    // Square charges 2.2% + 30c on the gross amount for online payments
-    const squareFeeCents = Math.round((grossAmount * 0.022 + 0.30) * 100);
+    // Square charges a flat 2.2% on the gross amount for online payments in Australia
+    const squareFeeCents = Math.round((grossAmount * 0.022) * 100);
     const netAmountCents = Math.round(transaction.amount * 100);
     
     // The platform fee is what's left over after Square takes their cut and the club gets their net amount

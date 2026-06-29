@@ -1,10 +1,11 @@
 /**
  * Calculates the gross amount to charge via Square Online (QR/Web)
+ * Note: Square Australia online rate is a flat 2.2% (no 30c fixed fee).
  * Fees Please bundled rate varies by club plan:
- * Free Tier: 2.2% + $0.30 (Square wholesale) + 2.5% platform clip = 4.7% + $0.30
- * Plus Tier: 2.2% + $0.30 (Square wholesale) + $0.30 platform clip = 2.2% + $0.60
- * Pro Tier: 2.2% + $0.30 (Square wholesale) + $0.15 platform clip = 2.2% + $0.45
- * Override: 2.2% + $0.30 (Square wholesale only)
+ * Free Tier: 2.2% (Square wholesale) + 2.5% platform clip = 4.7%
+ * Plus Tier: 2.2% (Square wholesale) + $0.30 platform clip
+ * Pro Tier: 2.2% (Square wholesale) + $0.15 platform clip
+ * Override: 2.2% (Square wholesale only)
  * Formula: Gross = (Net + Fixed) / (1 - Rate)
  */
 export const calculateSquareOnlineGross = (netAmount: number, club?: any): number => {
@@ -14,24 +15,24 @@ export const calculateSquareOnlineGross = (netAmount: number, club?: any): numbe
   const hasOverride = club?.override_platform_fee === true;
   
   let fpRate = 0.022; 
-  let fixedFee = 0.30;
+  let fixedFee = 0.00;
   
   if (hasOverride) {
-    // Square wholesale only: 2.2% + 30c
+    // Square wholesale only: 2.2%
     fpRate = 0.022;
-    fixedFee = 0.30;
+    fixedFee = 0.00;
   } else if (planTier === 'free') {
-    // 2.2% + 30c (Square) + 2.5% platform clip = 4.7% + 30c
+    // 2.2% (Square) + 2.5% platform clip = 4.7%
     fpRate = 0.022 + 0.025;
-    fixedFee = 0.30;
+    fixedFee = 0.00;
   } else if (planTier === 'plus') {
-    // 2.2% + 30c (Square) + 30c platform clip = 2.2% + 60c
+    // 2.2% (Square) + 30c platform clip
     fpRate = 0.022;
-    fixedFee = 0.30 + 0.30;
+    fixedFee = 0.30;
   } else if (planTier === 'pro') {
-    // 2.2% + 30c (Square) + 15c platform clip = 2.2% + 45c
+    // 2.2% (Square) + 15c platform clip
     fpRate = 0.022;
-    fixedFee = 0.30 + 0.15;
+    fixedFee = 0.15;
   }
   
   const grossAmount = (netAmount + fixedFee) / (1 - fpRate);
