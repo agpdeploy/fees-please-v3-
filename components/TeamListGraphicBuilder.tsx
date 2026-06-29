@@ -59,6 +59,11 @@ export default function TeamListGraphicBuilder({
   const [heroWidthPercent, setHeroWidthPercent] = useState<number>(45);
   const [showNumbers, setShowNumbers] = useState<boolean>(false);
   const [nameSize, setNameSize] = useState<number>(48);
+  const [letterSpacing, setLetterSpacing] = useState<number>(0);
+  const [matchTextColor, setMatchTextColor] = useState<string>(''); // Default fallback to secondaryColor
+  const [matchNotesOverride, setMatchNotesOverride] = useState<string>('');
+  const [matchNotesBg, setMatchNotesBg] = useState<string>('transparent');
+  const [sponsorScale, setSponsorScale] = useState<number>(100);
   const [isExpanded, setIsExpanded] = useState<boolean>(false); // Full screen preview toggle
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
@@ -81,8 +86,15 @@ export default function TeamListGraphicBuilder({
       setSecondaryColor(team.theme_colors[1]);
     }
 
-    if (team?.settings?.graphic_font) {
-      setSelectedFont(team.settings.graphic_font);
+    if (team?.settings) {
+      if (team.settings.graphic_font) setSelectedFont(team.settings.graphic_font);
+      if (team.settings.letter_spacing !== undefined) setLetterSpacing(team.settings.letter_spacing);
+      if (team.settings.match_text_color) setMatchTextColor(team.settings.match_text_color);
+      if (team.settings.sponsor_scale !== undefined) setSponsorScale(team.settings.sponsor_scale);
+      if (team.settings.name_format) setNameFormat(team.settings.name_format);
+      if (typeof team.settings.show_numbers === 'boolean') setShowNumbers(team.settings.show_numbers);
+      if (team.settings.name_size) setNameSize(team.settings.name_size);
+      if (team.settings.orientation) setOrientation(team.settings.orientation);
     }
 
     if (fixture?.lists?.squadIds) {
@@ -121,9 +133,12 @@ export default function TeamListGraphicBuilder({
         if (adv.secondaryColor) setSecondaryColor(adv.secondaryColor);
         if (adv.selectedFont) setSelectedFont(adv.selectedFont);
         if (adv.nameFormat) setNameFormat(adv.nameFormat);
-        if (typeof adv.showNumbers === 'boolean') setShowNumbers(adv.showNumbers);
+        if (adv.showNumbers !== undefined) setShowNumbers(adv.showNumbers);
         if (adv.nameSize) setNameSize(adv.nameSize);
         if (adv.orientation) setOrientation(adv.orientation);
+        if (adv.letterSpacing !== undefined) setLetterSpacing(adv.letterSpacing);
+        if (adv.matchTextColor) setMatchTextColor(adv.matchTextColor);
+        if (adv.sponsorScale !== undefined) setSponsorScale(adv.sponsorScale);
       } catch (e) {}
     }
     const savedFixture = localStorage.getItem(`graphic_builder_fixture_${fixture?.id}`);
@@ -139,6 +154,8 @@ export default function TeamListGraphicBuilder({
         if (fix.imageRotation) setImageRotation(fix.imageRotation);
         if (fix.customPhoto) setCustomPhoto(fix.customPhoto);
         if (fix.imageCaption) setImageCaption(fix.imageCaption);
+        if (fix.matchNotesOverride !== undefined) setMatchNotesOverride(fix.matchNotesOverride);
+        if (fix.matchNotesBg) setMatchNotesBg(fix.matchNotesBg);
       } catch (e) {}
     }
   }, [isOpen, mounted, team?.id, fixture?.id]);
@@ -147,15 +164,15 @@ export default function TeamListGraphicBuilder({
   useEffect(() => {
     if (!isOpen || !mounted) return;
     localStorage.setItem(`graphic_builder_advanced_${team?.id}`, JSON.stringify({
-      primaryColor, secondaryColor, selectedFont, nameFormat, showNumbers, nameSize, orientation
+      primaryColor, secondaryColor, selectedFont, nameFormat, showNumbers, nameSize, orientation, letterSpacing, matchTextColor, sponsorScale
     }));
-  }, [isOpen, mounted, team?.id, primaryColor, secondaryColor, selectedFont, nameFormat, showNumbers, nameSize, orientation]);
+  }, [isOpen, mounted, team?.id, primaryColor, secondaryColor, selectedFont, nameFormat, showNumbers, nameSize, orientation, letterSpacing, matchTextColor, sponsorScale]);
 
   useEffect(() => {
     if (!isOpen || !mounted) return;
     try {
       localStorage.setItem(`graphic_builder_fixture_${fixture?.id}`, JSON.stringify({
-        orderedPlayers, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption
+        orderedPlayers, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption, matchNotesOverride, matchNotesBg
       }));
     } catch (e) {
       console.warn("Could not save fixture state. Image might be too large for localStorage.");
@@ -182,20 +199,63 @@ export default function TeamListGraphicBuilder({
     return () => observer.disconnect();
   }, [isOpen, isExpanded, orientation]);
 
-  const saveSettings = async (primary: string, secondary: string, fontName: string) => {
+  const saveSettings = async () => {
     if (!team?.id) return;
+    const newSettings = { 
+      ...(team.settings || {}), 
+      graphic_font: selectedFont,
+      letter_spacing: letterSpacing,
+      match_text_color: matchTextColor,
+      sponsor_scale: sponsorScale,
+      name_format: nameFormat,
+      show_numbers: showNumbers,
+      name_size: nameSize,
+      orientation: orientation
+    };
     await supabase.from('teams').update({ 
-      theme_colors: [primary, secondary],
-      settings: { ...(team.settings || {}), graphic_font: fontName }
+      theme_colors: [primaryColor, secondaryColor],
+      settings: newSettings
     }).eq('id', team.id);
+    alert('Default Configuration Saved!');
   };
 
-  const handleGenerate = async () => {
+  const downloadImage = async () => {
     if (!captureRef.current) return;
     setIsGenerating(true);
     
-    saveSettings(primaryColor, secondaryColor, selectedFont);
+    try {
+      const dataUrl = await toPng(captureRef.current, {
+        quality: 1.0,
+        pixelRatio: 1, // Forces 1x resolution to prevent massive files on retina screens
+        cacheBust: true,
+        skipFonts: false
+      });
+      
+      const d = new Date(fixture?.match_date || Date.now());
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateString = `${yyyy}${mm}${dd}`;
+      const sanitizedTeamName = (team?.name || 'Team').replace(/[^a-zA-Z0-9]/g, '');
+      const fileName = `TeamList-${sanitizedTeamName}-${dateString}.png`;
 
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = dataUrl;
+      link.click();
+      
+    } catch (err) {
+      console.error("Failed to download image", err);
+      alert("Failed to download image. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const shareImage = async () => {
+    if (!captureRef.current) return;
+    setIsGenerating(true);
+    
     try {
       const dataUrl = await toPng(captureRef.current, {
         quality: 1.0,
@@ -218,24 +278,16 @@ export default function TeamListGraphicBuilder({
           const blob = await res.blob();
           const file = new File([blob], fileName, { type: 'image/png' });
           await navigator.share({
-            title: `Team List vs ${fixture.opponent}`,
+            title: `Team List vs ${fixture?.opponent || 'Opponent'}`,
             files: [file]
           });
-          setIsGenerating(false);
-          return;
         } catch (err: any) {
           if (err.name !== 'AbortError') console.error(err);
         }
       }
-
-      const link = document.createElement('a');
-      link.download = fileName;
-      link.href = dataUrl;
-      link.click();
-      
     } catch (err) {
-      console.error("Failed to generate image", err);
-      alert("Failed to generate image. Please try again.");
+      console.error("Failed to share image", err);
+      alert("Failed to share image. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -325,11 +377,10 @@ export default function TeamListGraphicBuilder({
                        left: `${imageX}%`,
                        top: `${imageY}%`,
                        transform: `translate(-50%, -50%) scale(${imageZoom}) rotate(${imageRotation}deg)`,
-                       width: imageFit === 'cover' ? '100%' : 'auto',
-                       height: imageFit === 'cover' ? '100%' : 'auto',
-                       minWidth: imageFit === 'contain' ? '100%' : 'auto',
-                       minHeight: imageFit === 'contain' ? '100%' : 'auto',
-                       objectFit: imageFit
+                       minWidth: imageFit === 'cover' ? '100%' : '0',
+                       minHeight: imageFit === 'cover' ? '100%' : '0',
+                       maxWidth: imageFit === 'contain' ? '100%' : 'none',
+                       maxHeight: imageFit === 'contain' ? '100%' : 'none',
                      }}
                    />
                      {imageCaption && (
@@ -370,42 +421,42 @@ export default function TeamListGraphicBuilder({
                    
                    {/* Home Team */}
                    <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
-                     <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-40 h-40' : 'w-14 h-14'}`}>
-                       {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-7xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`}>{getInitials(team?.name)}</span>}
-                     </div>
-                     <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight text-white`}>
-                       {team?.name}
-                     </h1>
-                   </div>
+                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-40 h-40' : 'w-14 h-14'}`}>
+                        {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-7xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`}>{getInitials(team?.name)}</span>}
+                      </div>
+                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight text-white`} style={{ letterSpacing: `${letterSpacing}px` }}>
+                        {team?.name}
+                      </h1>
+                    </div>
 
-                   {/* VS */}
-                   <div className="shrink-0 flex flex-col items-center">
-                     <span className={`font-black italic tracking-widest ${orientation === 'portrait' ? 'text-6xl mb-2' : 'text-2xl mb-0'}`} style={{ color: secondaryColor }}>VS</span>
-                   </div>
+                    {/* VS */}
+                    <div className="shrink-0 flex flex-col items-center">
+                      <span className={`font-black italic tracking-widest ${orientation === 'portrait' ? 'text-6xl mb-2' : 'text-2xl mb-0'}`} style={{ color: matchTextColor || secondaryColor, letterSpacing: `${letterSpacing}px` }}>VS</span>
+                    </div>
 
-                   {/* Away Team */}
-                   <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
-                     <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-40 h-40' : 'w-14 h-14'}`}>
-                       {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-7xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`}>{getInitials(fixture?.opponent)}</span>}
-                     </div>
-                     <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight text-white`}>
-                       {fixture?.opponent || 'TBA'}
-                     </h1>
+                    {/* Away Team */}
+                    <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
+                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-40 h-40' : 'w-14 h-14'}`}>
+                        {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-7xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`}>{getInitials(fixture?.opponent)}</span>}
+                      </div>
+                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight text-white`} style={{ letterSpacing: `${letterSpacing}px` }}>
+                        {fixture?.opponent || 'TBA'}
+                      </h1>
                    </div>
 
                  </div>
 
                  {/* Match Details */}
                  <div className={`flex flex-col items-center text-center ${orientation === 'portrait' ? 'gap-3 mt-4' : 'gap-0 mt-1'}`}>
-                   <div className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} font-black uppercase tracking-widest text-white/90`}>
+                   <div className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} font-black uppercase tracking-widest text-white/90`} style={{ letterSpacing: `${letterSpacing}px` }}>
                      {matchDateStr} @ {fixture?.start_time || 'TBA'}
                    </div>
-                   <div className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xs'} font-bold uppercase tracking-widest`} style={{ color: secondaryColor }}>
+                   <div className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xs'} font-bold uppercase tracking-widest`} style={{ color: matchTextColor || secondaryColor, letterSpacing: `${letterSpacing}px` }}>
                      <i className="fa-solid fa-location-dot mr-2"></i> {fixture?.location || 'Venue TBA'}
                    </div>
-                   {fixture?.notes && (
-                     <div className={`font-medium text-white/80 max-w-2xl italic ${orientation === 'portrait' ? 'text-3xl mt-4' : 'text-xs mt-1'}`}>
-                       "{fixture.notes}"
+                   {(matchNotesOverride || fixture?.notes) && (
+                     <div className={`font-medium max-w-2xl italic ${orientation === 'portrait' ? 'text-3xl mt-4 px-6 py-2 rounded-full' : 'text-xs mt-1 px-3 py-1 rounded-full'}`} style={{ backgroundColor: matchNotesBg, color: matchTextColor || secondaryColor, letterSpacing: `${letterSpacing}px` }}>
+                       "{matchNotesOverride || fixture?.notes}"
                      </div>
                    )}
                  </div>
@@ -414,7 +465,7 @@ export default function TeamListGraphicBuilder({
                {/* Players List */}
                <div className={`text-white z-20 relative pr-4 ${orientation === 'portrait' ? 'flex flex-col gap-5 mt-8' : 'grid grid-cols-2 gap-x-6 gap-y-1 mt-2'}`} style={{ width: `${100 - heroWidthPercent}%` }}>
                  {orderedPlayers.map((pid: string, idx: number) => (
-                   <div key={pid} className="font-black uppercase tracking-tight flex items-start gap-3 md:gap-6" style={{ fontSize: `${orientation === 'portrait' ? nameSize : Math.max(nameSize * 0.45, 12)}px`, textShadow: '2px 2px 8px rgba(0,0,0,0.6)' }}>
+                   <div key={pid} className="font-black uppercase tracking-tight flex items-start gap-3 md:gap-6" style={{ fontSize: `${orientation === 'portrait' ? nameSize : Math.max(nameSize * 0.45, 12)}px`, letterSpacing: `${letterSpacing}px`, textShadow: '2px 2px 8px rgba(0,0,0,0.6)' }}>
                      {showNumbers && <span className="opacity-50 min-w-[2.5ch] mt-[0.1em] shrink-0">{idx + 1}.</span>}
                      <span className="leading-none break-words pt-[0.1em]">{formatPlayerName(pid)}</span>
                    </div>
@@ -434,7 +485,7 @@ export default function TeamListGraphicBuilder({
                {hasSponsors && (
                  <div className={`absolute inset-0 flex items-center justify-center gap-8 md:gap-16 px-16 pb-2 ${orientation === 'portrait' ? 'pt-8' : 'pt-4'}`}>
                    {sponsors.map(s => (
-                     <img key={s.index} src={s.logo} className={`object-contain ${orientation === 'portrait' ? 'max-h-32' : 'max-h-12'}`} />
+                     <img key={s.index} src={s.logo} className="object-contain" style={{ maxHeight: `${(orientation === 'portrait' ? 128 : 48) * (sponsorScale / 100)}px` }} />
                    ))}
                  </div>
                )}
@@ -546,7 +597,7 @@ export default function TeamListGraphicBuilder({
                           <span>Zoom Scale</span>
                           <span>{imageZoom.toFixed(1)}x</span>
                         </label>
-                        <input type="range" min="0.5" max="3" step="0.1" value={imageZoom} onChange={e => setImageZoom(parseFloat(e.target.value))} className="w-full accent-emerald-500" />
+                        <input type="range" min="0.1" max="3" step="0.1" value={imageZoom} onChange={e => setImageZoom(parseFloat(e.target.value))} className="w-full accent-emerald-500" />
                       </div>
                       
                       {/* Position */}
@@ -611,20 +662,21 @@ export default function TeamListGraphicBuilder({
                         <span className="truncate">{formatPlayerName(pid)}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <button 
-                          onClick={() => movePlayer(idx, 'up')} 
-                          disabled={idx === 0}
-                          className="w-7 h-7 rounded bg-zinc-800 text-zinc-400 hover:text-white disabled:opacity-30 flex items-center justify-center transition-colors"
+                        <select 
+                          value={idx + 1}
+                          onChange={(e) => {
+                            const newIdx = parseInt(e.target.value) - 1;
+                            const newOrdered = [...orderedPlayers];
+                            const [moved] = newOrdered.splice(idx, 1);
+                            newOrdered.splice(newIdx, 0, moved);
+                            setOrderedPlayers(newOrdered);
+                          }}
+                          className="bg-zinc-800 text-white text-xs font-bold rounded px-2 py-1 border border-zinc-700 outline-none cursor-pointer"
                         >
-                          <i className="fa-solid fa-arrow-up"></i>
-                        </button>
-                        <button 
-                          onClick={() => movePlayer(idx, 'down')} 
-                          disabled={idx === orderedPlayers.length - 1}
-                          className="w-7 h-7 rounded bg-zinc-800 text-zinc-400 hover:text-white disabled:opacity-30 flex items-center justify-center transition-colors"
-                        >
-                          <i className="fa-solid fa-arrow-down"></i>
-                        </button>
+                          {orderedPlayers.map((_, i) => (
+                            <option key={i} value={i + 1}>{i + 1}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   ))}
@@ -632,13 +684,38 @@ export default function TeamListGraphicBuilder({
               )}
             </div>
 
-            {/* Advanced Settings Accordion */}
+            {/* Fixture Overrides (Per-Game) */}
+            <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
+              <div className="p-4 flex flex-col gap-4">
+                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-500"><i className="fa-solid fa-gamepad"></i> Fixture Overrides</span>
+                
+                <div>
+                  <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Match Notes Override</label>
+                  <input type="text" value={matchNotesOverride} onChange={e => setMatchNotesOverride(e.target.value)} placeholder={fixture?.notes || 'No default notes'} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-bold text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
+                </div>
+                
+                <div>
+                  <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Notes Background Color</label>
+                  <div className="flex gap-2">
+                    <input type="color" value={matchNotesBg === 'transparent' ? '#000000' : matchNotesBg} onChange={e => setMatchNotesBg(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                    <button 
+                      onClick={() => setMatchNotesBg(matchNotesBg === 'transparent' ? 'rgba(0,0,0,0.5)' : 'transparent')}
+                      className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-[10px] font-black uppercase transition-colors"
+                    >
+                      {matchNotesBg === 'transparent' ? 'Add Background' : 'Remove Background'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Default Configuration Accordion */}
             <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
               <button 
                 onClick={() => setAdvancedSettingsExpanded(!advancedSettingsExpanded)}
                 className="w-full p-4 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
               >
-                <span className="flex items-center gap-2"><i className="fa-solid fa-sliders"></i> Advanced Settings</span>
+                <span className="flex items-center gap-2"><i className="fa-solid fa-sliders"></i> Default Configuration</span>
                 <i className={`fa-solid fa-chevron-down transition-transform ${advancedSettingsExpanded ? 'rotate-180' : ''}`}></i>
               </button>
               
@@ -729,6 +806,51 @@ export default function TeamListGraphicBuilder({
                        <input type="checkbox" id="showNumbers" checked={showNumbers} onChange={e => setShowNumbers(e.target.checked)} className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 accent-emerald-500" />
                        <label htmlFor="showNumbers" className="text-xs font-bold text-zinc-300">Show List Numbers</label>
                      </div>
+                     
+                     <div>
+                       <label className="text-[9px] font-bold text-zinc-600 uppercase mb-2 flex justify-between">
+                         <span>Letter Spacing</span>
+                         <span>{letterSpacing}px</span>
+                       </label>
+                       <input type="range" min="-5" max="30" step="0.5" value={letterSpacing} onChange={e => setLetterSpacing(parseFloat(e.target.value))} className="w-full accent-emerald-500" />
+                     </div>
+                  </div>
+
+                  {/* Match Text Colors */}
+                  <div className="space-y-3">
+                     <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Match Text Color</h3>
+                     <div>
+                       <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Color Override</label>
+                       <div className="flex gap-2">
+                         <input type="color" value={matchTextColor || secondaryColor} onChange={e => setMatchTextColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                         <input type="text" value={matchTextColor || secondaryColor} onChange={e => setMatchTextColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
+                       </div>
+                     </div>
+                  </div>
+
+                  {/* Sponsor Logos */}
+                  {hasSponsors && (
+                    <div className="space-y-4">
+                       <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Sponsor Logos</h3>
+                       <div>
+                         <label className="text-[9px] font-bold text-zinc-600 uppercase mb-2 flex justify-between">
+                           <span>Logo Scale</span>
+                           <span>{sponsorScale}%</span>
+                         </label>
+                         <input type="range" min="30" max="150" value={sponsorScale} onChange={e => setSponsorScale(parseInt(e.target.value))} className="w-full accent-emerald-500" />
+                       </div>
+                    </div>
+                  )}
+
+                  {/* Save Settings */}
+                  <div className="pt-4 border-t border-zinc-800 mt-6">
+                    <button 
+                      onClick={saveSettings}
+                      className="w-full py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-bold uppercase tracking-widest text-[10px] transition-colors flex items-center justify-center gap-2"
+                    >
+                      <i className="fa-solid fa-floppy-disk"></i> Save Configuration
+                    </button>
+                    <p className="text-[8px] text-zinc-500 text-center mt-2">Saves layout and styles for future use</p>
                   </div>
                 </div>
               )}
@@ -746,13 +868,24 @@ export default function TeamListGraphicBuilder({
                 <i className="fa-solid fa-wand-magic-sparkles"></i> Upgrade to Generate
               </button>
             ) : (
-              <button 
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {isGenerating ? <><i className="fa-solid fa-spinner fa-spin"></i> Generating...</> : <><i className="fa-solid fa-share-nodes"></i> Share / Download</>}
-              </button>
+              <div className="flex gap-3">
+                <button 
+                  onClick={downloadImage}
+                  disabled={isGenerating}
+                  className="flex-1 py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-black/20 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
+                >
+                  {isGenerating ? <><i className="fa-solid fa-spinner fa-spin"></i></> : <><i className="fa-solid fa-download"></i> Download</>}
+                </button>
+                {typeof navigator !== 'undefined' && navigator.share && (
+                  <button 
+                    onClick={shareImage}
+                    disabled={isGenerating}
+                    className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
+                  >
+                    {isGenerating ? <><i className="fa-solid fa-spinner fa-spin"></i> Generating...</> : <><i className="fa-solid fa-share-nodes"></i> Share Image</>}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
