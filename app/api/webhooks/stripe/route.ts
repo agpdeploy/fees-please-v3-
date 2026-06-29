@@ -87,7 +87,7 @@ export async function POST(req: Request) {
             for (const admin of admins) {
               if (!admin.email) continue;
               
-              const firstName = admin.profiles?.first_name || 'there';
+              const firstName = (Array.isArray(admin.profiles) ? admin.profiles[0]?.first_name : admin.profiles?.first_name) || 'there';
               const clubName = currentClub?.name || 'your club';
               const personalizedBody = bodyText.replace('{clubName}', clubName);
 
