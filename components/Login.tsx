@@ -241,6 +241,12 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
             <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">
               No password required.
             </p>
+            <p className="text-[9px] text-zinc-500 mt-4 leading-normal px-4 font-medium">
+              By continuing, you agree to our{' '}
+              <a href="https://feesplease.app/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-500 transition-colors">Terms of Service</a>
+              {' '}and{' '}
+              <a href="https://feesplease.app/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-500 transition-colors">Privacy Policy</a>.
+            </p>
           </div>
         </div>
       </div>

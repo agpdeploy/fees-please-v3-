@@ -12,7 +12,10 @@ if (typeof window !== 'undefined') {
     posthog.init(posthogKey, {
       api_host: posthogHost,
       person_profiles: 'identified_only',
-      capture_pageview: false 
+      capture_pageview: false,
+      session_recording: {
+        maskAllInputs: true
+      }
     });
   } else {
     console.warn('⚠️ PostHog tracking is disabled: NEXT_PUBLIC_POSTHOG_KEY is missing.');
@@ -25,7 +28,18 @@ function PostHogPageView() {
   const ph = usePostHog();
 
   useEffect(() => {
-    if (pathname && ph && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+    const isPaymentPage = pathname?.startsWith('/pay/') || pathname?.includes('/prepay');
+    const consent = localStorage.getItem('fp_analytics_consent');
+    
+    if (ph) {
+      if (isPaymentPage || consent === 'declined') {
+        ph.opt_out_capturing();
+      } else {
+        ph.opt_in_capturing();
+      }
+    }
+
+    if (pathname && ph && process.env.NEXT_PUBLIC_POSTHOG_KEY && !isPaymentPage && consent !== 'declined') {
       let url = window.origin + pathname;
       if (searchParams && searchParams.toString()) {
         url = url + `?${searchParams.toString()}`;

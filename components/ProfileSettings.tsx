@@ -3,9 +3,12 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
+import { usePostHog } from "posthog-js/react";
 
 export default function ProfileSettings() {
   const { profile } = useProfile();
+  const ph = usePostHog();
+  const [analyticsConsent, setAnalyticsConsent] = useState(false);
   const [fullName, setFullName] = useState("");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
@@ -17,6 +20,8 @@ export default function ProfileSettings() {
   const [isSocialAuth, setIsSocialAuth] = useState(false);
 
   useEffect(() => {
+    setAnalyticsConsent(localStorage.getItem('fp_analytics_consent') !== 'declined');
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       const providers = session?.user?.app_metadata?.providers || [];
       const hasSocial = providers.some((p: string) => p !== 'email');
@@ -30,6 +35,18 @@ export default function ProfileSettings() {
       }
     });
   }, [profile]);
+
+  const handleConsentToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = e.target.checked;
+    setAnalyticsConsent(isChecked);
+    if (isChecked) {
+      localStorage.setItem('fp_analytics_consent', 'accepted');
+      ph?.opt_in_capturing();
+    } else {
+      localStorage.setItem('fp_analytics_consent', 'declined');
+      ph?.opt_out_capturing();
+    }
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -227,7 +244,21 @@ export default function ProfileSettings() {
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-1">
+                  Share Anonymous Usage Data
+                </label>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                  Help us troubleshoot bugs and improve the app. Completely optional.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={analyticsConsent} onChange={handleConsentToggle} />
+                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
             <button
               type="submit"
               disabled={loading}
