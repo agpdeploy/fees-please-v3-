@@ -62,13 +62,8 @@ export default function Setup({ activeTab }: SetupProps) {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   
   // SPONSOR STATE
-  const [sponsor1Logo, setSponsor1Logo] = useState("");
-  const [sponsor1Url, setSponsor1Url] = useState("");
-  const [sponsor2Logo, setSponsor2Logo] = useState("");
-  const [sponsor2Url, setSponsor2Url] = useState("");
-  const [sponsor3Logo, setSponsor3Logo] = useState("");
-  const [sponsor3Url, setSponsor3Url] = useState("");
-  const [sponsorStats, setSponsorStats] = useState({ impressions: 0, clicks: 0, ctr: 0 });
+  const [sponsors, setSponsors] = useState<any[]>([]);
+  const [sponsorStats, setSponsorStats] = useState<{ impressions: number, clicks: number, ctr: number, details?: Record<string, { imp: number, clk: number, name: string }> }>({ impressions: 0, clicks: 0, ctr: 0 });
   const [isUploadingSponsor, setIsUploadingSponsor] = useState(false);
 
   const [seasonName, setSeasonName] = useState("");
@@ -258,27 +253,39 @@ export default function Setup({ activeTab }: SetupProps) {
     if (teamData) {
       setTeams(teamData);
       if (teamData.length > 0) {
-         const { data: sponsorData } = await supabase.from("public_team_profiles").select("*").eq("team_id", teamData[0].id).single();
+         const { data: sponsorData } = await supabase.from("team_sponsors").select("*").in("team_id", teamData.map(t => t.id)).eq('is_active', true);
          if (sponsorData) {
-            setSponsor1Logo(sponsorData.sponsor_1_logo || "");
-            setSponsor1Url(sponsorData.sponsor_1_url || "");
-            setSponsor2Logo(sponsorData.sponsor_2_logo || "");
-            setSponsor2Url(sponsorData.sponsor_2_url || "");
-            setSponsor3Logo(sponsorData.sponsor_3_logo || "");
-            setSponsor3Url(sponsorData.sponsor_3_url || "");
+            // Deduplicate across teams if needed, or just take teamData[0]
+            const primaryTeamSponsors = sponsorData.filter((s: any) => s.team_id === teamData[0].id);
+            setSponsors(primaryTeamSponsors);
          }
       }
     }
 
-    const { data: sponsorAnalytics } = await supabase.from("sponsor_analytics").select("event_type").eq("club_id", clubId);
+    const teamIds = teamData?.map(t => t.id) || [];
+    const { data: sponsorAnalytics, error: sponsorError } = await supabase.from("sponsor_analytics").select("event_type, sponsor_index, sponsor_id").in("team_id", teamIds);
+    if (sponsorError) console.error("Sponsor Stats Error:", sponsorError);
+
     let imp = 0, clk = 0;
+    let details: Record<string, { imp: number, clk: number }> = {};
     if (sponsorAnalytics) {
       sponsorAnalytics.forEach((s: any) => {
-        if (s.event_type === 'impression') imp++;
-        if (s.event_type === 'click') clk++;
+        // use sponsor_id if available, fallback to sponsor_index for legacy
+        const sKey = s.sponsor_id || s.sponsor_index?.toString();
+        if (!sKey) return;
+        if (!details[sKey]) details[sKey] = { imp: 0, clk: 0 };
+        
+        if (s.event_type === 'impression') {
+          imp++;
+          details[sKey].imp++;
+        }
+        if (s.event_type === 'click') {
+          clk++;
+          details[sKey].clk++;
+        }
       });
     }
-    setSponsorStats({ impressions: imp, clicks: clk, ctr: imp > 0 ? (clk / imp) * 100 : 0 });
+    setSponsorStats({ impressions: imp, clicks: clk, ctr: imp > 0 ? (clk / imp) * 100 : 0, details });
 
     const { data: fixData } = await supabase.from("fixtures").select("*, teams(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
     if (fixData) {
@@ -340,7 +347,7 @@ export default function Setup({ activeTab }: SetupProps) {
     });
   };
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'sponsor1' | 'sponsor2' | 'sponsor3') {
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>, type: string) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) return showToast("File too large. Max 10MB.", "error");
@@ -357,9 +364,10 @@ export default function Setup({ activeTab }: SetupProps) {
       const { data } = supabase.storage.from('logos').getPublicUrl(fileName);
       
       if (type === 'logo') setLogoUrl(data.publicUrl);
-      if (type === 'sponsor1') setSponsor1Logo(data.publicUrl);
-      if (type === 'sponsor2') setSponsor2Logo(data.publicUrl);
-      if (type === 'sponsor3') setSponsor3Logo(data.publicUrl);
+      if (type.startsWith('sponsor-')) {
+          const sId = type.replace('sponsor-', '');
+          setSponsors(prev => prev.map(s => s.id === sId ? { ...s, logo_url: data.publicUrl } : s));
+        }
       
       showToast("Uploaded! Hit Save Configuration.");
     } catch (err: any) { showToast(err.message || "Upload failed", "error"); } 
@@ -467,10 +475,7 @@ export default function Setup({ activeTab }: SetupProps) {
         const storefrontPayload = clubTeams.map(t => ({ 
            team_id: t.id, 
            team_name: t.name, 
-           club_logo_url: logoUrl,
-           sponsor_1_logo: sponsor1Logo, sponsor_1_url: sponsor1Url,
-           sponsor_2_logo: sponsor2Logo, sponsor_2_url: sponsor2Url,
-           sponsor_3_logo: sponsor3Logo, sponsor_3_url: sponsor3Url
+           club_logo_url: logoUrl
         }));
         const { error: storeError } = await supabase.from('public_team_profiles').upsert(storefrontPayload);
         if (storeError) console.error("Storefront Sync Error:", storeError);
@@ -671,10 +676,7 @@ export default function Setup({ activeTab }: SetupProps) {
         await supabase.from("public_team_profiles").upsert({
           team_id: savedTeamId,
           team_name: teamName,
-          club_logo_url: logoUrl || clubRecord?.logo_url,
-          sponsor_1_logo: sponsor1Logo, sponsor_1_url: sponsor1Url,
-          sponsor_2_logo: sponsor2Logo, sponsor_2_url: sponsor2Url,
-          sponsor_3_logo: sponsor3Logo, sponsor_3_url: sponsor3Url
+          club_logo_url: logoUrl || clubRecord?.logo_url
         });
       }
       showToast("Team saved successfully!"); 
@@ -1138,20 +1140,55 @@ export default function Setup({ activeTab }: SetupProps) {
                   </div>
                   <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Sponsorship Impact</h2>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.impressions}</p>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Impressions</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-black text-blue-600 dark:text-blue-500">{sponsorStats.clicks}</p>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-600/70 mt-1">Clicks</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-black text-zinc-900 dark:text-white">{sponsorStats.ctr.toFixed(1)}%</p>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Click Rate</p>
-                  </div>
-                </div>
+                  {(() => {
+                    const activeSponsors = sponsors.filter(s => s.is_active);
+                    let totalImp = 0;
+                    let totalClk = 0;
+                    activeSponsors.forEach(s => {
+                      const stat = sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
+                      totalImp += stat.imp;
+                      totalClk += stat.clk;
+                    });
+                    const overallCtr = totalImp > 0 ? (totalClk / totalImp) * 100 : 0;
+                    return (
+                      <>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <p className="text-2xl font-black text-zinc-900 dark:text-white">{totalImp}</p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Impressions</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-black text-blue-600 dark:blue-500">{totalClk}</p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-blue-600/70 mt-1">Clicks</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-black text-zinc-900 dark:text-white">{overallCtr.toFixed(1)}%</p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">Click Rate</p>
+                          </div>
+                        </div>
+                        {activeSponsors.length > 0 && (totalImp > 0 || totalClk > 0) && (
+                          <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
+                            <div className="space-y-2">
+                              {activeSponsors.map((s: any, i: number) => {
+                                const stat = sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
+                                const itemCtr = stat.imp > 0 ? (stat.clk / stat.imp) * 100 : 0;
+                                return (stat.imp > 0 || stat.clk > 0) ? (
+                                <div key={i} className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-zinc-700 dark:text-zinc-300 truncate pr-2">{s.name || 'Unnamed Sponsor'}</span>
+                                  <div className="flex gap-4 shrink-0 text-zinc-500">
+                                    <span className="w-14 text-right"><i className="fa-regular fa-eye mr-1"></i>{stat.imp}</span>
+                                    <span className="w-14 text-right"><i className="fa-solid fa-arrow-pointer mr-1"></i>{stat.clk}</span>
+                                    <span className="w-14 text-right font-bold text-zinc-600 dark:text-zinc-400">{itemCtr.toFixed(1)}%</span>
+                                  </div>
+                                </div>
+                              ) : null;
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
               </div>
 
               <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Account Sponsors</h2>
@@ -1161,35 +1198,62 @@ export default function Setup({ activeTab }: SetupProps) {
                           <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Save Account First to Upload Sponsors</p>
                       </div>
                    ) : (
-                     [
-                       { id: 'sponsor1', num: 1, logo: sponsor1Logo, url: sponsor1Url, setUrl: setSponsor1Url, clear: () => {setSponsor1Logo(""); setSponsor1Url("")} },
-                       { id: 'sponsor2', num: 2, logo: sponsor2Logo, url: sponsor2Url, setUrl: setSponsor2Url, clear: () => {setSponsor2Logo(""); setSponsor2Url("")} },
-                       { id: 'sponsor3', num: 3, logo: sponsor3Logo, url: sponsor3Url, setUrl: setSponsor3Url, clear: () => {setSponsor3Logo(""); setSponsor3Url("")} }
-                     ].map((s) => (
-                       <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
+                     sponsors.filter(s => s.is_active).map((s, index) => (
+                         <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/50 transition-colors">
                           <div className="flex gap-3">
-                             <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative group">
-                                {s.logo ? (
-                                   <>
-                                     <img src={s.logo} className="w-full h-full object-contain p-1" />
-                                     <button onClick={s.clear} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="fa-solid fa-trash text-xs"></i></button>
-                                   </>
+                             <div className="w-16 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden relative">
+                                {s.logo_url ? (
+                                     <img src={s.logo_url} className="w-full h-full object-contain p-1" />
                                 ) : <i className="fa-solid fa-image text-zinc-400"></i>}
                              </div>
                              <div className="flex-1 space-y-2">
-                               <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, s.id as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor} />
+                               <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, `sponsor-${s.id}` as any)} className="hidden" id={`${s.id}-upload`} disabled={isUploadingSponsor} />
                                <div className="flex justify-between items-center">
                                   <label htmlFor={`${s.id}-upload`} className={`text-[10px] font-bold px-3 py-1.5 rounded-md cursor-pointer transition-colors bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30`}>
-                                     {s.logo ? 'Change Logo' : `Upload Sponsor ${s.num}`}
+                                     {s.logo_url ? 'Change Logo' : `Upload Sponsor`}
                                   </label>
+                                  <button onClick={() => setSponsors(prev => prev.map(p => p.id === s.id ? { ...p, is_active: false } : p))} className="text-red-500 hover:text-red-700 text-[10px] font-bold uppercase px-2 py-1 flex items-center gap-1 transition-colors">
+                                     <i className="fa-solid fa-trash"></i> Archive
+                                  </button>
                                </div>
-                               <input type="url" placeholder="https://..." value={s.url} onChange={(e) => s.setUrl(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                               <input type="text" placeholder={`Sponsor Name (e.g. Nike)`} value={s.name} onChange={(e) => setSponsors(prev => prev.map(p => p.id === s.id ? { ...p, name: e.target.value } : p))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                               <input type="url" placeholder="https://..." value={s.url} onChange={(e) => setSponsors(prev => prev.map(p => p.id === s.id ? { ...p, url: e.target.value } : p))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                              </div>
                           </div>
                        </div>
                      ))
                    )}
+                   
+                   {sponsors.filter(s => s.is_active).length < 4 && (
+                     <button onClick={() => setSponsors(prev => [...prev, { id: `new-${Date.now()}`, logo_url: "", url: "", name: "", team_id: teams[0]?.id, is_active: true }])} className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-700/50 rounded-xl text-xs font-bold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                       <i className="fa-solid fa-plus mr-2"></i> Add Sponsor
+                     </button>
+                   )}
               </div>
+              
+              {sponsors.some(s => !s.is_active) && (
+                <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800/50">
+                  <h2 className="text-[11px] font-black uppercase italic text-zinc-400 dark:text-zinc-500 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-2">Archived Sponsors</h2>
+                  <div className="space-y-3">
+                    {sponsors.filter(s => !s.is_active).map(s => (
+                      <div key={s.id} className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 transition-colors opacity-70 hover:opacity-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-8 rounded-md bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                            {s.logo_url ? <img src={s.logo_url} className="w-full h-full object-contain" /> : <i className="fa-solid fa-image text-zinc-400 text-[10px]"></i>}
+                          </div>
+                          <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{s.name || 'Unnamed Sponsor'}</span>
+                        </div>
+                        <button 
+                          onClick={() => setSponsors(prev => prev.map(p => p.id === s.id ? { ...p, is_active: true } : p))} 
+                          disabled={sponsors.filter(active_s => active_s.is_active).length >= 4}
+                          className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-md transition-colors whitespace-nowrap flex items-center ${sponsors.filter(active_s => active_s.is_active).length >= 4 ? 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed' : 'text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20'}`}>
+                          <i className="fa-solid fa-rotate-left mr-1"></i> Unarchive
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           {hasFeature(clubRecord, 'SPONSORS') && (

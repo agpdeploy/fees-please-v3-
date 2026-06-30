@@ -28,13 +28,15 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
     { data: team },
     { data: publicProfile },
     { data: fixture },
-    { data: allTxs }
+    { data: allTxs },
+    { data: teamSponsorsData }
   ] = await Promise.all([
     supabase.from('clubs').select('*').eq('id', transaction.club_id).single(),
     supabase.from('teams').select('*').eq('id', transaction.team_id).single(),
     supabase.from('public_team_profiles').select('*').eq('team_id', transaction.team_id).maybeSingle(),
     transaction.fixture_id ? supabase.from('fixtures').select('*').eq('id', transaction.fixture_id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from('transactions').select('*').eq('player_id', transaction.player_id).eq('club_id', transaction.club_id)
+    supabase.from('transactions').select('*').eq('player_id', transaction.player_id).eq('club_id', transaction.club_id),
+    supabase.from('team_sponsors').select('*').eq('team_id', transaction.team_id).eq('is_active', true)
   ]);
 
   let balance = 0;
@@ -86,11 +88,7 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
      };
   });
 
-  const sponsors = publicProfile ? [
-    { logo: publicProfile.sponsor_1_logo, url: publicProfile.sponsor_1_url, index: 1 },
-    { logo: publicProfile.sponsor_2_logo, url: publicProfile.sponsor_2_url, index: 2 },
-    { logo: publicProfile.sponsor_3_logo, url: publicProfile.sponsor_3_url, index: 3 }
-  ].filter(s => s.logo) : [];
+  const sponsors = teamSponsorsData || [];
 
   const player = transaction.players;
 
@@ -142,9 +140,9 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
               <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mb-5">
-                {sponsors.map((s) => (
-                  <a key={s.index} href={s.url || '#'} target={s.url ? "_blank" : undefined} rel={s.url ? "noopener noreferrer" : undefined} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}>
-                    <img src={s.logo} alt={`Sponsor ${s.index}`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
+                {sponsors.slice(0, 4).map((s: any, i) => (
+                  <a key={s.id || i} href={s.url || '#'} target={s.url ? "_blank" : undefined} rel={s.url ? "noopener noreferrer" : undefined} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}>
+                    <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
                   </a>
                 ))}
               </div>

@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     // 1. Fetch Fixture and Team details
     const { data: fixture } = await supabaseAdmin
       .from('fixtures')
-      .select('*, teams (name, slug, club_id, public_team_profiles(sponsor_1_logo, sponsor_1_url, sponsor_2_logo, sponsor_2_url, sponsor_3_logo, sponsor_3_url, club_logo_url))')
+      .select('*, teams (name, slug, club_id, public_team_profiles(club_logo_url))')
       .eq('id', fixtureId)
       .maybeSingle();
 
@@ -66,25 +66,30 @@ export async function POST(req: Request) {
 
     const tp = Array.isArray(fixture.teams?.public_team_profiles) ? fixture.teams?.public_team_profiles[0] : fixture.teams?.public_team_profiles;
     let sponsorsHtml = '';
-    if (tp && (tp.sponsor_1_logo || tp.sponsor_2_logo || tp.sponsor_3_logo)) {
-      const sponsors = [
-        { logo: tp.sponsor_1_logo, url: tp.sponsor_1_url },
-        { logo: tp.sponsor_2_logo, url: tp.sponsor_2_url },
-        { logo: tp.sponsor_3_logo, url: tp.sponsor_3_url }
-      ].filter(s => s.logo);
-      
-      if (sponsors.length > 0) {
-        sponsorsHtml = `
-          <div style="margin-top: 32px; margin-bottom: 8px; text-align: center;">
-            <p style="font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 0;">Supported By</p>
-            <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
-              <tr>
-                ${sponsors.map(s => `<td align="center" style="padding: 0 8px;">${s.url ? `<a href="${s.url}" target="_blank">` : ''}<img src="${s.logo}" alt="Sponsor" height="32" style="max-height: 32px; width: auto; display: block;" />${s.url ? `</a>` : ''}</td>`).join('')}
-              </tr>
-            </table>
-          </div>
-        `;
-      }
+    // Fetch active sponsors
+    const { data: teamSponsorsData } = await supabaseAdmin
+      .from('team_sponsors')
+      .select('*')
+      .eq('team_id', teamId)
+      .eq('is_active', true);
+
+    const sponsors = teamSponsorsData || [];
+
+    if (sponsors.length > 0) {
+      sponsorsHtml = `
+        <div style="margin-top: 32px; margin-bottom: 8px; text-align: center;">
+          <p style="font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 0;">Supported By</p>
+          <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+            <tr>
+              ${sponsors.slice(0, 4).map((s: any) => {
+                const clickUrl = s.url ? `${baseUrl}/api/track-sponsor?team_id=${teamId}&sponsor_id=${s.id}&event_type=click&source=email&redirect=${encodeURIComponent(s.url)}` : '';
+                const impressionUrl = `${baseUrl}/api/track-sponsor?team_id=${teamId}&sponsor_id=${s.id}&event_type=impression&source=email`;
+                return `<td align="center" style="padding: 0 8px;">${clickUrl ? `<a href="${clickUrl}" target="_blank">` : ''}<img src="${s.logo_url}" alt="${s.name || 'Sponsor'}" height="32" style="max-height: 32px; width: auto; display: block;" />${clickUrl ? `</a>` : ''}<img src="${impressionUrl}" width="1" height="1" style="display:none;" alt="" /></td>`;
+              }).join('')}
+            </tr>
+          </table>
+        </div>
+      `;
     }
 
     const teamLogoUrl = tp?.club_logo_url;

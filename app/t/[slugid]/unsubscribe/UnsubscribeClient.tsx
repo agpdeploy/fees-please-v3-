@@ -17,7 +17,18 @@ export default function UnsubscribeClient({ teamId, teamName }: ClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'resubscribed' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState("");
   
-  const hasLoggedImpression = useRef(false);
+  const [hasLoggedImpression, setHasLoggedImpression] = useState(false);
+  const [sponsors, setSponsors] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadSponsors() {
+      if (teamId) {
+        const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', teamId).eq('is_active', true);
+        if (data) setSponsors(data);
+      }
+    }
+    loadSponsors();
+  }, [teamId]);
 
   useEffect(() => {
     async function loadTeamInfo() {
@@ -84,27 +95,32 @@ export default function UnsubscribeClient({ teamId, teamName }: ClientProps) {
     }
   };
 
-  const sponsors = teamInfo ? [
-    { logo: teamInfo.sponsor_1_logo, url: teamInfo.sponsor_1_url, index: 1 },
-    { logo: teamInfo.sponsor_2_logo, url: teamInfo.sponsor_2_url, index: 2 },
-    { logo: teamInfo.sponsor_3_logo, url: teamInfo.sponsor_3_url, index: 3 }
-  ].filter(s => s.logo) : [];
+  // Removed static sponsors assignment
 
   useEffect(() => {
-    if (sponsors.length > 0 && !hasLoggedImpression.current && teamId) {
-      hasLoggedImpression.current = true;
+    if (sponsors.length > 0 && !hasLoggedImpression && teamId) {
+      setHasLoggedImpression(true);
       const impressionData = sponsors.map(s => ({
         team_id: teamId,
-        sponsor_index: s.index,
-        event_type: 'impression'
+        sponsor_id: s.id,
+        event_type: 'impression',
+        source: 'hub'
       }));
-      supabase.from('sponsor_analytics').insert(impressionData).then();
+      fetch('/api/track-sponsor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(impressionData)
+      }).catch(err => console.error("Tracking error", err));
     }
-  }, [sponsors, teamId]);
+  }, [sponsors, teamId, hasLoggedImpression]);
 
-  const handleSponsorClick = (sponsorIndex: number, url: string) => {
+  const handleSponsorClick = (sponsorId: string, url: string) => {
     if (teamId) {
-        supabase.from('sponsor_analytics').insert([{ team_id: teamId, sponsor_index: sponsorIndex, event_type: 'click' }]);
+        fetch('/api/track-sponsor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ team_id: teamId, sponsor_id: sponsorId, event_type: 'click', source: 'hub' })
+        }).catch(err => console.error("Tracking error", err));
     }
     if (url) window.open(url, '_blank');
   };
@@ -207,10 +223,12 @@ export default function UnsubscribeClient({ teamId, teamName }: ClientProps) {
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
               <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mb-5">
-                {sponsors.map((s) => (
-                  <button key={s.index} onClick={() => handleSponsorClick(s.index, s.url)} disabled={!s.url} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}>
-                    <img src={s.logo} alt={`Sponsor ${s.index}`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
-                  </button>
+                {sponsors.slice(0, 4).map((s: any, i) => (
+                  <a key={s.id || i} href={s.url || '#'} onClick={(e) => {
+                    if (s.url) { e.preventDefault(); handleSponsorClick(s.id, s.url); }
+                  }} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
+                    <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
+                  </a>
                 ))}
               </div>
             </>

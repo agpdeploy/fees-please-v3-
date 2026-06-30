@@ -277,34 +277,47 @@ export async function GET(req: Request) {
       const entityName = report.report_type === 'club_summary' ? clubName : `${clubName} - ${teamName}`;
       const subjectDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
-      // Fetch team profile for logo and sponsors
-      let tpQuery = supabaseAdmin.from('public_team_profiles').select('club_logo_url, sponsor_1_logo, sponsor_1_url, sponsor_2_logo, sponsor_2_url, sponsor_3_logo, sponsor_3_url').eq('club_id', clubId);
+      // Fetch team profile for logo
+      let tpQuery = supabaseAdmin.from('public_team_profiles').select('club_logo_url').eq('club_id', clubId);
       if (teamId) {
         tpQuery = tpQuery.eq('team_id', teamId);
       }
       const finalTpQuery = tpQuery.limit(1).maybeSingle();
       const { data: tpData } = await finalTpQuery;
 
-      let sponsorsHtml = '';
-      if (tpData && (tpData.sponsor_1_logo || tpData.sponsor_2_logo || tpData.sponsor_3_logo)) {
-        const sponsors = [
-          { logo: tpData.sponsor_1_logo, url: tpData.sponsor_1_url },
-          { logo: tpData.sponsor_2_logo, url: tpData.sponsor_2_url },
-          { logo: tpData.sponsor_3_logo, url: tpData.sponsor_3_url }
-        ].filter(s => s.logo);
-        
-        if (sponsors.length > 0) {
-          sponsorsHtml = `
-            <div style="margin-top: 32px; margin-bottom: 8px; text-align: center;">
-              <p style="font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 0;">Supported By</p>
-              <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
-                <tr>
-                  ${sponsors.map(s => `<td align="center" style="padding: 0 8px;">${s.url ? `<a href="${s.url}" target="_blank">` : ''}<img src="${s.logo}" alt="Sponsor" height="32" style="max-height: 32px; width: auto; display: block;" />${s.url ? `</a>` : ''}</td>`).join('')}
-                </tr>
-              </table>
-            </div>
-          `;
+      // Fetch sponsors
+      let spQuery = supabaseAdmin.from('team_sponsors').select('*').eq('is_active', true);
+      if (teamId) {
+        spQuery = spQuery.eq('team_id', teamId);
+      } else {
+        // Find one active team's sponsors for club emails
+        const { data: teamsData } = await supabaseAdmin.from('teams').select('id').eq('club_id', clubId).limit(1);
+        if (teamsData && teamsData.length > 0) {
+          spQuery = spQuery.eq('team_id', teamsData[0].id);
+        } else {
+          spQuery = spQuery.eq('team_id', '00000000-0000-0000-0000-000000000000'); // Force empty if no team
         }
+      }
+      const { data: teamSponsorsData } = await spQuery;
+      const sponsors = teamSponsorsData || [];
+
+      let sponsorsHtml = '';
+      if (sponsors.length > 0) {
+        sponsorsHtml = `
+          <div style="margin-top: 32px; margin-bottom: 8px; text-align: center;">
+            <p style="font-size: 10px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 0;">Supported By</p>
+            <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+              <tr>
+                ${sponsors.slice(0, 4).map((s: any) => {
+                  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.feesplease.app';
+                  const clickUrl = s.url ? `${baseUrl}/api/track-sponsor?team_id=${teamId || s.team_id}&sponsor_id=${s.id}&event_type=click&source=email&redirect=${encodeURIComponent(s.url)}` : '';
+                  const impressionUrl = `${baseUrl}/api/track-sponsor?team_id=${teamId || s.team_id}&sponsor_id=${s.id}&event_type=impression&source=email`;
+                  return `<td align="center" style="padding: 0 8px;">${clickUrl ? `<a href="${clickUrl}" target="_blank">` : ''}<img src="${s.logo_url}" alt="${s.name || 'Sponsor'}" height="32" style="max-height: 32px; width: auto; display: block;" />${clickUrl ? `</a>` : ''}<img src="${impressionUrl}" width="1" height="1" style="display:none;" alt="" /></td>`;
+                }).join('')}
+              </tr>
+            </table>
+          </div>
+        `;
       }
       
       const teamLogoUrl = tpData?.club_logo_url || null;

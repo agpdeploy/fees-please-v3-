@@ -101,15 +101,10 @@ export default function TeamListGraphicBuilder({
       setOrderedPlayers([...fixture.lists.squadIds]);
     }
 
-    const loadSponsors = async () => {
-      const { data } = await supabase.from('public_team_profiles').select('sponsor_1_logo, sponsor_2_logo, sponsor_3_logo').eq('team_id', team?.id).single();
+    const loadSponsorsAndClub = async () => {
+      const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', team?.id).eq('is_active', true);
       if (data) {
-        const loadedSponsors = [
-          { logo: data.sponsor_1_logo, index: 1 },
-          { logo: data.sponsor_2_logo, index: 2 },
-          { logo: data.sponsor_3_logo, index: 3 }
-        ].filter(s => s.logo);
-        setSponsors(loadedSponsors);
+        setSponsors(data.map(s => ({ logo: s.logo_url, index: s.id })));
       }
 
       if (!team?.logo_url && clubId) {
@@ -119,7 +114,8 @@ export default function TeamListGraphicBuilder({
         }
       }
     };
-    loadSponsors();
+    loadSponsorsAndClub();
+
   }, [isOpen, team, fixture, clubId]);
 
   // Load from LocalStorage

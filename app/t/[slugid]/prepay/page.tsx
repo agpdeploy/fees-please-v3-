@@ -33,18 +33,13 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
   const { data: club } = await supabase.from('clubs').select('*').eq('id', clubId).single();
   if (!club) return <div className="p-8 text-center font-bold">Club not found.</div>;
 
-  // 4. Fetch public profile for sponsors
-  const { data: publicProfile } = await supabase
-    .from('public_team_profiles')
+  const { data: teamSponsorsData } = await supabase
+    .from('team_sponsors')
     .select('*')
     .eq('team_id', player.default_team_id)
-    .maybeSingle();
+    .eq('is_active', true);
 
-  const sponsors = publicProfile ? [
-    { logo: publicProfile.sponsor_1_logo, url: publicProfile.sponsor_1_url, index: 1 },
-    { logo: publicProfile.sponsor_2_logo, url: publicProfile.sponsor_2_url, index: 2 },
-    { logo: publicProfile.sponsor_3_logo, url: publicProfile.sponsor_3_url, index: 3 }
-  ].filter(s => s.logo) : [];
+  const sponsors = teamSponsorsData || [];
 
   // 5. Calculate amount owed
   const { data: transactions } = await supabase.from('transactions').select('*').eq('player_id', playerId).eq('club_id', clubId);
@@ -286,9 +281,9 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
               <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mb-5">
-                {sponsors.map((s) => (
-                  <a key={s.index} href={s.url || '#'} target={s.url ? "_blank" : undefined} rel={s.url ? "noopener noreferrer" : undefined} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}>
-                    <img src={s.logo} alt={`Sponsor ${s.index}`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
+                {sponsors.slice(0, 4).map((s: any, i) => (
+                  <a key={s.id || i} href={s.url || '#'} target={s.url ? "_blank" : undefined} rel={s.url ? "noopener noreferrer" : undefined} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}>
+                    <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
                   </a>
                 ))}
               </div>
