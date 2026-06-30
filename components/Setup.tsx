@@ -536,6 +536,7 @@ export default function Setup({ activeTab }: SetupProps) {
       }
       
       showToast("Settings saved successfully!");
+      await loadClubData();
     } else {
       const { data: newClub, error } = await supabase.from("clubs").insert([{ ...payload, slug: generatedSlug }]).select().single();
       if (error) { 
