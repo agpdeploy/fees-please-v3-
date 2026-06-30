@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         const { error } = await supabaseAdmin.from('sponsor_analytics').insert(body.map(item => ({
             team_id: item.team_id,
             sponsor_id: item.sponsor_id,
-            sponsor_index: item.sponsor_index,
+            sponsor_index: item.sponsor_index || 1,
             event_type: item.event_type,
             source: item.source || 'hub'
         })));
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         const { error } = await supabaseAdmin.from('sponsor_analytics').insert({
           team_id: body.team_id,
           sponsor_id: body.sponsor_id,
-          sponsor_index: body.sponsor_index,
+          sponsor_index: body.sponsor_index || 1,
           event_type: body.event_type,
           source: body.source || 'hub',
         });
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       supabaseAdmin.from('sponsor_analytics').insert({
         team_id,
         sponsor_id,
-        sponsor_index,
+        sponsor_index: sponsor_index || 1,
         event_type,
         source,
       }).then(({ error }) => {
