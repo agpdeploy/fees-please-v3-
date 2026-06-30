@@ -253,7 +253,7 @@ export default function Setup({ activeTab }: SetupProps) {
     if (teamData) {
       setTeams(teamData);
       if (teamData.length > 0) {
-         const { data: sponsorData } = await supabase.from("team_sponsors").select("*").in("team_id", teamData.map(t => t.id)).eq('is_active', true);
+         const { data: sponsorData } = await supabase.from("team_sponsors").select("*").in("team_id", teamData.map(t => t.id));
          if (sponsorData) {
             // Deduplicate across teams if needed, or just take teamData[0]
             const primaryTeamSponsors = sponsorData.filter((s: any) => s.team_id === teamData[0].id);
@@ -268,11 +268,29 @@ export default function Setup({ activeTab }: SetupProps) {
 
     let imp = 0, clk = 0;
     let details: Record<string, { imp: number, clk: number }> = {};
+    
+    // Create a map to group analytics by sponsor name across all teams
+    const sponsorNameMap: Record<string, string> = {};
+    if (sponsors && sponsors.length > 0) {
+      // Actually, we need all sponsorData to map all teams' sponsor IDs
+      // But we don't have sponsorData in scope here easily unless we refetch it or move the variable up.
+      // We can just fetch it again or query it. Wait, sponsorAnalytics has sponsor_id.
+    }
+    
+    // Let's just fetch all team sponsors again quickly to build the map
+    const { data: allSponsors } = await supabase.from("team_sponsors").select("id, name").in("team_id", teamIds);
+    if (allSponsors) {
+      allSponsors.forEach(s => {
+        if (s.name) sponsorNameMap[s.id] = s.name;
+      });
+    }
+
     if (sponsorAnalytics) {
       sponsorAnalytics.forEach((s: any) => {
-        // use sponsor_id if available, fallback to sponsor_index for legacy
-        const sKey = s.sponsor_id || s.sponsor_index?.toString();
+        // Group by name if we have it, otherwise fallback to id or index
+        let sKey = s.sponsor_id ? (sponsorNameMap[s.sponsor_id] || s.sponsor_id) : s.sponsor_index?.toString();
         if (!sKey) return;
+        
         if (!details[sKey]) details[sKey] = { imp: 0, clk: 0 };
         
         if (s.event_type === 'impression') {
@@ -1145,7 +1163,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     let totalImp = 0;
                     let totalClk = 0;
                     activeSponsors.forEach(s => {
-                      const stat = sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
+                      const stat = sponsorStats.details?.[s.name] || sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
                       totalImp += stat.imp;
                       totalClk += stat.clk;
                     });
@@ -1170,7 +1188,7 @@ export default function Setup({ activeTab }: SetupProps) {
                           <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
                             <div className="space-y-2">
                               {activeSponsors.map((s: any, i: number) => {
-                                const stat = sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
+                                const stat = sponsorStats.details?.[s.name] || sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
                                 const itemCtr = stat.imp > 0 ? (stat.clk / stat.imp) * 100 : 0;
                                 return (stat.imp > 0 || stat.clk > 0) ? (
                                 <div key={i} className="flex justify-between items-center text-xs">
