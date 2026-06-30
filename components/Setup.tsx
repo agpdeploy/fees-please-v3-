@@ -530,8 +530,12 @@ export default function Setup({ activeTab }: SetupProps) {
           }
           if (upserts.length > 0) {
              const { error: sponsorSyncError } = await supabase.from('team_sponsors').upsert(upserts);
-             if (sponsorSyncError) console.error("Sponsor sync error:", sponsorSyncError);
-          }
+             if (sponsorSyncError) {
+          console.error("Sponsor sync error:", sponsorSyncError);
+          showToast(`Error saving sponsors: ${sponsorSyncError.message || JSON.stringify(sponsorSyncError)}`);
+          setIsSaving(false);
+          return;
+        }  }
         }
       }
       
