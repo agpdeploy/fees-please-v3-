@@ -97,7 +97,13 @@ export default function Home() {
   const [allClubs, setAllClubs] = useState<any[]>([]);
   const [showNewAccountModal, setShowNewAccountModal] = useState(false);
   const [showReferralModal, setShowReferralModal] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['team_management']);
 
+  const toggleMenu = (menu: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(menu) ? prev.filter(m => m !== menu) : [...prev, menu]
+    );
+  };
   // --- PWA UPDATE LISTENER (Fix for aggressive caching) ---
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
@@ -612,65 +618,92 @@ export default function Home() {
               </div>
 
               {isAdmin && (
-                <div>
-                  {/* APP MANAGEMENT SECTION */}
-                  <div className="px-6 py-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">App Management</div>
-                  
-                  {profile?.role === 'super_admin' && (
-                    <button onClick={() => window.location.assign('/admin')} className="w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
-                      <i className="fa-solid fa-crown w-5 text-center text-amber-500"></i> Platform Admin
+                <div className="space-y-1">
+                  {/* CONFIGURATION SECTION */}
+                  <div>
+                    <button 
+                      onClick={() => toggleMenu('config_management')}
+                      className="w-full px-6 py-3 flex items-center justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
+                    >
+                      <span>Configuration</span>
+                      <i className={`fa-solid fa-chevron-down transition-transform duration-200 ${expandedMenus.includes('config_management') ? '' : '-rotate-90'}`}></i>
                     </button>
-                  )}
-                  
-                  {isAdmin && (
-                    <>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-sliders w-5 text-center"></i> Account Details
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('billing'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'billing' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Billing
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('payments'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'payments' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-credit-card w-5 text-center"></i> Payments
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('access'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'access' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-shield-halved w-5 text-center"></i> Admins
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('reports'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'reports' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-chart-pie w-5 text-center"></i> Reports
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('wallet'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'wallet' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-wallet w-5 text-center"></i> Team Wallet
-                      </button>
-                    </>
-                  )}
+                    
+                    {expandedMenus.includes('config_management') && (
+                      <div className="pl-4 pr-2 space-y-1 py-1 animate-in slide-in-from-top-2 duration-200 fade-in">
+                        {profile?.role === 'super_admin' && (
+                          <button onClick={() => window.location.assign('/admin')} className="w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                            <i className="fa-solid fa-crown w-5 text-center text-amber-500"></i> Platform Admin
+                          </button>
+                        )}
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('config'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'config' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-sliders w-5 text-center"></i> Account Details
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('access'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'access' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-shield-halved w-5 text-center"></i> Admins
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* FINANCIALS & REPORTS SECTION */}
+                  <div>
+                    <button 
+                      onClick={() => toggleMenu('financials')}
+                      className="w-full px-6 py-3 flex items-center justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
+                    >
+                      <span>Financials & Reports</span>
+                      <i className={`fa-solid fa-chevron-down transition-transform duration-200 ${expandedMenus.includes('financials') ? '' : '-rotate-90'}`}></i>
+                    </button>
+                    
+                    {expandedMenus.includes('financials') && (
+                      <div className="pl-4 pr-2 space-y-1 py-1 animate-in slide-in-from-top-2 duration-200 fade-in">
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('billing'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'billing' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Billing
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('payments'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'payments' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-credit-card w-5 text-center"></i> Payments
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('wallet'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'wallet' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-wallet w-5 text-center"></i> Team Wallet
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('reports'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'reports' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-chart-pie w-5 text-center"></i> Reports
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* TEAM MANAGEMENT SECTION */}
-                  {isAdmin && (
-                    <div className="px-6 py-2 mt-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Team Management</div>
-                  )}
-
-                  {isAdmin && (
-                    <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                      <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
+                  <div>
+                    <button 
+                      onClick={() => toggleMenu('team_management')}
+                      className="w-full px-6 py-3 flex items-center justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
+                    >
+                      <span>Team Management</span>
+                      <i className={`fa-solid fa-chevron-down transition-transform duration-200 ${expandedMenus.includes('team_management') ? '' : '-rotate-90'}`}></i>
                     </button>
-                  )}
-                  {isAdmin && (
-                    <>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
-                      </button>
-                      <button onClick={() => { handleTabChange('setup'); setSetupTab('sponsors'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'sponsors' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-bullhorn w-5 text-center"></i> Sponsors
-                      </button>
-                      <button onClick={() => { handleTabChange('history'); }} className={`w-full text-left px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'history' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-r-2 border-emerald-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                        <i className="fa-solid fa-clock-rotate-left w-5 text-center"></i> Season History
-                      </button>
-                    </>
-                  )}
+                    
+                    {expandedMenus.includes('team_management') && (
+                      <div className="pl-4 pr-2 space-y-1 py-1 animate-in slide-in-from-top-2 duration-200 fade-in">
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('teams'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'teams' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-users-viewfinder w-5 text-center"></i> Teams
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('players'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'players' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-clipboard-user w-5 text-center"></i> Players
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('fixtures'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'fixtures' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-calendar-days w-5 text-center"></i> Fixtures
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('sponsors'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'sponsors' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-bullhorn w-5 text-center"></i> Sponsors
+                        </button>
+                        <button onClick={() => { handleTabChange('history'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'history' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-clock-rotate-left w-5 text-center"></i> Season History
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

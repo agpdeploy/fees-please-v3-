@@ -627,6 +627,7 @@ function PlayerRow({
   const hasClubAdmin = userRoles.some(r => r.role === 'club_admin');
   const hasTeamAdmin = userRoles.some(r => r.role === 'team_admin');
 
+  return (
     <div className={`bg-white dark:bg-zinc-900 border ${player.is_active === false ? 'border-zinc-200/50 dark:border-zinc-800/50 border-dashed opacity-60 grayscale' : 'border-zinc-200 dark:border-zinc-800'} rounded-xl shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700`}>
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-start justify-between w-full">
@@ -685,10 +686,10 @@ function PlayerRow({
             {player.unsubscribed && (
               <button onClick={handleResubscribe} disabled={isSaving} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-emerald-500 hover:text-emerald-600 transition-colors flex items-center justify-center shadow-sm" title="Resubscribe"><i className="fa-solid fa-envelope-circle-check text-[10px]"></i></button>
             )}
+            <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center" title="Edit Player"><i className="fa-solid fa-pen text-[10px]"></i></button>
             <button onClick={handleToggleActive} disabled={isSaving} className={`w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 ${player.is_active === false ? 'text-zinc-500 hover:text-emerald-500' : 'text-zinc-500 hover:text-amber-500'} dark:text-zinc-400 transition-colors flex items-center justify-center`} title={player.is_active === false ? "Reactivate Player" : "Deactivate Player"}>
               <i className={`fa-solid ${player.is_active === false ? 'fa-rotate-left' : 'fa-power-off'} text-[10px]`}></i>
             </button>
-            <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center" title="Edit Player"><i className="fa-solid fa-pen text-[10px]"></i></button>
             {isSuperAdmin && (
               <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center" title="Delete Player"><i className="fa-solid fa-trash text-[10px]"></i></button>
             )}
@@ -702,7 +703,7 @@ function PlayerRow({
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
             <h3 className="font-black text-lg mb-2 uppercase tracking-wide">Invite to Player Portal</h3>
             <p className="text-sm text-zinc-500 mb-6 font-medium">
-              An email will be sent to <strong>{player.email}</strong>. The player can then log into the platform to view their transaction history and manage their availability.
+              An email will be sent to the player so they can log into the platform to view their transaction history and manage their availability.
             </p>
             <div className="flex gap-3 justify-end mt-2">
               <button onClick={() => setIsInviteModalOpen(false)} className="px-5 py-2.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase tracking-widest transition-colors">Cancel</button>
