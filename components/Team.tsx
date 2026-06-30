@@ -98,7 +98,7 @@ export default function Team() {
 
       
       // Fetch club info to get season_name and plan_tier for filtering/features
-      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier, name, logo_url, trial_ends_at, has_had_trial').eq('id', activeClubId).single();
+      const { data: clubData } = await supabase.from('clubs').select('season_name, plan_tier, name, logo_url, trial_ends_at, has_had_trial, settings').eq('id', activeClubId).single();
       const clubSeasonName = clubData?.season_name || null;
       setActiveSeasonName(clubSeasonName);
       const isTrial = clubData?.trial_ends_at && new Date(clubData.trial_ends_at) > new Date() && clubData?.plan_tier === 'free';
@@ -106,7 +106,7 @@ export default function Team() {
       if (clubData) setClubInfo(clubData);
 
       // 1. Determine Teams
-      let teamQuery = supabase.from("teams").select("id, name, slug").eq("club_id", activeClubId);
+      let teamQuery = supabase.from("teams").select("id, name, slug, theme_colors, settings, logo_url").eq("club_id", activeClubId);
       if (!isClubAdmin) {
         const allowedTeamIds = roles?.filter((r: any) => r.role === 'team_admin' && r.club_id === activeClubId).map((r: any) => r.team_id) || [];
         if (allowedTeamIds.length === 0) { setIsLoading(false); return; }
@@ -1325,6 +1325,7 @@ export default function Team() {
          clubPlayers={clubPlayers}
          team={teams.find(t => t.id === selectedTeamId)}
          clubId={activeClubId || ''}
+         clubSettings={clubInfo?.settings || {}}
          planTier={planTier}
        />
      </div>

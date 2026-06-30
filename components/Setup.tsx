@@ -10,6 +10,7 @@ import AutomationsTab from "@/components/AutomationsTab";
 import TeamWalletTab from "@/components/TeamWalletTab";
 import PlayHQSeasonAlert from "@/components/PlayHQSeasonAlert";
 import FinaliseSeasonView from "@/components/FinaliseSeasonView";
+import GraphicDefaultsTab from "@/components/GraphicDefaultsTab";
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 import { hasFeature } from "@/lib/features";
@@ -17,7 +18,7 @@ import { hasFeature } from "@/lib/features";
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string);
 
 interface SetupProps {
-  activeTab: 'config' | 'billing' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'wallet' | 'payments' | 'sponsors';
+  activeTab: 'config' | 'billing' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'wallet' | 'payments' | 'sponsors' | 'graphic';
 }
 
 interface UserRole {
@@ -2206,6 +2207,11 @@ export default function Setup({ activeTab }: SetupProps) {
           showToast={showToast} 
           planTier={clubRecord?.plan_tier || 'free'}
         />
+      )}
+
+      {/* --- GRAPHIC DEFAULTS TAB --- */}
+      {clubId && clubId !== 'new' && activeTab === 'graphic' && (
+        <GraphicDefaultsTab clubId={clubId} clubRecord={clubRecord} setClubRecord={setClubRecord} />
       )}
 
     </div>

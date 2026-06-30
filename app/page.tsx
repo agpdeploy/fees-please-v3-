@@ -39,7 +39,7 @@ export default function Home() {
     return false;
   });
 
-  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'wallet' | 'payments' | 'billing' | 'sponsors'>(() => {
+  const [setupTab, setSetupTab] = useState<'config' | 'access' | 'teams' | 'players' | 'fixtures' | 'reports' | 'wallet' | 'payments' | 'billing' | 'sponsors' | 'graphic'>(() => {
     if (typeof window !== 'undefined') {
       return (sessionStorage.getItem('setupTab') as any) || 'config';
     }
@@ -697,6 +697,9 @@ export default function Home() {
                         </button>
                         <button onClick={() => { handleTabChange('setup'); setSetupTab('sponsors'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'sponsors' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
                           <i className="fa-solid fa-bullhorn w-5 text-center"></i> Sponsors
+                        </button>
+                        <button onClick={() => { handleTabChange('setup'); setSetupTab('graphic'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'setup' && setupTab === 'graphic' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                          <i className="fa-solid fa-paintbrush w-5 text-center"></i> Branding
                         </button>
                         <button onClick={() => { handleTabChange('history'); }} className={`w-full text-left px-6 py-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex items-center gap-4 text-xs font-black uppercase tracking-widest ${activeTab === 'history' ? 'text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'text-zinc-700 dark:text-zinc-300'}`}>
                           <i className="fa-solid fa-clock-rotate-left w-5 text-center"></i> Season History

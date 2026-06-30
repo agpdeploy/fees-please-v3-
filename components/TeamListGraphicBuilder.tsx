@@ -12,7 +12,10 @@ interface TeamListGraphicBuilderProps {
   team: any;
   clubPlayers: any[];
   clubId: string;
+  clubSettings?: any;
   planTier?: string;
+  editMode?: 'club' | 'team';
+  onSaveClubSettings?: (settings: any) => void;
 }
 
 const COMMON_GOOGLE_FONTS = [
@@ -29,17 +32,32 @@ export default function TeamListGraphicBuilder({
   team,
   clubPlayers,
   clubId,
-  planTier
+  clubSettings,
+  planTier,
+  editMode = 'team',
+  onSaveClubSettings
 }: TeamListGraphicBuilderProps) {
   const [mounted, setMounted] = useState(false);
   
   const [sponsors, setSponsors] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [primaryColor, setPrimaryColor] = useState('#10b981'); // default emerald
-  const [secondaryColor, setSecondaryColor] = useState('#f59e0b'); // default amber
+  
+  const defaults = clubSettings?.graphic_defaults || {};
+  const [primaryColor, setPrimaryColor] = useState(defaults.primaryColor || team?.theme_colors?.[0] || '#3FB116');
+  const [secondaryColor, setSecondaryColor] = useState(defaults.secondaryColor || team?.theme_colors?.[1] || '#306F06');
+  const [headerBgColor, setHeaderBgColor] = useState(defaults.headerBgColor || "#ffffff");
+  const [teamNamesFont, setTeamNamesFont] = useState(defaults.teamNamesFont || "Inter");
+  const [teamNamesColor, setTeamNamesColor] = useState(defaults.teamNamesColor || "#363636");
+  const [playerNamesFont, setPlayerNamesFont] = useState(defaults.playerNamesFont || "Inter");
+  const [playerNamesColor, setPlayerNamesColor] = useState(defaults.playerNamesColor || "#ffffff");
+  const [matchDetailsColor, setMatchDetailsColor] = useState(defaults.matchDetailsColor || "#1C1C1C");
+  const [matchNotesColor, setMatchNotesColor] = useState(defaults.matchNotesColor || "#696969");
+  const [sponsorScale, setSponsorScale] = useState<number>(defaults.sponsorScale || team?.settings?.sponsorScale || 100);
+  const [sponsorStyles, setSponsorStyles] = useState<Record<string, { scale: number, x: number, y: number }>>(defaults.sponsorStyles || team?.settings?.sponsorStyles || {});
+  const [sponsorOrder, setSponsorOrder] = useState<string[]>(defaults.sponsorOrder || team?.settings?.sponsorOrder || []);
+
   const [nameFormat, setNameFormat] = useState<'full' | 'first_initial' | 'nickname'>('first_initial');
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
-  const [selectedFont, setSelectedFont] = useState("Inter");
   const [orderedPlayers, setOrderedPlayers] = useState<string[]>([]);
   
   // Accordion States
@@ -60,10 +78,8 @@ export default function TeamListGraphicBuilder({
   const [showNumbers, setShowNumbers] = useState<boolean>(false);
   const [nameSize, setNameSize] = useState<number>(48);
   const [letterSpacing, setLetterSpacing] = useState<number>(0);
-  const [matchTextColor, setMatchTextColor] = useState<string>(''); // Default fallback to secondaryColor
   const [matchNotesOverride, setMatchNotesOverride] = useState<string>('');
   const [matchNotesBg, setMatchNotesBg] = useState<string>('transparent');
-  const [sponsorScale, setSponsorScale] = useState<number>(100);
   const [isExpanded, setIsExpanded] = useState<boolean>(false); // Full screen preview toggle
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
@@ -81,20 +97,18 @@ export default function TeamListGraphicBuilder({
   useEffect(() => {
     if (!isOpen) return;
 
-    if (team?.theme_colors && team.theme_colors.length >= 2) {
-      setPrimaryColor(team.theme_colors[0]);
-      setSecondaryColor(team.theme_colors[1]);
-    }
-
     if (team?.settings) {
-      if (team.settings.graphic_font) setSelectedFont(team.settings.graphic_font);
       if (team.settings.letter_spacing !== undefined) setLetterSpacing(team.settings.letter_spacing);
-      if (team.settings.match_text_color) setMatchTextColor(team.settings.match_text_color);
-      if (team.settings.sponsor_scale !== undefined) setSponsorScale(team.settings.sponsor_scale);
       if (team.settings.name_format) setNameFormat(team.settings.name_format);
       if (typeof team.settings.show_numbers === 'boolean') setShowNumbers(team.settings.show_numbers);
       if (team.settings.name_size) setNameSize(team.settings.name_size);
       if (team.settings.orientation) setOrientation(team.settings.orientation);
+      if (team.settings.hero_width_percent !== undefined) setHeroWidthPercent(team.settings.hero_width_percent);
+      if (team.settings.image_fit) setImageFit(team.settings.image_fit);
+      if (team.settings.image_zoom !== undefined) setImageZoom(team.settings.image_zoom);
+      if (team.settings.image_x !== undefined) setImageX(team.settings.image_x);
+      if (team.settings.image_y !== undefined) setImageY(team.settings.image_y);
+      if (team.settings.image_rotation !== undefined) setImageRotation(team.settings.image_rotation);
     }
 
     if (fixture?.lists?.squadIds) {
@@ -102,9 +116,18 @@ export default function TeamListGraphicBuilder({
     }
 
     const loadSponsorsAndClub = async () => {
-      const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', team?.id).eq('is_active', true);
-      if (data) {
-        setSponsors(data.map(s => ({ logo: s.logo_url, index: s.id })));
+      if (editMode === 'club' && clubId) {
+        // Since club sponsors are synced across all team_sponsors, we just get them for the first team in the club
+        const { data: teamData } = await supabase.from('teams').select('id').eq('club_id', clubId).limit(1).single();
+        if (teamData?.id) {
+          const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', teamData.id).eq('is_active', true);
+          if (data) setSponsors(data.map(s => ({ logo: s.logo_url, index: s.id })));
+        }
+      } else {
+        const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', team?.id).eq('is_active', true);
+        if (data) {
+          setSponsors(data.map(s => ({ logo: s.logo_url, index: s.id })));
+        }
       }
 
       if (!team?.logo_url && clubId) {
@@ -125,16 +148,11 @@ export default function TeamListGraphicBuilder({
     if (savedAdvanced) {
       try {
         const adv = JSON.parse(savedAdvanced);
-        if (adv.primaryColor) setPrimaryColor(adv.primaryColor);
-        if (adv.secondaryColor) setSecondaryColor(adv.secondaryColor);
-        if (adv.selectedFont) setSelectedFont(adv.selectedFont);
         if (adv.nameFormat) setNameFormat(adv.nameFormat);
         if (adv.showNumbers !== undefined) setShowNumbers(adv.showNumbers);
         if (adv.nameSize) setNameSize(adv.nameSize);
         if (adv.orientation) setOrientation(adv.orientation);
         if (adv.letterSpacing !== undefined) setLetterSpacing(adv.letterSpacing);
-        if (adv.matchTextColor) setMatchTextColor(adv.matchTextColor);
-        if (adv.sponsorScale !== undefined) setSponsorScale(adv.sponsorScale);
       } catch (e) {}
     }
     const savedFixture = localStorage.getItem(`graphic_builder_fixture_${fixture?.id}`);
@@ -160,9 +178,9 @@ export default function TeamListGraphicBuilder({
   useEffect(() => {
     if (!isOpen || !mounted) return;
     localStorage.setItem(`graphic_builder_advanced_${team?.id}`, JSON.stringify({
-      primaryColor, secondaryColor, selectedFont, nameFormat, showNumbers, nameSize, orientation, letterSpacing, matchTextColor, sponsorScale
+      nameFormat, showNumbers, nameSize, orientation, letterSpacing
     }));
-  }, [isOpen, mounted, team?.id, primaryColor, secondaryColor, selectedFont, nameFormat, showNumbers, nameSize, orientation, letterSpacing, matchTextColor, sponsorScale]);
+  }, [isOpen, mounted, team?.id, nameFormat, showNumbers, nameSize, orientation, letterSpacing]);
 
   useEffect(() => {
     if (!isOpen || !mounted) return;
@@ -179,7 +197,7 @@ export default function TeamListGraphicBuilder({
   useEffect(() => {
     if (!containerRef.current || !isOpen) return;
     const canvasWidth = orientation === 'portrait' ? 1080 : 1200;
-    const canvasHeight = orientation === 'portrait' ? 1920 : 630;
+    const canvasHeight = orientation === 'portrait' ? 1350 : 630;
     
     const observer = new ResizeObserver(entries => {
       for (let entry of entries) {
@@ -196,23 +214,41 @@ export default function TeamListGraphicBuilder({
   }, [isOpen, isExpanded, orientation]);
 
   const saveSettings = async () => {
+    if (editMode === 'club') {
+      if (!clubId) return;
+      const newDefaults = {
+        primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor,
+        playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder
+      };
+      const updatedSettings = { ...(clubSettings || {}), graphic_defaults: newDefaults };
+      await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
+      if (onSaveClubSettings) onSaveClubSettings(updatedSettings);
+      alert('Global Branding Defaults Saved!');
+      return;
+    }
+
     if (!team?.id) return;
     const newSettings = { 
       ...(team.settings || {}), 
-      graphic_font: selectedFont,
       letter_spacing: letterSpacing,
-      match_text_color: matchTextColor,
-      sponsor_scale: sponsorScale,
       name_format: nameFormat,
       show_numbers: showNumbers,
       name_size: nameSize,
-      orientation: orientation
+      orientation: orientation,
+      hero_width_percent: heroWidthPercent,
+      image_fit: imageFit,
+      image_zoom: imageZoom,
+      image_x: imageX,
+      image_y: imageY,
+      image_rotation: imageRotation,
+      sponsorScale,
+      sponsorStyles,
+      sponsorOrder
     };
     await supabase.from('teams').update({ 
-      theme_colors: [primaryColor, secondaryColor],
       settings: newSettings
     }).eq('id', team.id);
-    alert('Default Configuration Saved!');
+    alert('Layout Configuration Saved!');
   };
 
   const downloadImage = async () => {
@@ -268,7 +304,7 @@ export default function TeamListGraphicBuilder({
       const sanitizedTeamName = (team?.name || 'Team').replace(/[^a-zA-Z0-9]/g, '');
       const fileName = `TeamList-${sanitizedTeamName}-${dateString}.png`;
 
-      if (navigator.share) {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
         try {
           const res = await fetch(dataUrl);
           const blob = await res.blob();
@@ -317,17 +353,37 @@ export default function TeamListGraphicBuilder({
 
   if (!isOpen || !mounted) return null;
 
-  const hasSponsors = sponsors.length > 0;
+  const validSponsors = sponsors.filter(s => s.logo && s.logo.trim() !== '');
+  const orderedSponsors = [...validSponsors].sort((a, b) => {
+    const indexA = sponsorOrder.indexOf(a.index);
+    const indexB = sponsorOrder.indexOf(b.index);
+    if (indexA === -1 && indexB === -1) return 0;
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
+  });
+  const hasSponsors = orderedSponsors.length > 0;
+
+  const handleMoveSponsor = (sponsorId: string, direction: number) => {
+    const currentOrder = sponsorOrder.length === validSponsors.length ? sponsorOrder : validSponsors.map(s => s.index);
+    const currentIndex = currentOrder.indexOf(sponsorId);
+    if (currentIndex === -1) return;
+    const newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= currentOrder.length) return;
+    const newOrder = [...currentOrder];
+    [newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]];
+    setSponsorOrder(newOrder);
+  };
   const matchDateStr = fixture?.match_date ? new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-  const fontFamilyString = `'${selectedFont}', sans-serif`;
 
   const canvasWidth = orientation === 'portrait' ? 1080 : 1200;
-  const canvasHeight = orientation === 'portrait' ? 1920 : 630;
+  const canvasHeight = orientation === 'portrait' ? 1350 : 630;
 
   const modalContent = (
     <div className="fixed inset-0 z-[100000] flex flex-col bg-black/95 backdrop-blur-md">
       
-      <link href={`https://fonts.googleapis.com/css2?family=${selectedFont.replace(/\s+/g, '+')}:wght@400;700;900&display=swap`} rel="stylesheet" crossOrigin="anonymous" />
+      <link href={`https://fonts.googleapis.com/css2?family=${teamNamesFont.replace(/\s+/g, '+')}:wght@400;700;900&display=swap`} rel="stylesheet" crossOrigin="anonymous" />
+      {playerNamesFont !== teamNamesFont && <link href={`https://fonts.googleapis.com/css2?family=${playerNamesFont.replace(/\s+/g, '+')}:wght@400;700;900&display=swap`} rel="stylesheet" crossOrigin="anonymous" />}
 
       {/* Header Bar */}
       <div className="p-4 border-b border-zinc-800 flex items-center justify-end bg-black shrink-0 z-10">
@@ -354,7 +410,7 @@ export default function TeamListGraphicBuilder({
            <div 
              ref={captureRef}
              className="w-full h-full absolute inset-0 bg-white flex flex-col relative"
-             style={{ backgroundColor: primaryColor, fontFamily: fontFamilyString }}
+             style={{ backgroundColor: primaryColor }}
            >
              {/* Background layers */}
              <div className="absolute inset-0 z-0 overflow-hidden">
@@ -386,7 +442,7 @@ export default function TeamListGraphicBuilder({
                        >
                          <span 
                            className={`bg-black/50 text-white rounded-3xl font-black tracking-wide leading-[1.7] box-decoration-clone ${orientation === 'portrait' ? 'px-8 py-4 text-4xl' : 'px-4 py-2 text-xl'}`}
-                           style={{ fontFamily: "'Inter', sans-serif", WebkitBoxDecorationBreak: 'clone' }}
+                           style={{ fontFamily: `'${teamNamesFont}', sans-serif`, WebkitBoxDecorationBreak: 'clone' }}
                          >
                            {imageCaption}
                          </span>
@@ -396,46 +452,46 @@ export default function TeamListGraphicBuilder({
                ) : (
                  <div className="w-full h-full border-l-[8px] border-white/20 flex flex-col items-center justify-center p-8 text-center text-white/30 backdrop-blur-sm" style={{ backgroundColor: primaryColor }}>
                    <i className={`fa-solid fa-image ${orientation === 'portrait' ? 'text-8xl mb-6' : 'text-5xl mb-4'}`}></i>
-                   <p className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xl'} font-black uppercase tracking-widest`}>No Hero<br/>Image Uploaded</p>
+                   <p className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xl'} font-black uppercase tracking-widest`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>No Hero<br/>Image Uploaded</p>
                  </div>
                )}
              </div>
 
              {/* Content Layer */}
-             <div className={`relative z-20 flex-1 flex flex-col ${orientation === 'portrait' ? 'px-12 pt-24' : 'px-8 pt-4'}`}>
+             <div className={`relative z-20 flex-1 flex flex-col ${orientation === 'portrait' ? 'px-12 pt-12' : 'px-8 pt-4'}`}>
                
                {/* Header - App-Style Versus Layout */}
                <div 
-                 className={`flex flex-col rounded-3xl relative z-30 ${orientation === 'portrait' ? 'mb-16 p-10' : 'mb-3 p-4'}`} 
+                 className={`flex flex-col rounded-3xl relative z-30 ${orientation === 'portrait' ? 'mb-8 p-6' : 'mb-3 p-4'}`} 
                  style={{ 
-                   backgroundColor: primaryColor, 
+                   backgroundColor: headerBgColor, 
                    border: '1px solid rgba(255,255,255,0.2)',
                    width: orientation === 'landscape' ? `${100 - heroWidthPercent}%` : 'auto'
                  }}
                >
-                 <div className={`flex items-center justify-between gap-8 ${orientation === 'portrait' ? 'mb-8' : 'mb-2'}`}>
+                 <div className={`flex items-center justify-between gap-8 ${orientation === 'portrait' ? 'mb-6' : 'mb-2'}`}>
                    
                    {/* Home Team */}
                    <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
-                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-40 h-40' : 'w-14 h-14'}`}>
-                        {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-7xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`}>{getInitials(team?.name)}</span>}
+                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
+                        {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(team?.name)}</span>}
                       </div>
-                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight text-white`} style={{ letterSpacing: `${letterSpacing}px` }}>
+                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
                         {team?.name}
                       </h1>
                     </div>
 
                     {/* VS */}
                     <div className="shrink-0 flex flex-col items-center">
-                      <span className={`font-black italic tracking-widest ${orientation === 'portrait' ? 'text-6xl mb-2' : 'text-2xl mb-0'}`} style={{ color: matchTextColor || secondaryColor, letterSpacing: `${letterSpacing}px` }}>VS</span>
+                      <span className={`font-black italic tracking-widest ${orientation === 'portrait' ? 'text-6xl mb-2' : 'text-2xl mb-0'}`} style={{ color: matchNotesColor, letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif` }}>VS</span>
                     </div>
 
                     {/* Away Team */}
                     <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
-                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-40 h-40' : 'w-14 h-14'}`}>
-                        {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-7xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`}>{getInitials(fixture?.opponent)}</span>}
+                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
+                        {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(fixture?.opponent)}</span>}
                       </div>
-                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight text-white`} style={{ letterSpacing: `${letterSpacing}px` }}>
+                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
                         {fixture?.opponent || 'TBA'}
                       </h1>
                    </div>
@@ -443,15 +499,15 @@ export default function TeamListGraphicBuilder({
                  </div>
 
                  {/* Match Details */}
-                 <div className={`flex flex-col items-center text-center ${orientation === 'portrait' ? 'gap-3 mt-4' : 'gap-0 mt-1'}`}>
-                   <div className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} font-black uppercase tracking-widest text-white/90`} style={{ letterSpacing: `${letterSpacing}px` }}>
+                 <div className={`flex flex-col items-center text-center ${orientation === 'portrait' ? 'gap-3 mt-4' : 'gap-0 mt-1'}`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>
+                   <div className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} font-black uppercase tracking-widest`} style={{ letterSpacing: `${letterSpacing}px`, color: matchDetailsColor }}>
                      {matchDateStr} @ {fixture?.start_time || 'TBA'}
                    </div>
-                   <div className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xs'} font-bold uppercase tracking-widest`} style={{ color: matchTextColor || secondaryColor, letterSpacing: `${letterSpacing}px` }}>
+                   <div className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xs'} font-bold uppercase tracking-widest`} style={{ color: matchNotesColor, letterSpacing: `${letterSpacing}px` }}>
                      <i className="fa-solid fa-location-dot mr-2"></i> {fixture?.location || 'Venue TBA'}
                    </div>
                    {(matchNotesOverride || fixture?.notes) && (
-                     <div className={`font-medium max-w-2xl italic ${orientation === 'portrait' ? 'text-3xl mt-4 px-6 py-2 rounded-full' : 'text-xs mt-1 px-3 py-1 rounded-full'}`} style={{ backgroundColor: matchNotesBg, color: matchTextColor || secondaryColor, letterSpacing: `${letterSpacing}px` }}>
+                     <div className={`font-medium max-w-2xl italic ${orientation === 'portrait' ? 'text-3xl mt-4 px-6 py-2 rounded-full' : 'text-xs mt-1 px-3 py-1 rounded-full'}`} style={{ backgroundColor: matchNotesBg, color: matchNotesColor, letterSpacing: `${letterSpacing}px` }}>
                        "{matchNotesOverride || fixture?.notes}"
                      </div>
                    )}
@@ -459,10 +515,10 @@ export default function TeamListGraphicBuilder({
                </div>
 
                {/* Players List */}
-               <div className={`text-white z-20 relative pr-4 ${orientation === 'portrait' ? 'flex flex-col gap-5 mt-8' : 'grid grid-cols-2 gap-x-6 gap-y-1 mt-2'}`} style={{ width: `${100 - heroWidthPercent}%` }}>
+               <div className={`z-20 relative pr-4 ${orientation === 'portrait' ? 'flex flex-col gap-4 mt-4' : 'columns-2 gap-x-8 mt-2'}`} style={{ width: `${100 - heroWidthPercent}%` }}>
                  {orderedPlayers.map((pid: string, idx: number) => (
-                   <div key={pid} className="font-black uppercase tracking-tight flex items-start gap-3 md:gap-6" style={{ fontSize: `${orientation === 'portrait' ? nameSize : Math.max(nameSize * 0.45, 12)}px`, letterSpacing: `${letterSpacing}px`, textShadow: '2px 2px 8px rgba(0,0,0,0.6)' }}>
-                     {showNumbers && <span className="opacity-50 min-w-[2.5ch] mt-[0.1em] shrink-0">{idx + 1}.</span>}
+                   <div key={pid} className={`font-black uppercase tracking-tight flex items-start gap-3 md:gap-6 break-inside-avoid ${orientation === 'portrait' ? '' : 'mb-1.5'}`} style={{ fontSize: `${orientation === 'portrait' ? nameSize : Math.max(nameSize * 0.45, 12)}px`, letterSpacing: `${letterSpacing}px`, textShadow: '2px 2px 8px rgba(0,0,0,0.6)', fontFamily: `'${playerNamesFont}', sans-serif`, color: playerNamesColor }}>
+                     {showNumbers && <span className="opacity-50 w-[2.5ch] text-right mt-[0.1em] shrink-0 inline-block">{idx + 1}.</span>}
                      <span className="leading-none break-words pt-[0.1em]">{formatPlayerName(pid)}</span>
                    </div>
                  ))}
@@ -474,15 +530,26 @@ export default function TeamListGraphicBuilder({
              <div 
                 className="absolute bottom-0 left-0 right-0 bg-white z-40 flex items-center justify-center shadow-[0_-20px_50px_rgba(0,0,0,0.3)] clip-footer" 
                 style={{ 
-                  height: hasSponsors ? (orientation === 'portrait' ? '280px' : '100px') : (orientation === 'portrait' ? '100px' : '40px'),
+                  height: hasSponsors ? (orientation === 'portrait' ? '180px' : '100px') : (orientation === 'portrait' ? '80px' : '40px'),
                   clipPath: orientation === 'portrait' ? 'polygon(0 15%, 100% 0, 100% 100%, 0% 100%)' : 'polygon(0 30%, 100% 0, 100% 100%, 0% 100%)' 
                 }}
               >
-               {hasSponsors && (
+                {hasSponsors && (
                  <div className={`absolute inset-0 flex items-center justify-center gap-8 md:gap-16 px-16 pb-2 ${orientation === 'portrait' ? 'pt-8' : 'pt-4'}`}>
-                   {sponsors.map(s => (
-                     <img key={s.index} src={s.logo} className="object-contain" style={{ maxHeight: `${(orientation === 'portrait' ? 128 : 48) * (sponsorScale / 100)}px` }} />
-                   ))}
+                   {orderedSponsors.map(s => {
+                     const style = sponsorStyles[s.index] || { scale: 100, x: 0, y: 0 };
+                     return (
+                       <img 
+                         key={s.index} 
+                         src={s.logo} 
+                         className="object-contain" 
+                         style={{ 
+                           maxHeight: `${(orientation === 'portrait' ? 96 : 48) * (sponsorScale / 100)}px`,
+                           transform: `translate(${style.x || 0}px, ${style.y || 0}px) scale(${(style.scale || 100) / 100})`
+                         }} 
+                       />
+                     );
+                   })}
                  </div>
                )}
                
@@ -492,6 +559,14 @@ export default function TeamListGraphicBuilder({
                </div>
              </div>
              
+             {planTier === 'free' && (
+               <div className="absolute inset-0 z-[100] pointer-events-none flex items-center justify-center overflow-hidden">
+                 <div className="w-[150%] py-12 bg-black/50 backdrop-blur-md -rotate-[35deg] flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] border-y border-white/20">
+                   <span className="text-white font-black uppercase tracking-[0.5em] text-6xl drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] opacity-90 whitespace-nowrap">PREVIEW ONLY</span>
+                 </div>
+               </div>
+             )}
+
            </div>
         </div>
       </div>
@@ -639,79 +714,83 @@ export default function TeamListGraphicBuilder({
               )}
             </div>
 
-            {/* Lineup Reorder */}
-            <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
-              <button 
-                onClick={() => setLineupOrderExpanded(!lineupOrderExpanded)}
-                className="w-full p-4 flex items-center justify-between text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:bg-zinc-900 transition-colors"
-              >
-                <span className="flex items-center gap-2"><i className="fa-solid fa-list-ol"></i> Lineup Order</span>
-                <i className={`fa-solid fa-chevron-down transition-transform ${lineupOrderExpanded ? 'rotate-180' : ''}`}></i>
-              </button>
-              
-              {lineupOrderExpanded && (
-                <div className="p-4 border-t border-zinc-800 space-y-1 bg-zinc-900/10">
-                  {orderedPlayers.map((pid, idx) => (
-                    <div key={pid} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-800/50">
-                      <div className="text-xs font-bold text-zinc-300 flex items-center gap-3 truncate">
-                        <span className="text-zinc-500 font-black w-4">{idx + 1}.</span>
-                        <span className="truncate">{formatPlayerName(pid)}</span>
+            {/* Lineup Reorder - hidden in club edit mode */}
+            {editMode !== 'club' && (
+              <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
+                <button 
+                  onClick={() => setLineupOrderExpanded(!lineupOrderExpanded)}
+                  className="w-full p-4 flex items-center justify-between text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:bg-zinc-900 transition-colors"
+                >
+                  <span className="flex items-center gap-2"><i className="fa-solid fa-list-ol"></i> Lineup Order</span>
+                  <i className={`fa-solid fa-chevron-down transition-transform ${lineupOrderExpanded ? 'rotate-180' : ''}`}></i>
+                </button>
+                
+                {lineupOrderExpanded && (
+                  <div className="p-4 border-t border-zinc-800 space-y-1 bg-zinc-900/10">
+                    {orderedPlayers.map((pid, idx) => (
+                      <div key={pid} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-800/50">
+                        <div className="text-xs font-bold text-zinc-300 flex items-center gap-3 truncate">
+                          <span className="text-zinc-500 font-black w-4">{idx + 1}.</span>
+                          <span className="truncate">{formatPlayerName(pid)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <select 
+                            value={idx + 1}
+                            onChange={(e) => {
+                              const newIdx = parseInt(e.target.value) - 1;
+                              const newOrdered = [...orderedPlayers];
+                              const [moved] = newOrdered.splice(idx, 1);
+                              newOrdered.splice(newIdx, 0, moved);
+                              setOrderedPlayers(newOrdered);
+                            }}
+                            className="bg-zinc-800 text-white text-xs font-bold rounded px-2 py-1 border border-zinc-700 outline-none cursor-pointer"
+                          >
+                            {orderedPlayers.map((_, i) => (
+                              <option key={i} value={i + 1}>{i + 1}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <select 
-                          value={idx + 1}
-                          onChange={(e) => {
-                            const newIdx = parseInt(e.target.value) - 1;
-                            const newOrdered = [...orderedPlayers];
-                            const [moved] = newOrdered.splice(idx, 1);
-                            newOrdered.splice(newIdx, 0, moved);
-                            setOrderedPlayers(newOrdered);
-                          }}
-                          className="bg-zinc-800 text-white text-xs font-bold rounded px-2 py-1 border border-zinc-700 outline-none cursor-pointer"
-                        >
-                          {orderedPlayers.map((_, i) => (
-                            <option key={i} value={i + 1}>{i + 1}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Fixture Overrides (Per-Game) */}
-            <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
-              <div className="p-4 flex flex-col gap-4">
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-500"><i className="fa-solid fa-gamepad"></i> Fixture Overrides</span>
-                
-                <div>
-                  <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Match Notes Override</label>
-                  <input type="text" value={matchNotesOverride} onChange={e => setMatchNotesOverride(e.target.value)} placeholder={fixture?.notes || 'No default notes'} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-bold text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
-                </div>
-                
-                <div>
-                  <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Notes Background Color</label>
-                  <div className="flex gap-2">
-                    <input type="color" value={matchNotesBg === 'transparent' ? '#000000' : matchNotesBg} onChange={e => setMatchNotesBg(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
-                    <button 
-                      onClick={() => setMatchNotesBg(matchNotesBg === 'transparent' ? 'rgba(0,0,0,0.5)' : 'transparent')}
-                      className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-[10px] font-black uppercase transition-colors"
-                    >
-                      {matchNotesBg === 'transparent' ? 'Add Background' : 'Remove Background'}
-                    </button>
+            {/* Fixture Overrides (Per-Game) - hidden in club edit mode */}
+            {editMode !== 'club' && (
+              <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
+                <div className="p-4 flex flex-col gap-4">
+                  <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-500"><i className="fa-solid fa-gamepad"></i> Fixture Overrides</span>
+                  
+                  <div>
+                    <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Match Notes Override</label>
+                    <input type="text" value={matchNotesOverride} onChange={e => setMatchNotesOverride(e.target.value)} placeholder={fixture?.notes || 'No default notes'} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-bold text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Notes Background Color</label>
+                    <div className="flex gap-2">
+                      <input type="color" value={matchNotesBg === 'transparent' ? '#000000' : matchNotesBg} onChange={e => setMatchNotesBg(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                      <button 
+                        onClick={() => setMatchNotesBg(matchNotesBg === 'transparent' ? 'rgba(0,0,0,0.5)' : 'transparent')}
+                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-[10px] font-black uppercase transition-colors"
+                      >
+                        {matchNotesBg === 'transparent' ? 'Add Background' : 'Remove Background'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Default Configuration Accordion */}
+            {/* Layout Configuration Accordion */}
             <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
               <button 
                 onClick={() => setAdvancedSettingsExpanded(!advancedSettingsExpanded)}
                 className="w-full p-4 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
               >
-                <span className="flex items-center gap-2"><i className="fa-solid fa-sliders"></i> Default Configuration</span>
+                <span className="flex items-center gap-2"><i className="fa-solid fa-sliders"></i> {editMode === 'club' ? 'Global Branding Defaults' : 'Layout Configuration'}</span>
                 <i className={`fa-solid fa-chevron-down transition-transform ${advancedSettingsExpanded ? 'rotate-180' : ''}`}></i>
               </button>
               
@@ -736,46 +815,154 @@ export default function TeamListGraphicBuilder({
                       </div>
                   </div>
 
-                  {/* Colors */}
-                  <div className="space-y-3">
-                     <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Theme Colors</h3>
-                     <div className="flex flex-col gap-3">
-                       <div>
-                         <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Primary</label>
-                         <div className="flex gap-2">
-                           <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
-                           <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
+                  {/* Edit Mode: Club - Colors and Fonts */}
+                  {editMode === 'club' && (
+                    <>
+                      <div className="space-y-3 pt-4 border-t border-zinc-800">
+                         <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Theme Colors</h3>
+                         <div className="flex flex-col gap-3">
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Primary</label>
+                             <div className="flex gap-2">
+                               <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                               <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
+                             </div>
+                           </div>
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Secondary</label>
+                             <div className="flex gap-2">
+                               <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                               <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
+                             </div>
+                           </div>
                          </div>
-                       </div>
-                       <div>
-                         <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Secondary</label>
-                         <div className="flex gap-2">
-                           <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
-                           <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
-                         </div>
-                       </div>
-                     </div>
-                  </div>
+                      </div>
 
-                  {/* Font Selection */}
-                  <div className="space-y-3">
-                     <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Typography Search</h3>
-                     <div className="relative">
-                       <input 
-                         type="text"
-                         list="google-fonts-list"
-                         value={selectedFont} 
-                         onChange={e => setSelectedFont(e.target.value)}
-                         placeholder="Type a Google Font..."
-                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs font-bold outline-none text-zinc-100"
-                       />
-                       <datalist id="google-fonts-list">
+                      <div className="space-y-3 pt-4 border-t border-zinc-800">
+                         <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Header & Match Details</h3>
+                         <div>
+                           <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Header Background Override (Optional)</label>
+                           <div className="flex gap-2">
+                             <input type="color" value={headerBgColor || primaryColor} onChange={e => setHeaderBgColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                             <button onClick={() => setHeaderBgColor("")} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-[10px] font-black uppercase transition-colors">Reset Default</button>
+                           </div>
+                         </div>
+                         <div className="grid grid-cols-2 gap-3">
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Team Names Font</label>
+                             <input type="text" list="google-fonts-list" value={teamNamesFont} onChange={e => setTeamNamesFont(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs font-bold outline-none text-zinc-100" />
+                           </div>
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Team Text Color</label>
+                             <div className="flex gap-2">
+                               <input type="color" value={teamNamesColor} onChange={e => setTeamNamesColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                               <input type="text" value={teamNamesColor} onChange={e => setTeamNamesColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 text-[10px] font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500" />
+                             </div>
+                           </div>
+                         </div>
+                         <div className="grid grid-cols-2 gap-3">
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Date & Location</label>
+                             <div className="flex gap-2">
+                               <input type="color" value={matchDetailsColor} onChange={e => setMatchDetailsColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                               <input type="text" value={matchDetailsColor} onChange={e => setMatchDetailsColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 text-[10px] font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500" />
+                             </div>
+                           </div>
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">VS & Notes Color</label>
+                             <div className="flex gap-2">
+                               <input type="color" value={matchNotesColor || secondaryColor} onChange={e => setMatchNotesColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                               <input type="text" value={matchNotesColor || secondaryColor} onChange={e => setMatchNotesColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 text-[10px] font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500" />
+                             </div>
+                           </div>
+                         </div>
+                      </div>
+
+                      <div className="space-y-3 pt-4 border-t border-zinc-800">
+                         <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Player List Fonts</h3>
+                         <div className="grid grid-cols-2 gap-3">
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Player Font</label>
+                             <input type="text" list="google-fonts-list" value={playerNamesFont} onChange={e => setPlayerNamesFont(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs font-bold outline-none text-zinc-100" />
+                           </div>
+                           <div>
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Player Text Color</label>
+                             <div className="flex gap-2">
+                               <input type="color" value={playerNamesColor} onChange={e => setPlayerNamesColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
+                               <input type="text" value={playerNamesColor} onChange={e => setPlayerNamesColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2 text-[10px] font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500" />
+                             </div>
+                           </div>
+                         </div>
+                      </div>
+
+                      <datalist id="google-fonts-list">
                          {COMMON_GOOGLE_FONTS.map(font => (
                            <option key={font} value={font} />
                          ))}
-                       </datalist>
-                     </div>
-                  </div>
+                      </datalist>
+
+                      <div className="space-y-3 pt-4 border-t border-zinc-800">
+                         <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Sponsor Logos</h3>
+                         <div>
+                           <label className="text-[9px] font-bold text-zinc-600 uppercase mb-2 flex justify-between">
+                             <span>Global Logo Scale</span>
+                             <span>{sponsorScale}%</span>
+                           </label>
+                           <input type="range" min="30" max="150" value={sponsorScale} onChange={e => setSponsorScale(parseInt(e.target.value))} className="w-full accent-emerald-500" />
+                         </div>
+
+                         {orderedSponsors.length > 0 && (
+                           <div className="mt-4 space-y-4 border-t border-zinc-800/50 pt-4">
+                             <label className="text-[9px] font-bold text-zinc-600 uppercase mb-2 block">Individual Adjustments</label>
+                             {orderedSponsors.map(s => {
+                               const style = sponsorStyles[s.index] || { scale: 100, x: 0, y: 0 };
+                               return (
+                                 <div key={s.index} className="bg-zinc-950/50 p-3 rounded-lg border border-zinc-800/80">
+                                   <div className="flex items-center gap-3 mb-3">
+                                     <div className="flex flex-col gap-1 mr-1">
+                                       <button onClick={() => handleMoveSponsor(s.index, -1)} disabled={orderedSponsors.indexOf(s) === 0} className="w-5 h-5 rounded bg-zinc-900 text-zinc-400 hover:text-white flex items-center justify-center disabled:opacity-30">
+                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+                                       </button>
+                                       <button onClick={() => handleMoveSponsor(s.index, 1)} disabled={orderedSponsors.indexOf(s) === orderedSponsors.length - 1} className="w-5 h-5 rounded bg-zinc-900 text-zinc-400 hover:text-white flex items-center justify-center disabled:opacity-30">
+                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                                       </button>
+                                     </div>
+                                     <div className="w-8 h-8 rounded bg-white flex items-center justify-center p-1 overflow-hidden shrink-0">
+                                       <img src={s.logo} className="max-w-full max-h-full object-contain" />
+                                     </div>
+                                     <span className="text-[10px] font-bold text-zinc-300 truncate flex-1">Sponsor {orderedSponsors.indexOf(s) + 1}</span>
+                                     <button onClick={() => setSponsorStyles(prev => ({ ...prev, [s.index]: { scale: 100, x: 0, y: 0 } }))} className="text-[9px] text-zinc-500 hover:text-white uppercase tracking-wider bg-zinc-900 px-2 py-1 rounded">Reset</button>
+                                   </div>
+                                   <div className="space-y-3">
+                                     <div>
+                                       <div className="flex justify-between text-[8px] font-bold text-zinc-500 uppercase mb-1">
+                                         <span>Scale</span><span>{style.scale || 100}%</span>
+                                       </div>
+                                       <input type="range" min="50" max="250" value={style.scale || 100} onChange={e => setSponsorStyles(prev => ({ ...prev, [s.index]: { ...style, scale: parseInt(e.target.value) } }))} className="w-full accent-emerald-500" />
+                                     </div>
+                                     <div className="grid grid-cols-2 gap-3">
+                                       <div>
+                                         <div className="flex justify-between text-[8px] font-bold text-zinc-500 uppercase mb-1">
+                                           <span>X Offset</span><span>{style.x || 0}px</span>
+                                         </div>
+                                         <input type="range" min="-100" max="100" value={style.x || 0} onChange={e => setSponsorStyles(prev => ({ ...prev, [s.index]: { ...style, x: parseInt(e.target.value) } }))} className="w-full accent-emerald-500" />
+                                       </div>
+                                       <div>
+                                         <div className="flex justify-between text-[8px] font-bold text-zinc-500 uppercase mb-1">
+                                           <span>Y Offset</span><span>{style.y || 0}px</span>
+                                         </div>
+                                         <input type="range" min="-100" max="100" value={style.y || 0} onChange={e => setSponsorStyles(prev => ({ ...prev, [s.index]: { ...style, y: parseInt(e.target.value) } }))} className="w-full accent-emerald-500" />
+                                       </div>
+                                     </div>
+                                   </div>
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         )}
+                      </div>
+                    </>
+                  )}
 
                   {/* Player Names Configuration */}
                   <div className="space-y-4">
@@ -812,31 +999,7 @@ export default function TeamListGraphicBuilder({
                      </div>
                   </div>
 
-                  {/* Match Text Colors */}
-                  <div className="space-y-3">
-                     <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Match Text Color</h3>
-                     <div>
-                       <label className="text-[9px] font-bold text-zinc-600 uppercase mb-1 block">Color Override</label>
-                       <div className="flex gap-2">
-                         <input type="color" value={matchTextColor || secondaryColor} onChange={e => setMatchTextColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0 shrink-0 bg-transparent" />
-                         <input type="text" value={matchTextColor || secondaryColor} onChange={e => setMatchTextColor(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono uppercase text-zinc-100 outline-none focus:border-emerald-500 transition-colors" />
-                       </div>
-                     </div>
-                  </div>
 
-                  {/* Sponsor Logos */}
-                  {hasSponsors && (
-                    <div className="space-y-4">
-                       <h3 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Sponsor Logos</h3>
-                       <div>
-                         <label className="text-[9px] font-bold text-zinc-600 uppercase mb-2 flex justify-between">
-                           <span>Logo Scale</span>
-                           <span>{sponsorScale}%</span>
-                         </label>
-                         <input type="range" min="30" max="150" value={sponsorScale} onChange={e => setSponsorScale(parseInt(e.target.value))} className="w-full accent-emerald-500" />
-                       </div>
-                    </div>
-                  )}
 
                   {/* Save Settings */}
                   <div className="pt-4 border-t border-zinc-800 mt-6">
@@ -856,7 +1019,14 @@ export default function TeamListGraphicBuilder({
 
           {/* Generate Button Footer */}
           <div className="p-4 border-t border-zinc-800 bg-[#111]">
-            {planTier === 'free' ? (
+            {editMode === 'club' ? (
+               <button 
+                 onClick={onClose}
+                 className="w-full py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-black/20 flex items-center justify-center gap-2 transition-transform active:scale-95"
+               >
+                 Close Editor
+               </button>
+            ) : planTier === 'free' ? (
               <button 
                 onClick={() => window.dispatchEvent(new CustomEvent('navigate-setup', { detail: 'billing' }))}
                 className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-amber-900 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -872,7 +1042,7 @@ export default function TeamListGraphicBuilder({
                 >
                   {isGenerating ? <><i className="fa-solid fa-spinner fa-spin"></i></> : <><i className="fa-solid fa-download"></i> Download</>}
                 </button>
-                {typeof navigator !== 'undefined' && navigator.share && (
+                {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
                   <button 
                     onClick={shareImage}
                     disabled={isGenerating}
