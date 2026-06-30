@@ -519,6 +519,7 @@ export default function Setup({ activeTab }: SetupProps) {
                 });
               } else {
                 upserts.push({
+                  id: crypto.randomUUID(),
                   team_id: t.id,
                   name: sponsorState.name,
                   logo_url: sponsorState.logo_url,
