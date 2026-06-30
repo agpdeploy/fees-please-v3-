@@ -56,7 +56,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
         const [clubResArr, teamCountRes, playerRes, sponsorsRes] = await Promise.all([
           supabase.from('clubs').select('announcement').eq('id', clubId).limit(1),
           supabase.from('teams').select('id', { count: 'exact', head: true }).eq('club_id', clubId),
-          supabase.from("players").select("id, user_id, first_name, last_name, nickname, default_team_id").eq("club_id", clubId).order("first_name"),
+          supabase.from("players").select("id, user_id, first_name, last_name, nickname, default_team_id, is_active").eq("club_id", clubId).order("first_name"),
           supabase.from("team_sponsors").select("*").eq("team_id", teamId).eq("is_active", true)
         ]);
 
@@ -68,9 +68,10 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
         if (clubRes.data?.announcement) setClubAnnouncement(clubRes.data.announcement);
         setHasMultipleTeams((teamCountRes.count || 0) > 1);
         if (playerRes.data) {
-          setAllClubPlayers(playerRes.data);
+          const activePlayers = playerRes.data.filter((p: any) => p.is_active !== false);
+          setAllClubPlayers(activePlayers);
           if (initialPlayerId) {
-            const player = playerRes.data.find((p: any) => p.user_id === initialPlayerId || p.id === initialPlayerId);
+            const player = activePlayers.find((p: any) => p.user_id === initialPlayerId || p.id === initialPlayerId);
             if (player) setSelectedPlayer(player);
           }
         }

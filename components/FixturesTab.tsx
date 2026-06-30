@@ -325,7 +325,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
             onClick={() => setIsBulkMode(true)}
             className={`flex-1 py-3 text-[10px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
           >
-            <i className="fa-solid fa-wand-magic-sparkles"></i> dAIve UPLOAD
+            <i className="fa-solid fa-wand-magic-sparkles"></i> SMART UPLOAD
           </button>
           <button
             onClick={() => {
@@ -372,7 +372,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
                     <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
                       <i className="fa-solid fa-wand-magic-sparkles text-3xl text-emerald-600 dark:text-emerald-500"></i>
                     </div>
-                    <h3 className="font-black tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-1">GIVE IT TO dAIve</h3>
+                    <h3 className="font-black tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-1">USE SMART UPLOAD</h3>
                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Upload Master Draw (PDF/IMG/CSV)</p>
                   </div>
                 ) : (

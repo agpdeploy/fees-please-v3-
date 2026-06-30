@@ -308,7 +308,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
               onClick={() => setIsBulkMode(true)}
               className={`flex-1 py-3 text-[10px] font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${isBulkMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
             >
-              <i className="fa-solid fa-wand-magic-sparkles"></i> dAIve UPLOAD
+              <i className="fa-solid fa-wand-magic-sparkles"></i> SMART UPLOAD
             </button>
             <button
               onClick={() => {
@@ -360,7 +360,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
                   <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
                     <i className="fa-solid fa-wand-magic-sparkles text-3xl text-emerald-600 dark:text-emerald-500"></i>
                   </div>
-                  <h3 className="font-black tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-1">GIVE IT TO dAIve</h3>
+                  <h3 className="font-black tracking-widest text-sm text-emerald-800 dark:text-emerald-400 mb-1">USE SMART UPLOAD</h3>
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Upload Roster (PDF/IMG/CSV)</p>
                 </div>
               )}
@@ -481,6 +481,7 @@ function PlayerRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   
   const [editForm, setEditForm] = useState({
     default_team_id: player.default_team_id || (teams.length === 1 ? teams[0].id : ""),
@@ -566,6 +567,7 @@ function PlayerRow({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       showToast("Invite sent successfully!");
+      setIsInviteModalOpen(false);
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {
@@ -625,69 +627,92 @@ function PlayerRow({
   const hasClubAdmin = userRoles.some(r => r.role === 'club_admin');
   const hasTeamAdmin = userRoles.some(r => r.role === 'team_admin');
 
-  return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl flex justify-between items-center group shadow-sm transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
-      <div>
-        <div className="font-bold text-zinc-900 dark:text-white text-sm uppercase tracking-wide flex flex-wrap items-center gap-2">
-          <span>{player.first_name} {player.last_name}</span>
-          {player.nickname && <span className="text-zinc-400 dark:text-zinc-500 text-xs italic font-normal normal-case">"{player.nickname}"</span>}
-          
-          {/* RENDER MANAGER BADGES */}
-          {hasClubAdmin && (
-            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
-              Account Admin
-            </span>
-          )}
-          {!hasClubAdmin && hasTeamAdmin && (
-            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-              Team Admin
-            </span>
-          )}
-          
-          {player.unsubscribed && (
-            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
-              Unsubscribed
-            </span>
-          )}
-          {player.is_active === false && (
-            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-              Deactivated
-            </span>
-          )}
-        </div>
-        
-        {/* NEW: ADDED EMAIL DISPLAY FOR THE LIST VIEW */}
-        {player.email && (
-          <div className="text-[10px] text-zinc-500 mt-0.5 lowercase font-bold">
-            {player.email}
+    <div className={`bg-white dark:bg-zinc-900 border ${player.is_active === false ? 'border-zinc-200/50 dark:border-zinc-800/50 border-dashed opacity-60 grayscale' : 'border-zinc-200 dark:border-zinc-800'} rounded-xl shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700`}>
+      <div className="flex flex-col gap-2 p-4">
+        <div className="flex items-start justify-between w-full">
+          {/* Left Side: Info */}
+          <div className="flex flex-col flex-1 min-w-0 pr-4">
+            <div className="font-bold text-zinc-900 dark:text-white text-sm uppercase tracking-wide flex flex-wrap items-center gap-2 break-words">
+              <span>{player.first_name} {player.last_name}</span>
+              {player.nickname && <span className="text-zinc-400 dark:text-zinc-500 text-xs italic font-normal normal-case break-words">"{player.nickname}"</span>}
+              
+              {hasClubAdmin && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+                  Account Admin
+                </span>
+              )}
+              {!hasClubAdmin && hasTeamAdmin && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                  Team Admin
+                </span>
+              )}
+              
+              {player.unsubscribed && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                  Unsubscribed
+                </span>
+              )}
+              {player.is_active === false && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                  Deactivated
+                </span>
+              )}
+            </div>
+            
+            {player.email && (
+              <div className="text-[10px] text-zinc-500 mt-1 lowercase font-bold break-all">
+                {player.email}
+              </div>
+            )}
+            
+            <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex items-center gap-2">
+              <span className={player.is_member ? 'text-emerald-600 dark:text-emerald-500' : 'text-zinc-400 dark:text-zinc-500'}>
+                {player.is_member ? 'Member' : 'Casual'}
+              </span>
+            </div>
+            
+            {player.email && (
+              <div className="mt-3">
+                <button onClick={() => setIsInviteModalOpen(true)} disabled={isSaving} className="px-4 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors shadow-sm whitespace-nowrap">
+                  Invite to player portal
+                </button>
+              </div>
+            )}
           </div>
-        )}
-        
-        <div className="text-[9px] font-black uppercase tracking-widest mt-1 text-zinc-500 flex items-center gap-2">
-          <span className={!teamExists ? "text-amber-500 dark:text-amber-600" : ""}>{currentTeamName}</span>
-          <span className="text-zinc-300 dark:text-zinc-700">•</span>
-          <span className={player.is_member ? 'text-emerald-600 dark:text-emerald-500' : 'text-zinc-400 dark:text-zinc-500'}>
-            {player.is_member ? 'Member' : 'Casual'}
-          </span>
+          
+          {/* Right Side: Action Icons */}
+          <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+            {player.unsubscribed && (
+              <button onClick={handleResubscribe} disabled={isSaving} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-emerald-500 hover:text-emerald-600 transition-colors flex items-center justify-center shadow-sm" title="Resubscribe"><i className="fa-solid fa-envelope-circle-check text-[10px]"></i></button>
+            )}
+            <button onClick={handleToggleActive} disabled={isSaving} className={`w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 ${player.is_active === false ? 'text-zinc-500 hover:text-emerald-500' : 'text-zinc-500 hover:text-amber-500'} dark:text-zinc-400 transition-colors flex items-center justify-center`} title={player.is_active === false ? "Reactivate Player" : "Deactivate Player"}>
+              <i className={`fa-solid ${player.is_active === false ? 'fa-rotate-left' : 'fa-power-off'} text-[10px]`}></i>
+            </button>
+            <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center" title="Edit Player"><i className="fa-solid fa-pen text-[10px]"></i></button>
+            {isSuperAdmin && (
+              <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center" title="Delete Player"><i className="fa-solid fa-trash text-[10px]"></i></button>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex gap-2 shrink-0 ml-4 items-center">
-        {player.email && (
-          <button onClick={handleInvitePlayer} disabled={isSaving} className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors flex items-center justify-center shadow-sm" title="Send App Invite">
-            <i className="fa-solid fa-paper-plane text-xs"></i>
-          </button>
-        )}
-        {player.unsubscribed && (
-          <button onClick={handleResubscribe} disabled={isSaving} className="px-3 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors shadow-sm whitespace-nowrap">Resubscribe</button>
-        )}
-        <button onClick={handleToggleActive} disabled={isSaving} className={`px-3 h-8 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm whitespace-nowrap ${player.is_active === false ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/30'}`}>
-          {player.is_active === false ? 'Reactivate' : 'Deactivate'}
-        </button>
-        <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-pen text-xs"></i></button>
-        {isSuperAdmin && (
-          <button onClick={handleDelete} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors flex items-center justify-center shadow-sm"><i className="fa-solid fa-trash text-xs"></i></button>
-        )}
-      </div>
+
+      {/* Invite Modal */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
+            <h3 className="font-black text-lg mb-2 uppercase tracking-wide">Invite to Player Portal</h3>
+            <p className="text-sm text-zinc-500 mb-6 font-medium">
+              An email will be sent to <strong>{player.email}</strong>. The player can then log into the platform to view their transaction history and manage their availability.
+            </p>
+            <div className="flex gap-3 justify-end mt-2">
+              <button onClick={() => setIsInviteModalOpen(false)} className="px-5 py-2.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-xs font-black uppercase tracking-widest transition-colors">Cancel</button>
+              <button onClick={handleInvitePlayer} disabled={isSaving} className="px-5 py-2.5 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors shadow-md disabled:opacity-50">
+                {isSaving ? "Sending..." : "Confirm & Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
