@@ -497,6 +497,42 @@ export default function Setup({ activeTab }: SetupProps) {
         }));
         const { error: storeError } = await supabase.from('public_team_profiles').upsert(storefrontPayload);
         if (storeError) console.error("Storefront Sync Error:", storeError);
+
+        // SYNC SPONSORS ACROSS ALL TEAMS
+        const { data: allCurrentSponsors } = await supabase.from('team_sponsors').select('*').in('team_id', clubTeams.map(t => t.id)).order('created_at', { ascending: true });
+        
+        if (allCurrentSponsors) {
+          const upserts: any[] = [];
+          for (const t of clubTeams) {
+            const teamCurrentSponsors = allCurrentSponsors.filter(s => s.team_id === t.id);
+            
+            sponsors.forEach((sponsorState, index) => {
+              const correspondingTeamSponsor = teamCurrentSponsors[index];
+              if (correspondingTeamSponsor) {
+                upserts.push({
+                  id: correspondingTeamSponsor.id,
+                  team_id: t.id,
+                  name: sponsorState.name,
+                  logo_url: sponsorState.logo_url,
+                  url: sponsorState.url,
+                  is_active: sponsorState.is_active
+                });
+              } else {
+                upserts.push({
+                  team_id: t.id,
+                  name: sponsorState.name,
+                  logo_url: sponsorState.logo_url,
+                  url: sponsorState.url,
+                  is_active: sponsorState.is_active
+                });
+              }
+            });
+          }
+          if (upserts.length > 0) {
+             const { error: sponsorSyncError } = await supabase.from('team_sponsors').upsert(upserts);
+             if (sponsorSyncError) console.error("Sponsor sync error:", sponsorSyncError);
+          }
+        }
       }
       
       showToast("Settings saved successfully!");
