@@ -63,7 +63,7 @@ export default function Setup({ activeTab }: SetupProps) {
   
   // SPONSOR STATE
   const [sponsors, setSponsors] = useState<any[]>([]);
-  const [sponsorStats, setSponsorStats] = useState<{ impressions: number, clicks: number, ctr: number, details?: Record<string, { imp: number, clk: number, name: string }> }>({ impressions: 0, clicks: 0, ctr: 0 });
+  const [sponsorStats, setSponsorStats] = useState<{ impressions: number, clicks: number, ctr: number, details?: Record<string, { imp: number, clk: number, hubImp: number, emailImp: number, name: string }> }>({ impressions: 0, clicks: 0, ctr: 0 });
   const [isUploadingSponsor, setIsUploadingSponsor] = useState(false);
 
   const [seasonName, setSeasonName] = useState("");
@@ -263,11 +263,11 @@ export default function Setup({ activeTab }: SetupProps) {
     }
 
     const teamIds = teamData?.map(t => t.id) || [];
-    const { data: sponsorAnalytics, error: sponsorError } = await supabase.from("sponsor_analytics").select("event_type, sponsor_index, sponsor_id").in("team_id", teamIds);
+    const { data: sponsorAnalytics, error: sponsorError } = await supabase.from("sponsor_analytics").select("event_type, sponsor_index, sponsor_id, source").in("team_id", teamIds);
     if (sponsorError) console.error("Sponsor Stats Error:", sponsorError);
 
     let imp = 0, clk = 0;
-    let details: Record<string, { imp: number, clk: number }> = {};
+    let details: Record<string, { imp: number, clk: number, hubImp: number, emailImp: number, name: string }> = {};
     
     // Create a map to group analytics by sponsor name across all teams
     const sponsorNameMap: Record<string, string> = {};
@@ -291,11 +291,13 @@ export default function Setup({ activeTab }: SetupProps) {
         let sKey = s.sponsor_id ? (sponsorNameMap[s.sponsor_id] || s.sponsor_id) : s.sponsor_index?.toString();
         if (!sKey) return;
         
-        if (!details[sKey]) details[sKey] = { imp: 0, clk: 0 };
+        if (!details[sKey]) details[sKey] = { imp: 0, clk: 0, hubImp: 0, emailImp: 0, name: s.name || sKey };
         
         if (s.event_type === 'impression') {
           imp++;
           details[sKey].imp++;
+          if (s.source === 'hub') details[sKey].hubImp++;
+          else if (s.source === 'email') details[sKey].emailImp++;
         }
         if (s.event_type === 'click') {
           clk++;
@@ -1205,7 +1207,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     let totalImp = 0;
                     let totalClk = 0;
                     activeSponsors.forEach(s => {
-                      const stat = sponsorStats.details?.[s.name] || sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
+                      const stat = sponsorStats.details?.[s.name] || sponsorStats.details?.[s.id] || { imp: 0, clk: 0, hubImp: 0, emailImp: 0, name: s.name };
                       totalImp += stat.imp;
                       totalClk += stat.clk;
                     });
@@ -1230,12 +1232,15 @@ export default function Setup({ activeTab }: SetupProps) {
                           <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
                             <div className="space-y-2">
                               {activeSponsors.map((s: any, i: number) => {
-                                const stat = sponsorStats.details?.[s.name] || sponsorStats.details?.[s.id] || { imp: 0, clk: 0 };
+                                const stat = sponsorStats.details?.[s.name] || sponsorStats.details?.[s.id] || { imp: 0, clk: 0, hubImp: 0, emailImp: 0, name: s.name };
                                 const itemCtr = stat.imp > 0 ? (stat.clk / stat.imp) * 100 : 0;
                                 return (stat.imp > 0 || stat.clk > 0) ? (
-                                <div key={i} className="flex justify-between items-center text-xs">
-                                  <span className="font-bold text-zinc-700 dark:text-zinc-300 truncate pr-2">{s.name || 'Unnamed Sponsor'}</span>
-                                  <div className="flex gap-4 shrink-0 text-zinc-500">
+                                <div key={i} className="flex justify-between items-center text-xs py-1">
+                                  <div className="flex flex-col pr-2">
+                                    <span className="font-bold text-zinc-700 dark:text-zinc-300 truncate">{s.name || 'Unnamed Sponsor'}</span>
+                                    <span className="text-[9px] font-bold text-zinc-400 mt-0.5">{stat.hubImp || 0} Hub • {stat.emailImp || 0} Email</span>
+                                  </div>
+                                  <div className="flex gap-4 shrink-0 text-zinc-500 items-center">
                                     <span className="w-14 text-right"><i className="fa-regular fa-eye mr-1"></i>{stat.imp}</span>
                                     <span className="w-14 text-right"><i className="fa-solid fa-arrow-pointer mr-1"></i>{stat.clk}</span>
                                     <span className="w-14 text-right font-bold text-zinc-600 dark:text-zinc-400">{itemCtr.toFixed(1)}%</span>
