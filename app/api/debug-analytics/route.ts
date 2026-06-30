@@ -5,16 +5,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const clubId = searchParams.get('clubId');
 
-  if (!clubId) {
-    return NextResponse.json({ error: 'Missing clubId' }, { status: 400 });
-  }
-
   const serviceClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   try {
+    if (!clubId) {
+      const { data: allClubs } = await serviceClient.from('clubs').select('id, name');
+      return NextResponse.json({ message: "Please provide a clubId. Here are all clubs on this database:", clubs: allClubs });
+    }
+
     const { data: serviceTeams, error: serviceTeamsErr } = await serviceClient.from('teams').select('id, name').eq('club_id', clubId);
     const teamIds = serviceTeams?.map(t => t.id) || [];
 
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     const { data: teamSponsors, error: teamSponsorsErr } = await serviceClient.from('team_sponsors').select('*').in('team_id', teamIds);
 
     return NextResponse.json({
+      club_id_searched: clubId,
       service_teams: serviceTeams?.length,
       service_teams_error: serviceTeamsErr,
       team_ids: teamIds,
