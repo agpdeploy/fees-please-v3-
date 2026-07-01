@@ -155,11 +155,39 @@ export default function TeamListGraphicBuilder({
         if (adv.letterSpacing !== undefined) setLetterSpacing(adv.letterSpacing);
       } catch (e) {}
     }
+    const savedStyles = localStorage.getItem(`graphic_builder_styles_${clubId || team?.id}`);
+    if (savedStyles) {
+      try {
+        const sty = JSON.parse(savedStyles);
+        if (sty.primaryColor) setPrimaryColor(sty.primaryColor);
+        if (sty.secondaryColor) setSecondaryColor(sty.secondaryColor);
+        if (sty.headerBgColor) setHeaderBgColor(sty.headerBgColor);
+        if (sty.teamNamesFont) setTeamNamesFont(sty.teamNamesFont);
+        if (sty.teamNamesColor) setTeamNamesColor(sty.teamNamesColor);
+        if (sty.playerNamesFont) setPlayerNamesFont(sty.playerNamesFont);
+        if (sty.playerNamesColor) setPlayerNamesColor(sty.playerNamesColor);
+        if (sty.matchDetailsColor) setMatchDetailsColor(sty.matchDetailsColor);
+        if (sty.matchNotesColor) setMatchNotesColor(sty.matchNotesColor);
+        if (sty.sponsorScale !== undefined) setSponsorScale(sty.sponsorScale);
+        if (sty.sponsorStyles) setSponsorStyles(sty.sponsorStyles);
+        if (sty.sponsorOrder) setSponsorOrder(sty.sponsorOrder);
+      } catch (e) {}
+    }
+
     const savedFixture = localStorage.getItem(`graphic_builder_fixture_${fixture?.id}`);
     if (savedFixture) {
       try {
         const fix = JSON.parse(savedFixture);
-        if (fix.orderedPlayers && fix.orderedPlayers.length > 0) setOrderedPlayers(fix.orderedPlayers);
+        if (fix.orderedPlayers && fix.orderedPlayers.length > 0) {
+           const currentSquad = fixture?.lists?.squadIds || [];
+           if (currentSquad.length > 0) {
+             const validCached = fix.orderedPlayers.filter((id: string) => currentSquad.includes(id));
+             const newPlayers = currentSquad.filter((id: string) => !validCached.includes(id));
+             setOrderedPlayers([...validCached, ...newPlayers]);
+           } else {
+             setOrderedPlayers(fix.orderedPlayers);
+           }
+        }
         if (fix.heroWidthPercent) setHeroWidthPercent(fix.heroWidthPercent);
         if (fix.imageFit) setImageFit(fix.imageFit);
         if (fix.imageZoom) setImageZoom(fix.imageZoom);
@@ -181,6 +209,24 @@ export default function TeamListGraphicBuilder({
       nameFormat, showNumbers, nameSize, orientation, letterSpacing
     }));
   }, [isOpen, mounted, team?.id, nameFormat, showNumbers, nameSize, orientation, letterSpacing]);
+
+  useEffect(() => {
+    if (!isOpen || !mounted) return;
+    const styles = {
+      primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor,
+      playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder
+    };
+    localStorage.setItem(`graphic_builder_styles_${clubId || team?.id}`, JSON.stringify(styles));
+    
+    if (editMode === 'club' && clubId) {
+      const timeout = setTimeout(async () => {
+        const updatedSettings = { ...(clubSettings || {}), graphic_defaults: styles };
+        await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
+        if (onSaveClubSettings) onSaveClubSettings(updatedSettings);
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isOpen, mounted, clubId, team?.id, editMode, primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor, playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder, clubSettings]);
 
   useEffect(() => {
     if (!isOpen || !mounted) return;
@@ -223,7 +269,6 @@ export default function TeamListGraphicBuilder({
       const updatedSettings = { ...(clubSettings || {}), graphic_defaults: newDefaults };
       await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
       if (onSaveClubSettings) onSaveClubSettings(updatedSettings);
-      alert('Global Branding Defaults Saved!');
       return;
     }
 
@@ -1007,9 +1052,9 @@ export default function TeamListGraphicBuilder({
                       onClick={saveSettings}
                       className="w-full py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-bold uppercase tracking-widest text-[10px] transition-colors flex items-center justify-center gap-2"
                     >
-                      <i className="fa-solid fa-floppy-disk"></i> Save Configuration
+                      <i className="fa-solid fa-floppy-disk"></i> Force Save Now
                     </button>
-                    <p className="text-[8px] text-zinc-500 text-center mt-2">Saves layout and styles for future use</p>
+                    <p className="text-[8px] text-zinc-500 text-center mt-2">Changes are auto-saved as you edit</p>
                   </div>
                 </div>
               )}
