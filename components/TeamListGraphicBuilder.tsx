@@ -209,6 +209,9 @@ export default function TeamListGraphicBuilder({
     }));
   }, [isOpen, mounted, team?.id, nameFormat, showNumbers, nameSize, orientation, letterSpacing]);
 
+  const clubSettingsRef = useRef(clubSettings);
+  useEffect(() => { clubSettingsRef.current = clubSettings; }, [clubSettings]);
+
   useEffect(() => {
     if (!isOpen || !mounted) return;
     const styles = {
@@ -220,8 +223,6 @@ export default function TeamListGraphicBuilder({
     } catch (e) {
       console.warn("Could not save styles to localStorage.");
     }
-    const clubSettingsRef = useRef(clubSettings);
-    useEffect(() => { clubSettingsRef.current = clubSettings; }, [clubSettings]);
     
     if (editMode === 'club' && clubId) {
       const timeout = setTimeout(async () => {
