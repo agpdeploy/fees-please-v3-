@@ -117,16 +117,15 @@ export default function TeamListGraphicBuilder({
 
     const loadSponsorsAndClub = async () => {
       if (editMode === 'club' && clubId) {
-        // Since club sponsors are synced across all team_sponsors, we just get them for the first team in the club
         const { data: teamData } = await supabase.from('teams').select('id').eq('club_id', clubId).limit(1).single();
         if (teamData?.id) {
           const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', teamData.id).eq('is_active', true);
-          if (data) setSponsors(data.map(s => ({ logo: s.logo_url, index: s.id })));
+          if (data) setSponsors(data.map(s => ({ logo: s.logo_url, index: s.logo_url })));
         }
       } else {
         const { data } = await supabase.from('team_sponsors').select('*').eq('team_id', team?.id).eq('is_active', true);
         if (data) {
-          setSponsors(data.map(s => ({ logo: s.logo_url, index: s.id })));
+          setSponsors(data.map(s => ({ logo: s.logo_url, index: s.logo_url })));
         }
       }
 
@@ -423,7 +422,25 @@ export default function TeamListGraphicBuilder({
     [newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]];
     setSponsorOrder(newOrder);
   };
-  const matchDateStr = fixture?.match_date ? new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const formatMatchDateStr = () => {
+    if (!fixture?.match_date) return '';
+    const date = new Date(fixture.match_date);
+    const dayName = date.toLocaleDateString('en-AU', { weekday: 'short' });
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-AU', { month: 'short' });
+    const year = date.getFullYear().toString().slice(-2);
+    
+    let timePart = '';
+    if (fixture?.start_time) {
+      const [hourStr, minStr] = fixture.start_time.split(':');
+      let hour = parseInt(hourStr);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12 || 12;
+      timePart = `${hour}:${minStr} ${ampm}, `;
+    }
+    return `${timePart}${dayName}, ${day} ${month} ${year}`;
+  };
+  const matchDateStr = formatMatchDateStr();
 
   const canvasWidth = orientation === 'portrait' ? 1080 : 1200;
   const canvasHeight = orientation === 'portrait' ? 1350 : 630;
@@ -549,17 +566,17 @@ export default function TeamListGraphicBuilder({
 
                  {/* Match Details */}
                  <div className={`flex flex-col items-center text-center ${orientation === 'portrait' ? 'gap-3 mt-4' : 'gap-0 mt-1'}`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>
-                   <div className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} font-black uppercase tracking-widest`} style={{ letterSpacing: `${letterSpacing}px`, color: matchDetailsColor }}>
-                     {matchDateStr} @ {fixture?.start_time || 'TBA'}
-                   </div>
+                   <h3 className={`font-black uppercase tracking-widest text-zinc-900 ${orientation === 'portrait' ? 'text-2xl mt-8' : 'text-sm mt-4'}`} style={{ color: matchDetailsColor }}>
+                      {matchDateStr}
+                    </h3>
                    <div className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xs'} font-bold uppercase tracking-widest`} style={{ color: matchNotesColor, letterSpacing: `${letterSpacing}px` }}>
                      <i className="fa-solid fa-location-dot mr-2"></i> {fixture?.location || 'Venue TBA'}
                    </div>
                    {(matchNotesOverride || fixture?.notes) && (
-                     <div className={`font-medium max-w-2xl italic ${orientation === 'portrait' ? 'text-3xl mt-4 px-6 py-2 rounded-full' : 'text-xs mt-1 px-3 py-1 rounded-full'}`} style={{ backgroundColor: matchNotesBg, color: matchNotesColor, letterSpacing: `${letterSpacing}px` }}>
-                       "{matchNotesOverride || fixture?.notes}"
-                     </div>
-                   )}
+                      <p className={`font-medium italic text-zinc-500 mt-2 ${orientation === 'portrait' ? 'text-lg' : 'text-[10px]'}`} style={{ color: matchNotesColor }}>
+                        {matchNotesOverride || fixture?.notes}
+                      </p>
+                    )}
                  </div>
                </div>
 
