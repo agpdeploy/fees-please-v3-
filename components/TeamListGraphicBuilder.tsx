@@ -220,16 +220,22 @@ export default function TeamListGraphicBuilder({
     } catch (e) {
       console.warn("Could not save styles to localStorage.");
     }
+    const clubSettingsRef = useRef(clubSettings);
+    useEffect(() => { clubSettingsRef.current = clubSettings; }, [clubSettings]);
     
     if (editMode === 'club' && clubId) {
       const timeout = setTimeout(async () => {
-        const updatedSettings = { ...(clubSettings || {}), graphic_defaults: styles };
-        await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
-        if (onSaveClubSettings) onSaveClubSettings(updatedSettings);
+        const updatedSettings = { ...(clubSettingsRef.current || {}), graphic_defaults: styles };
+        const { error } = await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
+        if (error) {
+           console.error("Auto-save failed", error);
+        } else {
+           if (onSaveClubSettings) onSaveClubSettings(updatedSettings);
+        }
       }, 1000);
       return () => clearTimeout(timeout);
     }
-  }, [isOpen, mounted, clubId, team?.id, editMode, primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor, playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder, clubSettings]);
+  }, [isOpen, mounted, clubId, team?.id, editMode, primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor, playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder]);
 
   useEffect(() => {
     if (!isOpen || !mounted) return;
@@ -263,15 +269,20 @@ export default function TeamListGraphicBuilder({
   }, [isOpen, isExpanded, orientation]);
 
   const saveSettings = async () => {
-    if (editMode === 'club') {
-      if (!clubId) return;
+    if (editMode === 'club' && clubId) {
       const newDefaults = {
         primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor,
         playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder
       };
-      const updatedSettings = { ...(clubSettings || {}), graphic_defaults: newDefaults };
-      await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
+      const updatedSettings = { ...(clubSettingsRef.current || {}), graphic_defaults: newDefaults };
+      const { error } = await supabase.from('clubs').update({ settings: updatedSettings }).eq('id', clubId);
+      if (error) {
+        alert("Failed to save configuration: " + error.message);
+        console.error(error);
+        return;
+      }
       if (onSaveClubSettings) onSaveClubSettings(updatedSettings);
+      alert('Club Defaults Saved!');
       return;
     }
 
