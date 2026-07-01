@@ -432,9 +432,11 @@ export default function TeamListGraphicBuilder({
     
     let timePart = '';
     if (fixture?.start_time) {
-      const [hourStr, minStr] = fixture.start_time.split(':');
+      const [hourStr, minStrRaw] = fixture.start_time.split(':');
       let hour = parseInt(hourStr);
-      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const minStr = minStrRaw ? minStrRaw.replace(/[^0-9]/g, '') : '00';
+      const isPm = fixture.start_time.toLowerCase().includes('pm') || (hour >= 12 && !fixture.start_time.toLowerCase().includes('am'));
+      const ampm = isPm ? 'PM' : 'AM';
       hour = hour % 12 || 12;
       timePart = `${hour}:${minStr} ${ampm}, `;
     }
@@ -528,36 +530,36 @@ export default function TeamListGraphicBuilder({
                
                {/* Header - App-Style Versus Layout */}
                <div 
-                 className={`flex flex-col rounded-3xl relative z-30 ${orientation === 'portrait' ? 'mb-8 p-6' : 'mb-3 p-4'}`} 
-                 style={{ 
-                   backgroundColor: headerBgColor, 
-                   border: '1px solid rgba(255,255,255,0.2)',
-                   width: orientation === 'landscape' ? `${100 - heroWidthPercent}%` : 'auto'
-                 }}
-               >
-                 <div className={`flex items-center justify-between gap-8 ${orientation === 'portrait' ? 'mb-6' : 'mb-2'}`}>
-                   
-                   {/* Home Team */}
-                   <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
-                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
-                        {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(team?.name)}</span>}
-                      </div>
-                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
-                        {team?.name}
-                      </h1>
-                    </div>
+                  className={`flex flex-col rounded-3xl relative z-30 ${orientation === 'portrait' ? 'mb-8 p-6' : 'mb-3 p-4'}`} 
+                  style={{ 
+                    backgroundColor: headerBgColor, 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    width: orientation === 'landscape' ? `${100 - heroWidthPercent}%` : 'auto'
+                  }}
+                >
+                  <div className={`flex items-start justify-center gap-2 md:gap-4 ${orientation === 'portrait' ? 'mb-6' : 'mb-2'}`}>
+                    
+                    {/* Home Team */}
+                    <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
+                       <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
+                         {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(team?.name)}</span>}
+                       </div>
+                       <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
+                         {team?.name}
+                       </h1>
+                     </div>
 
                     {/* VS */}
-                    <div className="shrink-0 flex flex-col items-center">
+                    <div className={`shrink-0 flex flex-col items-center ${orientation === 'portrait' ? 'mt-8' : 'mt-2'}`}>
                       <span className={`font-black italic tracking-widest ${orientation === 'portrait' ? 'text-6xl mb-2' : 'text-2xl mb-0'}`} style={{ color: matchNotesColor, letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif` }}>VS</span>
                     </div>
 
                     {/* Away Team */}
                     <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
-                      <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
-                        {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(fixture?.opponent)}</span>}
-                      </div>
-                      <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
+                       <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
+                         {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(fixture?.opponent)}</span>}
+                       </div>
+                       <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
                         {fixture?.opponent || 'TBA'}
                       </h1>
                    </div>
