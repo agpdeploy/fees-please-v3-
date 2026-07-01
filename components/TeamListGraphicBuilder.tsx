@@ -537,14 +537,14 @@ export default function TeamListGraphicBuilder({
                     width: orientation === 'landscape' ? `${100 - heroWidthPercent}%` : 'auto'
                   }}
                 >
-                  <div className={`flex items-start justify-center gap-2 md:gap-4 ${orientation === 'portrait' ? 'mb-6' : 'mb-2'}`}>
+                  <div className={`flex items-start justify-center gap-2 md:gap-4 ${orientation === 'portrait' ? 'mb-2' : 'mb-2'}`}>
                     
                     {/* Home Team */}
                     <div className={`flex flex-col items-center flex-1 ${orientation === 'portrait' ? 'gap-4' : 'gap-1'}`}>
                        <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
                          {(team?.logo_url || clubLogo) ? <img src={team?.logo_url || clubLogo!} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(team?.name)}</span>}
                        </div>
-                       <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
+                       <h1 className={`${orientation === 'portrait' ? 'text-3xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
                          {team?.name}
                        </h1>
                      </div>
@@ -559,7 +559,7 @@ export default function TeamListGraphicBuilder({
                        <div className={`bg-black/30 rounded-full flex items-center justify-center overflow-hidden shrink-0 shadow-2xl ${orientation === 'portrait' ? 'w-32 h-32' : 'w-14 h-14'}`}>
                          {fixture?.opponent_logo_url ? <img src={fixture?.opponent_logo_url} className="w-full h-full object-cover" /> : <span className={`${orientation === 'portrait' ? 'text-6xl' : 'text-2xl'} font-black text-white/40 tracking-tighter`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>{getInitials(fixture?.opponent)}</span>}
                        </div>
-                       <h1 className={`${orientation === 'portrait' ? 'text-4xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
+                       <h1 className={`${orientation === 'portrait' ? 'text-3xl' : 'text-sm'} text-center font-black uppercase leading-tight tracking-tight`} style={{ letterSpacing: `${letterSpacing}px`, fontFamily: `'${teamNamesFont}', sans-serif`, color: teamNamesColor }}>
                         {fixture?.opponent || 'TBA'}
                       </h1>
                    </div>
@@ -567,15 +567,15 @@ export default function TeamListGraphicBuilder({
                  </div>
 
                  {/* Match Details */}
-                 <div className={`flex flex-col items-center text-center ${orientation === 'portrait' ? 'gap-3 mt-4' : 'gap-0 mt-1'}`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>
-                   <h3 className={`font-black uppercase tracking-widest text-zinc-900 ${orientation === 'portrait' ? 'text-2xl mt-8' : 'text-sm mt-4'}`} style={{ color: matchDetailsColor }}>
+                 <div className={`flex flex-col items-center text-center ${orientation === 'portrait' ? 'gap-2 mt-4' : 'gap-0 mt-1'}`} style={{ fontFamily: `'${teamNamesFont}', sans-serif` }}>
+                   <h3 className={`font-black uppercase tracking-widest text-zinc-900 ${orientation === 'portrait' ? 'text-[26px] mt-0' : 'text-sm mt-1'}`} style={{ color: matchDetailsColor }}>
                       {matchDateStr}
                     </h3>
                    <div className={`${orientation === 'portrait' ? 'text-3xl' : 'text-xs'} font-bold uppercase tracking-widest`} style={{ color: matchNotesColor, letterSpacing: `${letterSpacing}px` }}>
                      <i className="fa-solid fa-location-dot mr-2"></i> {fixture?.location || 'Venue TBA'}
                    </div>
                    {(matchNotesOverride || fixture?.notes) && (
-                      <p className={`font-medium italic text-zinc-500 mt-2 ${orientation === 'portrait' ? 'text-lg' : 'text-[10px]'}`} style={{ color: matchNotesColor }}>
+                      <p className={`font-medium italic text-zinc-500 mt-2 ${orientation === 'portrait' ? 'text-xl' : 'text-[10px]'}`} style={{ color: matchNotesColor }}>
                         {matchNotesOverride || fixture?.notes}
                       </p>
                     )}
