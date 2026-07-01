@@ -97,6 +97,7 @@ export default function GameDay() {
   const [finaliseStatus, setFinaliseStatus] = useState<'completed' | 'abandoned'>('completed');
   const [chargeAbandonedFee, setChargeAbandonedFee] = useState(false);
   const [unpaidPlayerActions, setUnpaidPlayerActions] = useState<Record<string, 'charge' | 'remove' | 'paid'>>({});
+  const [pendingOnlinePlayerIds, setPendingOnlinePlayerIds] = useState<string[]>([]);
   
   // --- INLINE AI REPORTER STATES ---
   const [expandedPastFixtureId, setExpandedPastFixtureId] = useState<string | null>(null);
@@ -222,6 +223,7 @@ export default function GameDay() {
     setPastFixtures([]);
     setSquad([]);
     setAvailabilityData([]);
+    setPendingOnlinePlayerIds([]);
 
     if (activeClubId) {
       setClubInfo({ name: 'FP', logo: '', expense_label: '', pay_id_type: '', pay_id_value: '' });
@@ -366,6 +368,8 @@ export default function GameDay() {
         const { data: txData } = await supabase.from("transactions").select("player_id, amount, transaction_type, fixture_id, status").in("player_id", playerIds);
         const debts: Record<string, number> = {};
         const paidToday: string[] = []; 
+        const pendingOnline: string[] = [];
+        
         if (txData) {
           txData.forEach((tx: any) => {
             if (tx.transaction_type === 'fee') {
@@ -383,10 +387,14 @@ export default function GameDay() {
                 paidToday.push(tx.player_id);
               }
             }
+            if (tx.transaction_type === 'checkout_link' && tx.status === 'unpaid' && tx.fixture_id === activeFixture.id) {
+              if (!pendingOnline.includes(tx.player_id)) pendingOnline.push(tx.player_id);
+            }
           });
         }
         setPlayerDebts(debts); 
         setPaidPlayerIds(paidToday);
+        setPendingOnlinePlayerIds(pendingOnline);
 
         const draftStateStr = localStorage.getItem('gameday_draft_state');
         if (draftStateStr) {
@@ -1262,7 +1270,7 @@ export default function GameDay() {
                     bg = "bg-amber-500 dark:bg-amber-600";
                   }
                   return (
-                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded text-white tracking-widest ${bg} leading-none shadow-sm`}>
+                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded text-white tracking-widest leading-none shadow-sm ${bg} leading-none shadow-sm`}>
                       {text}
                     </span>
                   );
@@ -1556,16 +1564,21 @@ export default function GameDay() {
             ) : (
               squadToPay.map(player => {
                 const isSelected = selectedPlayerIds.includes(player.id);
+                const isPendingOnline = pendingOnlinePlayerIds.includes(player.id);
                 const currentBalance = playerDebts[player.id] || 0;
                 return (
                   <button 
                     key={player.id} 
                     onClick={() => togglePlayerSelection(player.id)} 
-                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border ${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
+                    className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border 
+${isSelected ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent' : 
+isPendingOnline ? 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-500 border-dashed border-zinc-300 dark:border-zinc-700 opacity-70 hover:opacity-100' : 
+'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                   >
+                    {isPendingOnline && !isSelected && <i className="fa-solid fa-clock text-[9px] mr-1.5 opacity-50"></i>}
                     {player.nickname || `${player.first_name} ${player.last_name?.charAt(0)}.`}
-                    {currentBalance > 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
-                    {currentBalance < 0 && !isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
+                    {currentBalance > 0 && !isSelected && !isPendingOnline && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
+                    {currentBalance < 0 && !isSelected && !isPendingOnline && <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-950"></div>}
                   </button>
                 );
               })
@@ -2069,20 +2082,20 @@ export default function GameDay() {
               </button>
             </div>
             
-            <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-500 mb-6 bg-emerald-50 dark:bg-emerald-500/10 py-2 rounded-lg animate-pulse">
-              <i className="fa-solid fa-circle-notch fa-spin"></i>
-              <span>Waiting for payment...</span>
-            </div>
-            
             <button 
               onClick={() => {
                 setIsQrModalOpen(false);
                 setQrTxId("");
+                if (qrModalPlayer) {
+                  setSelectedPlayerIds(prev => prev.filter(id => id !== qrModalPlayer.id));
+                  setPaymentData(prev => { const d = {...prev}; delete d[qrModalPlayer.id]; return d; });
+                }
                 setQrModalPlayer(null);
+                loadSquadData();
               }}
               className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-widest rounded-xl transition-colors shadow-sm"
             >
-              Close
+              Done
             </button>
           </div>
         </div>
