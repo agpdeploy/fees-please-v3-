@@ -216,7 +216,11 @@ export default function TeamListGraphicBuilder({
       primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor,
       playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder
     };
-    localStorage.setItem(`graphic_builder_styles_${clubId || team?.id}`, JSON.stringify(styles));
+    try {
+      localStorage.setItem(`graphic_builder_styles_${clubId || team?.id}`, JSON.stringify(styles));
+    } catch (e) {
+      console.warn("Could not save styles to localStorage.");
+    }
     
     if (editMode === 'club' && clubId) {
       const timeout = setTimeout(async () => {
