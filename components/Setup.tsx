@@ -2211,7 +2211,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
       {/* --- GRAPHIC DEFAULTS TAB --- */}
       {clubId && clubId !== 'new' && activeTab === 'graphic' && (
-        <GraphicDefaultsTab clubId={clubId} clubRecord={clubRecord} setClubRecord={setClubRecord} setClubSettings={setClubSettings} />
+        <GraphicDefaultsTab clubId={clubId} clubRecord={clubRecord} setClubRecord={setClubRecord} />
       )}
 
     </div>

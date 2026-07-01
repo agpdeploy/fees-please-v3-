@@ -7,10 +7,9 @@ interface GraphicDefaultsTabProps {
   clubId: string;
   clubRecord: any;
   setClubRecord: (record: any) => void;
-  setClubSettings: (settings: any) => void;
 }
 
-export default function GraphicDefaultsTab({ clubId, clubRecord, setClubRecord, setClubSettings }: GraphicDefaultsTabProps) {
+export default function GraphicDefaultsTab({ clubId, clubRecord, setClubRecord }: GraphicDefaultsTabProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // create a dummy team and fixture for the preview
@@ -44,7 +43,6 @@ export default function GraphicDefaultsTab({ clubId, clubRecord, setClubRecord, 
 
   const handleSaveClubSettings = (newSettings: any) => {
     setClubRecord({ ...clubRecord, settings: newSettings });
-    setClubSettings(newSettings);
   };
 
   const hasPlusFeatures = clubRecord?.plan_tier === 'pro' || clubRecord?.plan_tier === 'plus' || (clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === 'free');
