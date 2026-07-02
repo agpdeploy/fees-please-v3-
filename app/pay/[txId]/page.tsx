@@ -43,13 +43,13 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
   allTxs?.forEach(tx => {
     if (tx.transaction_type === 'payment' && tx.status !== 'failed' && tx.status !== 'pending') {
       balance -= tx.amount;
-    } else if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') {
+    } else if (tx.transaction_type === 'fee') {
       balance += tx.amount;
     }
   });
 
   let pastFees = allTxs?.filter(tx => 
-    (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') && 
+    tx.transaction_type === 'fee' && 
     tx.fixture_id !== transaction.fixture_id
   ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || [];
 

@@ -56,7 +56,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
 
     if (tx.transaction_type === 'payment' && tx.status !== 'failed' && tx.status !== 'pending') {
       balance -= tx.amount;
-    } else if (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') {
+    } else if (tx.transaction_type === 'fee') {
       balance += tx.amount;
     }
   });
@@ -116,7 +116,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
       : team.public_team_profiles?.club_logo_url;
 
   let pastFees = transactions?.filter(tx => 
-    (tx.transaction_type === 'fee' || tx.transaction_type === 'expense') && 
+    tx.transaction_type === 'fee' && 
     tx.fixture_id !== fixtureId
   ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || [];
 
