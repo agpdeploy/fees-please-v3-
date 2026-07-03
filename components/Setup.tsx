@@ -105,6 +105,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
   const [playerSearch, setPlayerSearch] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncingPlayhq, setIsSyncingPlayhq] = useState(false);
 
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
   const [newSeasons, setNewSeasons] = useState<any[]>([]);
@@ -1903,7 +1904,7 @@ export default function Setup({ activeTab }: SetupProps) {
                       <div className="mt-3 bg-[#0051e5]/5 dark:bg-[#0051e5]/10 border border-[#0051e5]/20 dark:border-[#0051e5]/30 rounded-xl p-4 transition-colors">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-[10px] font-black uppercase italic text-[#0051e5] flex items-center gap-2">
-                            <i className="fa-solid fa-rotate-right"></i> PlayHQ Auto-Sync
+                            <i className="fa-solid fa-rotate-right"></i> PlayHQ Import
                           </h3>
                         </div>
                         <div className="flex gap-2">
@@ -1911,7 +1912,7 @@ export default function Setup({ activeTab }: SetupProps) {
                           <button onClick={async () => {
                             const url = (document.getElementById(`playhq-sync-${t.id}`) as HTMLInputElement)?.value;
                             if (!url) return showToast('Please enter a PlayHQ Team URL', 'error');
-                            setIsSaving(true);
+                            setIsSyncingPlayhq(true);
                             try {
                               const res = await fetch('/api/playhq-sync', {
                                 method: 'POST',
@@ -1960,7 +1961,16 @@ export default function Setup({ activeTab }: SetupProps) {
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
 
-                                const payload = data.fixtures.map((f: any) => {
+                                const futureOnly = (document.getElementById(`playhq-future-only-${t.id}`) as HTMLInputElement)?.checked;
+                                let fixturesToImport = data.fixtures;
+                                if (futureOnly) {
+                                  fixturesToImport = fixturesToImport.filter((f: any) => {
+                                    if (!f.match_date) return true;
+                                    return new Date(f.match_date) >= today;
+                                  });
+                                }
+
+                                const payload = fixturesToImport.map((f: any) => {
                                   const isPast = f.match_date ? new Date(f.match_date) < today : false;
                                   return { 
                                     ...f, 
@@ -1978,11 +1988,19 @@ export default function Setup({ activeTab }: SetupProps) {
                               setTimeout(() => window.location.reload(), 1500);
                             } catch (e: any) {
                               showToast(e.message, 'error');
-                              setIsSaving(false);
+                              setIsSyncingPlayhq(false);
                             }
                           }} className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#0051e5] hover:bg-blue-600 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
-                            Sync
+                            {isSyncingPlayhq ? (
+                              <><i className="fa-solid fa-spinner fa-spin"></i> IMPORTING...</>
+                            ) : (
+                              <>Import</>
+                            )}
                           </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-3 px-1">
+                          <input type="checkbox" id={`playhq-future-only-${t.id}`} defaultChecked className="accent-[#0051e5] w-3.5 h-3.5 rounded shrink-0" />
+                          <label htmlFor={`playhq-future-only-${t.id}`} className="text-[10px] font-bold text-zinc-500 cursor-pointer select-none leading-tight">Only import future fixtures</label>
                         </div>
                       </div>
                     )}

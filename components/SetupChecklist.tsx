@@ -48,6 +48,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [playhqImportError, setPlayhqImportError] = useState("");
   const [isPlayhqImported, setIsPlayhqImported] = useState(false);
   const [setupPath, setSetupPath] = useState<'playhq' | 'manual' | null>(null);
+  const [futureFixturesOnly, setFutureFixturesOnly] = useState(false);
   
   const isPlayhq = clubInfo?.club_cat === 'PlayHQ';
   const [showPlayhqBox, setShowPlayhqBox] = useState(!isPlayhq);
@@ -357,7 +358,20 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
         }
 
         if (currentTeamId) {
-            const payload = data.fixtures.map((f: any) => ({
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let fixturesToImport = data.fixtures;
+            if (futureFixturesOnly) {
+              fixturesToImport = fixturesToImport.filter((f: any) => {
+                if (!f.match_date) return true;
+                return new Date(f.match_date) >= today;
+              });
+            }
+
+            const payload = fixturesToImport.map((f: any) => {
+              const isPast = f.match_date ? new Date(f.match_date) < today : false;
+              return {
               club_id: currentClubId,
               team_id: currentTeamId,
               opponent: f.opponent,
@@ -365,10 +379,10 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
               match_date: f.match_date,
               start_time: f.start_time,
               location: f.location,
-              status: 'scheduled',
+              status: isPast ? 'completed' : 'scheduled',
               umpire_fee: clubInfo?.default_umpire_fee || 0,
               season_name: clubInfo?.season_name || seasonName || null
-            }));
+            }});
             const { error: fixtureInsertError } = await supabase.from('fixtures').insert(payload);
             if (fixtureInsertError) throw fixtureInsertError;
             setHasFixtures(true);
@@ -1077,7 +1091,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                  </button>
                  {setupPath === 'playhq' && !showPlayhqBox && (
                    <button onClick={() => setShowPlayhqBox(true)} className="text-[10px] font-bold text-zinc-400 hover:text-[#0051e5] uppercase tracking-widest transition-colors flex items-center">
-                     <i className="fa-solid fa-rotate-right mr-1"></i> Resync PlayHQ
+                     <i className="fa-solid fa-rotate-right mr-1"></i> Import PlayHQ
                    </button>
                  )}
               </div>
@@ -1111,6 +1125,16 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                        <a href="https://www.playhq.com/cricket-australia/org/ferny-districts-cricket-club/462e4428/senior-competition-winter-2026/teams/ferny-districts-bin-chickens/b7cf852d" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#0051e5] hover:underline">
                          Ferny Districts Bin Chickens
                        </a>
+                     </div>
+                     <div className="flex items-center gap-2 mb-2 mt-1 px-1">
+                       <input 
+                         type="checkbox" 
+                         id="futureOnlySetup" 
+                         checked={futureFixturesOnly} 
+                         onChange={(e) => setFutureFixturesOnly(e.target.checked)}
+                         className="accent-[#0051e5] w-4 h-4 rounded shrink-0" 
+                       />
+                       <label htmlFor="futureOnlySetup" className="text-[10px] font-bold text-zinc-500 cursor-pointer select-none leading-tight">Only import future fixtures</label>
                      </div>
                      <button onClick={handlePlayhqImport} disabled={!playhqUrl} className="relative overflow-hidden w-full py-3 bg-[#0051e5] hover:bg-[#0041b5] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 shadow-sm">
                        Import Team
