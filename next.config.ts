@@ -1,4 +1,12 @@
 import type { NextConfig } from "next";
+import withPWAInit from "@ducanh2912/next-pwa";
+
+const withPWA = withPWAInit({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+});
 
 const nextConfig: any = {
   allowedDevOrigins: ["192.168.1.107", "192.168.1.107:3000", "localhost:3000"],
@@ -23,5 +31,5 @@ const nextConfig: any = {
   },
 };
 
-// Export standard config without the PWA wrapper
-export default nextConfig;
+// Export config wrapped with PWA builder
+export default withPWA(nextConfig);

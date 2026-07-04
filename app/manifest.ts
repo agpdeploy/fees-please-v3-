@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Fees Please',
     short_name: 'Fees Please',
     description: 'Less chasing. More playing.',
-    start_url: '/',
+    start_url: '/?utm_source=pwa',
     display: 'standalone',
     background_color: '#10b981',
     theme_color: '#10b981',
