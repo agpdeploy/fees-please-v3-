@@ -50,7 +50,8 @@ export async function POST(request: Request) {
     const platformFeeCents = amountCents - netAmountCents - squareFeeCents;
     
     // Generate idempotency key tied to txId and sourceId to prevent double charging on retry
-    const idempotencyKey = `${txId}-${sourceId}`;
+    // Square requires idempotency_key to be <= 45 characters, so we hash it to 32 chars
+    const idempotencyKey = crypto.createHash('md5').update(`${txId}-${sourceId}`).digest('hex');
 
     const playerName = transaction.players ? `${transaction.players.first_name} ${transaction.players.last_name}` : 'Unknown Player';
     const noteStr = `${transaction.description || 'Match Fees'} - ${playerName}`;
