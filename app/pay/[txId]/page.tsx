@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import CheckoutForm from './CheckoutForm'
 import TeamAvailabilityClient from '@/app/t/[slugid]/TeamAvailabilityClient'
+import { ensureValidSquareToken } from '@/lib/squareToken'
 
 export default async function PayPage(props: { params: Promise<{ txId: string }> }) {
   // Next.js 15 requires awaiting params
@@ -24,20 +25,21 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
   }
 
   const [
-    { data: club },
     { data: team },
     { data: publicProfile },
     { data: fixture },
     { data: allTxs },
     { data: teamSponsorsData }
   ] = await Promise.all([
-    supabase.from('clubs').select('*').eq('id', transaction.club_id).single(),
     supabase.from('teams').select('*').eq('id', transaction.team_id).single(),
     supabase.from('public_team_profiles').select('*').eq('team_id', transaction.team_id).maybeSingle(),
     transaction.fixture_id ? supabase.from('fixtures').select('*').eq('id', transaction.fixture_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from('transactions').select('*').eq('player_id', transaction.player_id).eq('club_id', transaction.club_id),
     supabase.from('team_sponsors').select('*').eq('team_id', transaction.team_id).eq('is_active', true)
   ]);
+
+  // Ensure Square token is valid, refreshing it if expired
+  const club = await ensureValidSquareToken(transaction.club_id, supabase);
 
   let balance = 0;
   allTxs?.forEach(tx => {

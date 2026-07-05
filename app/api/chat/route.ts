@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js'; 
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export const maxDuration = 60;
 
@@ -19,13 +21,36 @@ export async function POST(req: Request) {
     const lastUserMessage = lastUserMsgObj?.content || "";
     const lastUserAttachments = lastUserMsgObj?.attachments || [];
 
+    // 1. Authenticate user from session cookies
+    const cookieStore = await cookies();
+    const supabaseSession = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll() },
+          setAll() {}
+        },
+      }
+    );
+
+    const { data: { user }, error: authError } = await supabaseSession.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized: Please log in first." }, { status: 401 });
+    }
+
+    // 2. Prevent userId spoofing
+    if (userId !== user.id) {
+      return NextResponse.json({ error: "Forbidden: User ID mismatch." }, { status: 403 });
+    }
+
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY 
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     let userRole = "Member";
-    let userEmail = "";
+    let userEmail = user.email || "";
     let userName = "Unknown User";
     let clubName = "Unknown Club";
     let planTier = "Free";
@@ -38,21 +63,30 @@ export async function POST(req: Request) {
       }
     }
 
-    if (userId !== "Unknown") {
-      const { data: userAuth } = await supabaseAdmin.auth.admin.getUserById(userId);
-      if (userAuth?.user?.email) userEmail = userAuth.user.email;
-      const { data: profile } = await supabaseAdmin.from('profiles').select('first_name, last_name, role').eq('id', userId).single();
-      if (profile) userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User";
-      if (profile?.role === 'super_admin') {
-        userRole = "Super Admin";
-      } else if (activeClub) {
-        const { data: rolesData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', userId).eq('club_id', activeClub);
-        if (rolesData && rolesData.length > 0) {
-          const isClubAdmin = rolesData.some((r: any) => r.role === 'club_admin');
-          const isTeamAdmin = rolesData.some((r: any) => r.role === 'team_admin');
-          userRole = isClubAdmin ? 'Account Admin' : (isTeamAdmin ? 'Team Admin' : 'Member');
-        }
+    // 3. Verify user has a role in the requested club (or is a super admin)
+    let isAuthorized = false;
+
+    const { data: profile } = await supabaseAdmin.from('profiles').select('first_name, last_name, role').eq('id', user.id).single();
+    if (profile) userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User";
+
+    if (profile?.role === 'super_admin') {
+      isAuthorized = true;
+      userRole = "Super Admin";
+    } else if (activeClub) {
+      const { data: rolesData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', user.id).eq('club_id', activeClub);
+      if (rolesData && rolesData.length > 0) {
+        isAuthorized = true;
+        const isClubAdmin = rolesData.some((r: any) => r.role === 'club_admin');
+        const isTeamAdmin = rolesData.some((r: any) => r.role === 'team_admin');
+        userRole = isClubAdmin ? 'Account Admin' : (isTeamAdmin ? 'Team Admin' : 'Member');
       }
+    } else {
+      // General non-club scoped questions
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Forbidden: You do not have access to this club." }, { status: 403 });
     }
 
     const modelParams = {

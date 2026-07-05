@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { calculateSquareOnlineGross } from '@/lib/fees';
+import { ensureValidSquareToken } from '@/lib/squareToken';
 
 export async function POST(request: Request) {
   try {
@@ -31,11 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Already paid" }, { status: 400 });
     }
 
-    const { data: club } = await supabase
-      .from('clubs')
-      .select('*')
-      .eq('id', transaction.club_id)
-      .single();
+    const club = await ensureValidSquareToken(transaction.club_id, supabase);
       
     if (!club || !club.square_access_token) {
       return NextResponse.json({ error: "Club Square account not connected" }, { status: 400 });
@@ -52,8 +49,8 @@ export async function POST(request: Request) {
     // The platform fee is what's left over after Square takes their cut and the club gets their net amount
     const platformFeeCents = amountCents - netAmountCents - squareFeeCents;
     
-    // Generate idempotency key
-    const idempotencyKey = crypto.randomUUID();
+    // Generate idempotency key tied to txId and sourceId to prevent double charging on retry
+    const idempotencyKey = `${txId}-${sourceId}`;
 
     const playerName = transaction.players ? `${transaction.players.first_name} ${transaction.players.last_name}` : 'Unknown Player';
     const noteStr = `${transaction.description || 'Match Fees'} - ${playerName}`;

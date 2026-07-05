@@ -1,0 +1,62 @@
+[
+  {
+    "title": "Trial Email - Day 0 (Welcome)",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Trial Email - Day 7 (Halfway)",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Trial Email - Day 10 (Ending Soon)",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Trial Email - Day 14 (Ended)",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Onboarding Email - Plus",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Onboarding Email - Pro",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Availability Request Email",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Weekly Summary Report Email",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": false
+  },
+  {
+    "title": "Squad Payment Email",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Chat Welcome Email",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Welcome Email (Needs Onboarding)",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  },
+  {
+    "title": "Welcome Email (Onboarded)",
+    "hasHtmlMacro": true,
+    "hasProperWrapper": true
+  }
+]
