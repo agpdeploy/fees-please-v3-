@@ -44,11 +44,29 @@ export async function GET(req: Request) {
       reports = allReports.filter(r => {
         // schedule_time is '08:00', we just check the hour part for an hourly cron
         const reportHour = r.schedule_time ? r.schedule_time.split(':')[0] : '08';
-        return r.schedule_day === currentDay && reportHour === currentHour;
+        const isTimeMatch = r.schedule_day === currentDay && reportHour === currentHour;
+        
+        if (!isTimeMatch) return false;
+
+        // Prevent duplicate sends and handle frequency
+        if (r.last_sent_at) {
+          const lastSent = new Date(r.last_sent_at);
+          const hoursSinceLastSent = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
+          
+          // 1. Prevent duplicate sends within the same day (e.g. if cron-job.org pings twice)
+          if (hoursSinceLastSent < 24) return false;
+          
+          // 2. Handle Fortnightly frequency (must be at least ~13 days since last send)
+          if (r.frequency === 'fortnightly' && hoursSinceLastSent < (13 * 24)) {
+            return false;
+          }
+        }
+
+        return true;
       });
 
       if (reports.length === 0) {
-        return NextResponse.json({ success: true, message: `No active reports scheduled for ${currentDay} at ${currentHour}:00.` });
+        return NextResponse.json({ success: true, message: `No active reports scheduled/due for ${currentDay} at ${currentHour}:00.` });
       }
     }
 
