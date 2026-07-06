@@ -165,7 +165,7 @@ export async function POST(req: Request) {
               ${sponsors.slice(0, 4).map((s: any) => {
                 const clickUrl = s.url ? `${baseUrl}/api/track-sponsor?team_id=${teamId}&sponsor_id=${s.id}&event_type=click&source=email&redirect=${encodeURIComponent(s.url)}` : '';
                 const impressionUrl = `${baseUrl}/api/track-sponsor?team_id=${teamId}&sponsor_id=${s.id}&event_type=impression&source=email`;
-                return `<td align="center" style="padding: 0 8px;">${clickUrl ? `<a href="${clickUrl}" target="_blank">` : ''}<img src="${s.logo_url}" alt="${s.name || 'Sponsor'}" height="32" style="max-height: 32px; width: auto; display: block;" />${clickUrl ? `</a>` : ''}<img src="${impressionUrl}" width="1" height="1" style="display:none;" alt="" /></td>`;
+                return `<td align="center" style="padding: 0 8px;">${clickUrl ? `<a href="${clickUrl}" target="_blank">` : ''}<img src="${s.logo_url}" alt="${s.name || 'Sponsor'}" height="32" style="height: 32px; width: auto; display: block;" />${clickUrl ? `</a>` : ''}<img src="${impressionUrl}" width="1" height="1" style="display:none;" alt="" /></td>`;
               }).join('')}
             </tr>
           </table>

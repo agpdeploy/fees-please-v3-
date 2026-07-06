@@ -670,17 +670,25 @@ export default function Ledger() {
                                 <div className="space-y-2">
                                   {groupedFixturePlayers.map(p => {
                                     const net = p.paid - p.fee;
+                                    const globalOwed = playerBalances.find(pb => pb.id === p.id)?.owed || 0;
+                                    const isCoveredByCredit = net < 0 && globalOwed <= 0;
+
                                     return (
                                       <div key={p.id} className="bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-3 rounded-xl flex justify-between items-center shadow-sm transition-colors">
                                         <div>
-                                          <div className="text-xs font-bold text-zinc-900 dark:text-white">{p.name}</div>
+                                          <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                            {p.name}
+                                            {isCoveredByCredit && (
+                                              <span className="text-[8px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 px-1.5 py-0.5 rounded-sm">Covered by Credit</span>
+                                            )}
+                                          </div>
                                           <div className="text-[9px] font-black uppercase tracking-widest mt-1 flex gap-2">
                                             <span className="text-emerald-600 dark:text-emerald-500">Paid: ${p.paid}</span>
                                             <span className="text-zinc-300 dark:text-zinc-700">•</span>
                                             <span className="text-red-500/80">Fee: ${p.fee}</span>
                                           </div>
                                         </div>
-                                        <span className={`text-sm font-black ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        <span className={`text-sm font-black ${net >= 0 ? 'text-emerald-500' : (isCoveredByCredit ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-red-500')}`}>
                                           {net > 0 ? '+' : ''}${net}
                                         </span>
                                       </div>

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     });
 
     const body = await req.json();
-    const { fixtureId, teamId, selectedPlayerIds, customMessage, senderName = "Your Team Admin" } = body;
+    const { fixtureId, teamId, selectedPlayerIds } = body;
 
     if (!fixtureId || !teamId || !selectedPlayerIds || selectedPlayerIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -103,8 +103,8 @@ export async function POST(req: Request) {
       const paymentSection = (club.is_square_enabled && club.square_location_id) 
         ? `
             <div style="padding: 24px; text-align: center; border-top: 1px solid #f4f4f5;">
-              <p style="margin-top: 0; font-size: 14px; font-weight: bold; color: #52525b; margin-bottom: 16px;">Pre-pay your Match Fees online:</p>
-              <a href="${prePayUrl}" style="display: inline-block; padding: 12px 24px; background-color: ${themeColor}; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 14px; text-transform: uppercase;">Pay Securely</a>
+              <p style="margin-top: 0; font-size: 14px; font-weight: bold; color: #52525b; margin-bottom: 16px;">Pay your Match Fees:</p>
+              <a href="${prePayUrl}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 14px; text-transform: uppercase;">Pay Securely</a>
               
               <div style="margin-top: 16px; margin-bottom: 8px; text-align: center;">
                 <img src="https://img.icons8.com/color/48/000000/visa.png" height="24" alt="Visa" style="display: inline-block; vertical-align: middle; margin: 0 4px;" />
@@ -125,13 +125,7 @@ export async function POST(req: Request) {
             </div>
         ` : '');
 
-      const customMessageHtml = customMessage ? `
-          <div style="padding: 0 24px 24px 24px;">
-            <div style="padding: 16px; border-left: 4px solid ${themeColor}; background-color: #fafafa; font-style: italic; color: #3f3f46; font-size: 14px; line-height: 1.5; border-radius: 4px;">
-              "${customMessage.replace(/\n/g, '<br />')}"
-            </div>
-          </div>
-      ` : '';
+
 
       const htmlContent = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f4f5; padding: 20px; border-radius: 12px;">
@@ -142,17 +136,17 @@ export async function POST(req: Request) {
                 <img src="${teamLogoUrl}" width="48" height="48" style="display: block; border-radius: 8px; border: 1px solid #e4e4e7; background-color: #ffffff; object-fit: contain;" />
               </td>` : ''}
               <td align="left" valign="middle">
-                <h1 style="color: #18181b; font-size: 18px; font-weight: 900; margin: 0; text-transform: uppercase;">Lineup Selection for ${team.name}</h1>
+                <h1 style="color: #18181b; font-size: 18px; font-weight: 900; margin: 0; text-transform: uppercase;">Match Finalised for ${team.name}</h1>
               </td>
             </tr>
           </table>
 
           <div style="background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 24px;">
-            <div style="padding: 24px; padding-bottom: ${customMessage ? '8px' : '24px'};">
+            <div style="padding: 24px;">
               <p style="color: #18181b; font-size: 15px; margin-top: 0; margin-bottom: 16px;">Hi ${player.nickname || player.first_name},</p>
-              <p style="color: #52525b; font-size: 15px; margin-top: 0; margin-bottom: 0; line-height: 1.5;">You've been selected in the final team for the upcoming match. Please see the details below.</p>
+              <p style="color: #52525b; font-size: 15px; margin-top: 0; margin-bottom: 16px; line-height: 1.5;">Forgot something? You haven't paid your match fees. Pay online using the options below.</p>
+              <p style="color: #52525b; font-size: 15px; margin-top: 0; margin-bottom: 0; line-height: 1.5;">Talk to your team manager if you have any questions.</p>
             </div>
-            ${customMessageHtml}
           </div>
           
           <div style="background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
@@ -162,7 +156,7 @@ export async function POST(req: Request) {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="left">
-                    <span style="background-color: #10b981; color: #ffffff; font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; letter-spacing: 1px;">Upcoming</span>
+                    <span style="background-color: #71717a; color: #ffffff; font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; letter-spacing: 1px;">${fixture.status === 'abandoned' ? 'Abandoned' : 'Completed'}</span>
                   </td>
                   <td align="right">
                     <span style="font-size: 12px; font-weight: 700; color: #71717a; text-transform: uppercase;">${matchDate}</span>
@@ -215,7 +209,7 @@ export async function POST(req: Request) {
         from: `${club.name} <reminders@mail.feesplease.app>`,
         reply_to: 'noreply@mail.feesplease.app',
         to: isTestingEnv ? 'emailtesting@feesplease.app' : player.email,
-        subject: `You're in! ${fixture.opponent} (${matchDate})`,
+        subject: `Match Finalised - Fees Owed for ${fixture.opponent}`,
         html: htmlContent
       });
     }

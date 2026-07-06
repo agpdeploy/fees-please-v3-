@@ -98,6 +98,7 @@ export default function GameDay() {
   const [chargeAbandonedFee, setChargeAbandonedFee] = useState(false);
   const [unpaidPlayerActions, setUnpaidPlayerActions] = useState<Record<string, 'charge' | 'remove' | 'paid'>>({});
   const [pendingOnlinePlayerIds, setPendingOnlinePlayerIds] = useState<string[]>([]);
+  const [emailPlayersWithFinalisation, setEmailPlayersWithFinalisation] = useState(false);
   
   // --- INLINE AI REPORTER STATES ---
   const [expandedPastFixtureId, setExpandedPastFixtureId] = useState<string | null>(null);
@@ -392,6 +393,16 @@ export default function GameDay() {
             }
           });
         }
+
+        // Auto-mark players with sufficient credit as paid for today
+        playerDetails.forEach((player: any) => {
+           const feeAmount = player.is_member ? teamFees.member : teamFees.casual;
+           const balance = debts[player.id] || 0;
+           // If their total balance plus today's fee is still <= 0, their credit fully covers the match
+           if (balance + feeAmount <= 0 && !paidToday.includes(player.id)) {
+              paidToday.push(player.id);
+           }
+        });
         setPlayerDebts(debts); 
         setPaidPlayerIds(paidToday);
         setPendingOnlinePlayerIds(pendingOnline);
@@ -742,6 +753,31 @@ export default function GameDay() {
         setPayUmpire(false);
       }
 
+      // 6. Send Emails
+      if (emailPlayersWithFinalisation && shouldChargeFees) {
+        // Collect players who still owe fees
+        const playersToEmail = squad.filter(player => {
+          const action = unpaidPlayerActions[player.id] || 'charge';
+          return action === 'charge' && !paidPlayerIds.includes(player.id);
+        }).map(p => p.id);
+        
+        if (playersToEmail.length > 0) {
+          try {
+            await fetch("/api/send-finalised", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                fixtureId: activeFixture.id, 
+                teamId: activeFixture.team_id || selectedTeamId, 
+                selectedPlayerIds: playersToEmail
+              }),
+            });
+          } catch (e) {
+            console.error("Failed to send finalisation emails:", e);
+          }
+        }
+      }
+
       const successMsg = finaliseStatus === 'completed' 
         ? "Match Finalised & Debts Logged!" 
         : (chargeAbandonedFee ? "Match Abandoned & Debts Logged!" : "Match Abandoned");
@@ -751,9 +787,6 @@ export default function GameDay() {
       await loadTeamData();
 
       setIsFinaliseModalOpen(false);
-
-      // --- 🔥 FIX: Force state reload to reflect the newly inserted transactions ---
-      await loadSquadData();
 
     } catch (err) {
       console.error("Finalization error:", err);
@@ -1096,30 +1129,52 @@ export default function GameDay() {
 
                 {finaliseStatus === 'completed' && squad.filter(p => !paidPlayerIds.includes(p.id)).length > 0 && (
                   <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                     <div className="flex items-center justify-between mb-3">
+                       <div className="flex items-center gap-2">
+                         <i className="fa-regular fa-envelope text-zinc-500"></i>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Email Unpaid Players?</span>
+                       </div>
+                       <button 
+                         onClick={() => setEmailPlayersWithFinalisation(!emailPlayersWithFinalisation)}
+                         className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${emailPlayersWithFinalisation ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                       >
+                         <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${emailPlayersWithFinalisation ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                       </button>
+                     </div>
+                     <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                       {emailPlayersWithFinalisation
+                         ? "Players who owe fees will receive an email letting them know the match has been finalised."
+                         : "No finalisation emails will be sent."}
+                     </p>
+                  </div>
+                )}
+
+                {finaliseStatus === 'completed' && squad.filter(p => !paidPlayerIds.includes(p.id)).length > 0 && (
+                  <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 mb-3 block">Unpaid Players ({squad.filter(p => !paidPlayerIds.includes(p.id)).length})</span>
                      <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
                         {squad.filter(p => !paidPlayerIds.includes(p.id)).map(p => (
-                           <div key={p.id} className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-2.5 rounded-xl">
-                              <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase truncate pr-2">
-                                 {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                           <div key={p.id} className="flex flex-col gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-2.5 rounded-xl">
+                              <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase truncate">
+                                 {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
                                  <span className="text-[10px] text-zinc-400 font-medium ml-2">(${p.is_member ? teamFees.member : teamFees.casual})</span>
                               </span>
-                              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 shrink-0">
+                              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
                                  <button
                                    onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'charge'}))}
-                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'charge' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                   className={`flex-1 py-1.5 px-1 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'charge' ? 'bg-red-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                                  >
                                     Owes Fees
                                  </button>
                                  <button
                                    onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'paid'}))}
-                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'paid' ? 'bg-emerald-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                   className={`flex-1 py-1.5 px-1 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'paid' ? 'bg-emerald-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                                  >
                                     Paid
                                  </button>
                                  <button
                                    onClick={() => setUnpaidPlayerActions(prev => ({...prev, [p.id]: 'remove'}))}
-                                   className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'remove' ? 'bg-zinc-300 dark:bg-zinc-600 text-zinc-800 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                                   className={`flex-1 py-1.5 px-1 text-[9px] font-black uppercase rounded-md transition-colors ${unpaidPlayerActions[p.id] === 'remove' ? 'bg-zinc-300 dark:bg-zinc-600 text-zinc-800 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                                  >
                                     Did Not Play
                                  </button>
