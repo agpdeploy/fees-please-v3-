@@ -177,14 +177,17 @@ export async function GET(req: Request) {
         for (const fix of upcomingFixtures) {
           const { data: avail } = await supabaseAdmin
             .from('availability')
-            .select('status')
+            .select('status, players(nickname, first_name, last_name)')
             .eq('fixture_id', fix.id);
             
           let yes = 0, no = 0, maybe = 0;
+          let yesNames: string[] = [], noNames: string[] = [], maybeNames: string[] = [];
           (avail || []).forEach(a => {
-             if (a.status === 'yes') yes++;
-             else if (a.status === 'no') no++;
-             else if (a.status === 'maybe') maybe++;
+             const p = a.players as any;
+             const name = p ? (p.nickname || `${p.first_name || ''} ${p.last_name?.charAt(0) || ''}.`).trim() : 'Unknown';
+             if (a.status === 'yes') { yes++; yesNames.push(name); }
+             else if (a.status === 'no') { no++; noNames.push(name); }
+             else if (a.status === 'maybe') { maybe++; maybeNames.push(name); }
           });
           
           const fixDate = new Date(fix.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -208,17 +211,20 @@ export async function GET(req: Request) {
               <div style="padding: 16px 20px; background-color: #fafafa;">
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td width="33%" align="center">
+                    <td width="33%" align="center" valign="top">
                        <div style="font-size: 20px; font-weight: 900; color: #18181b;">${yes}</div>
                        <div style="font-size: 9px; font-weight: 900; color: #10b981; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Avail</div>
+                       <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${yesNames.join('<br/>')}</div>
                     </td>
-                    <td width="33%" align="center">
+                    <td width="33%" align="center" valign="top">
                        <div style="font-size: 20px; font-weight: 900; color: #18181b;">${maybe}</div>
                        <div style="font-size: 9px; font-weight: 900; color: #f59e0b; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Maybe</div>
+                       <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${maybeNames.join('<br/>')}</div>
                     </td>
-                    <td width="33%" align="center">
+                    <td width="33%" align="center" valign="top">
                        <div style="font-size: 20px; font-weight: 900; color: #18181b;">${no}</div>
                        <div style="font-size: 9px; font-weight: 900; color: #ef4444; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Out</div>
+                       <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${noNames.join('<br/>')}</div>
                     </td>
                   </tr>
                 </table>
@@ -330,7 +336,7 @@ export async function GET(req: Request) {
                   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.feesplease.app';
                   const clickUrl = s.url ? `${baseUrl}/api/track-sponsor?team_id=${teamId || s.team_id}&sponsor_id=${s.id}&event_type=click&source=email&redirect=${encodeURIComponent(s.url)}` : '';
                   const impressionUrl = `${baseUrl}/api/track-sponsor?team_id=${teamId || s.team_id}&sponsor_id=${s.id}&event_type=impression&source=email`;
-                  return `<td align="center" style="padding: 0 8px;">${clickUrl ? `<a href="${clickUrl}" target="_blank">` : ''}<img src="${s.logo_url}" alt="${s.name || 'Sponsor'}" height="32" style="max-height: 32px; width: auto; display: block;" />${clickUrl ? `</a>` : ''}<img src="${impressionUrl}" width="1" height="1" style="display:none;" alt="" /></td>`;
+                  return `<td align="center" style="padding: 0 8px;">${clickUrl ? `<a href="${clickUrl}" target="_blank">` : ''}<img src="${s.logo_url}" alt="${s.name || 'Sponsor'}" height="48" style="max-height: 48px; max-width: 120px; width: auto; display: block; object-fit: contain;" />${clickUrl ? `</a>` : ''}<img src="${impressionUrl}" width="1" height="1" style="display:none;" alt="" /></td>`;
                 }).join('')}
               </tr>
             </table>
@@ -342,6 +348,31 @@ export async function GET(req: Request) {
 
       // --- FINAL EMAIL HTML (LIGHT THEME) ---
       const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <style>
+            @media only screen and (max-width: 500px) {
+              .stack-column {
+                display: block !important;
+                width: 100% !important;
+                border-right: none !important;
+                border-bottom: 1px solid #f4f4f5 !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                padding-bottom: 16px !important;
+                margin-bottom: 16px !important;
+              }
+              .stack-column:last-child {
+                border-bottom: none !important;
+                padding-bottom: 0 !important;
+                margin-bottom: 0 !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
         <div style="background-color: #f4f4f5; padding: 32px 16px; text-align: center;">
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; text-align: left;">
             
@@ -355,7 +386,7 @@ export async function GET(req: Request) {
                   <h2 style="font-size: 12px; color: #71717a; margin: 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Weekly Insights for ${entityName}</h2>
                 </td>
                 <td align="right" valign="middle">
-                  <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.feesplease.app'}/login" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; border-radius: 8px; text-decoration: none;">Log In</a>
+                  <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.feesplease.app'}/login" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Log In</a>
                 </td>
               </tr>
             </table>
@@ -370,21 +401,21 @@ export async function GET(req: Request) {
               <div style="padding: 24px 20px;">
                  <table width="100%" cellpadding="0" cellspacing="0">
                    <tr>
-                     <td width="33%" valign="top" style="border-right: 1px solid #f4f4f5; padding-right: 10px;">
+                     <td class="stack-column" width="33%" valign="top" style="border-right: 1px solid #f4f4f5; padding-right: 10px;">
                        <div style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Collected</div>
                        <div style="font-size: 24px; font-weight: 900; color: #10b981; margin-bottom: 8px; letter-spacing: -1px;">${formatter.format(collectedToDate)}</div>
                        <div style="font-size: 9px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px;">
                          Cash: ${formatter.format(cash)}<br/>Card: ${formatter.format(card)}
                        </div>
                      </td>
-                     <td width="33%" valign="top" style="border-right: 1px solid #f4f4f5; padding-left: 10px; padding-right: 10px;">
+                     <td class="stack-column" width="33%" valign="top" style="border-right: 1px solid #f4f4f5; padding-left: 10px; padding-right: 10px;">
                        <div style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Net Pos</div>
                        <div style="font-size: 24px; font-weight: 900; color: ${collectedToDate - expensesToDate >= 0 ? '#10b981' : '#ef4444'}; margin-bottom: 8px; letter-spacing: -1px;">${collectedToDate - expensesToDate > 0 ? '+' : ''}${formatter.format(collectedToDate - expensesToDate)}</div>
                        <div style="font-size: 9px; font-weight: 900; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px;">
                          Fees: ${formatter.format(expensesToDate)}
                        </div>
                      </td>
-                     <td width="33%" valign="top" style="padding-left: 10px;">
+                     <td class="stack-column" width="33%" valign="top" style="padding-left: 10px;">
                        <div style="font-size: 10px; font-weight: 900; color: #ef4444; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">O/S</div>
                        <div style="font-size: 24px; font-weight: 900; color: #ef4444; letter-spacing: -1px;">${formatter.format(totalOutstanding)}</div>
                      </td>
@@ -441,6 +472,8 @@ export async function GET(req: Request) {
             </div>
           </div>
         </div>
+        </body>
+        </html>
       `;
 
       const isTestingEnv = process.env.NODE_ENV !== 'production' || 
