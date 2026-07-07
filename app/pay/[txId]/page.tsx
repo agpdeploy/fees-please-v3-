@@ -138,18 +138,7 @@ export default async function PayPage(props: { params: Promise<{ txId: string }>
       
       <div className="w-full max-w-md mx-auto mt-8 pt-8 border-t border-zinc-200 dark:border-zinc-800/50">
         <div className="flex flex-col items-center">
-          {sponsors.length > 0 && (
-            <>
-              <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
-              <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mb-5">
-                {sponsors.slice(0, 4).map((s: any, i) => (
-                  <a key={s.id || i} href={s.url || '#'} target={s.url ? "_blank" : undefined} rel={s.url ? "noopener noreferrer" : undefined} className={`h-10 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}>
-                    <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
-                  </a>
-                ))}
-              </div>
-            </>
-          )}
+
           <a href="https://feesplease.app" target="_blank" rel="noopener noreferrer" className="italic font-black text-emerald-500 text-[10px] tracking-widest hover:opacity-80 mt-1">
             Powered By Fees Please
           </a>

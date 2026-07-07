@@ -806,7 +806,7 @@ export default function GameDay() {
 
     setIsProcessing(true);
     try {
-      const matchNotes = `Combined Payment (${activeFixture?.opponent || 'TBA'})`;
+      const matchNotes = `Match Fees (${teams.find(t => t.id === (activeFixture?.team_id || selectedTeamId))?.name || 'Team'})`;
       const { data: newTx, error: txError } = await supabase.from('transactions').insert({
         club_id: activeFixture?.club_id || resolvedClubId,
         player_id: player.id,

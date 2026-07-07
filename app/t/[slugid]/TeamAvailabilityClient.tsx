@@ -400,14 +400,16 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
           {sponsors.length > 0 && (
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
-              <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mb-5">
+              <div className="flex w-full overflow-x-auto flex-nowrap items-center gap-6 sm:gap-8 mb-5 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="ml-auto shrink-0"></div>
                 {sponsors.slice(0, 4).map((s: any, i) => (
                 <a key={s.id || i} href={s.url || '#'} onClick={(e) => {
                   if (s.url) { e.preventDefault(); handleSponsorClick(s.id, s.url); }
-                }} className={`h-12 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
-                  <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[120px] object-contain opacity-70 hover:opacity-100" />
+                }} className={`shrink-0 snap-center h-10 sm:h-12 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
+                  <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[100px] object-contain opacity-70 hover:opacity-100" />
                   </a>
                 ))}
+                <div className="mr-auto shrink-0"></div>
               </div>
             </>
           )}

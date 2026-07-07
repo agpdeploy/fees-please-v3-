@@ -115,7 +115,11 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
            <div className="flex justify-between items-center">
              <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Total Owed</p>
-                <p className="text-xs text-zinc-400 font-medium">{transaction.description || 'Match Fee'}</p>
+                <p className="text-xs text-zinc-400 font-medium">
+                  {transaction.description?.startsWith('Combined Payment') 
+                    ? `Match Fees (${team?.name || 'Team'})` 
+                    : (transaction.description || 'Match Fee')}
+                </p>
              </div>
              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500">${totalToCollect.toFixed(2)}</p>
            </div>
