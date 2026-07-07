@@ -901,7 +901,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const unassignedPlayers = filteredRosterPlayers.filter(p => p.default_team_id === null);
   const otherTeamPlayers = filteredRosterPlayers.filter(p => p.default_team_id !== activeRosterTeam?.id && p.default_team_id !== null);
 
-  const uniqueEmails = Array.from(new Set(clubUsers.map(user => user.email)));
+  const uniqueEmails = Array.from(new Set(clubUsers.filter(u => u.role === 'club_admin' || u.role === 'team_admin').map(user => user.email)));
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
@@ -1539,7 +1539,7 @@ export default function Setup({ activeTab }: SetupProps) {
               </div>
             ) : (
               uniqueEmails.map((email) => {
-                const userRolesForEmail = clubUsers.filter(u => u.email === email);
+                const userRolesForEmail = clubUsers.filter(u => u.email === email && (u.role === 'club_admin' || u.role === 'team_admin'));
                 
                 // Cross-reference with the players array to display their linked name
                 const linkedPlayer = players.find(p => p.email && p.email.toLowerCase() === email.toLowerCase());

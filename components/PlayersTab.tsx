@@ -626,6 +626,7 @@ function PlayerRow({
 
   const hasClubAdmin = userRoles.some(r => r.role === 'club_admin');
   const hasTeamAdmin = userRoles.some(r => r.role === 'team_admin');
+  const isRegistered = userRoles.some(r => r.role === 'player' || r.role === 'club_admin' || r.role === 'team_admin');
 
   return (
     <div className={`bg-white dark:bg-zinc-900 border ${player.is_active === false ? 'border-zinc-200/50 dark:border-zinc-800/50 border-dashed opacity-60 grayscale' : 'border-zinc-200 dark:border-zinc-800'} rounded-xl shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700`}>
@@ -637,6 +638,13 @@ function PlayerRow({
               <span>{player.first_name} {player.last_name}</span>
               {player.nickname && <span className="text-zinc-400 dark:text-zinc-500 text-xs italic font-normal normal-case break-words">"{player.nickname}"</span>}
               
+              {isRegistered && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-emerald-100/50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+                  <i className="fa-solid fa-check mr-1"></i>
+                  Registered
+                </span>
+              )}
+
               {hasClubAdmin && (
                 <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
                   Account Admin
