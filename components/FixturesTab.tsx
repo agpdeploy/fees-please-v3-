@@ -347,9 +347,9 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
               <input type="text" placeholder="Opponent" value={opponent || ""} onChange={(e) => setOpponent(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
               <input type="date" value={matchDate || ""} onChange={(e) => setMatchDate(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 color-scheme-light dark:color-scheme-dark transition-colors" />
               
-              <div className="flex gap-2">
-                <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime || ""} onChange={(e) => setFixtureTime(e.target.value)} className="w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                <div className="flex-1 relative">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input type="text" placeholder="Start Time (e.g. 1:00 PM)" value={fixtureTime || ""} onChange={(e) => setFixtureTime(e.target.value)} className="w-full sm:w-1/3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                <div className="flex-1 w-full sm:w-auto relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
                   <input type="number" placeholder={expenseLabel || "Umpire Fee"} value={umpireFee ?? ""} onChange={(e) => setUmpireFee(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                 </div>
@@ -652,19 +652,19 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
           {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input type="text" placeholder="Opponent" value={editForm.opponent || ""} onChange={(e) => setEditForm({...editForm, opponent: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-          <input type="date" value={editForm.match_date || ""} onChange={(e) => setEditForm({...editForm, match_date: e.target.value})} className="flex-[0.8] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors color-scheme-light dark:color-scheme-dark" />
+          <input type="date" value={editForm.match_date || ""} onChange={(e) => setEditForm({...editForm, match_date: e.target.value})} className="flex-[0.8] w-full sm:w-auto bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors color-scheme-light dark:color-scheme-dark" />
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input type="text" placeholder="Time" value={editForm.start_time || ""} onChange={(e) => setEditForm({...editForm, start_time: e.target.value})} className="flex-[0.6] bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
           <input type="text" placeholder="Location" value={editForm.location || ""} onChange={(e) => setEditForm({...editForm, location: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
            <input type="text" placeholder="Notes" value={editForm.notes || ""} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-           <div className="flex-[0.6] relative">
+           <div className="flex-[0.6] relative w-full sm:w-auto">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
               <input type="number" placeholder={expenseLabel} value={editForm.umpire_fee ?? ""} onChange={(e) => setEditForm({...editForm, umpire_fee: e.target.value === '' ? '' : Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl pl-8 pr-4 py-3 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
            </div>
