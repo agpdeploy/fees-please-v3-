@@ -4,6 +4,53 @@ import { createClient } from '@supabase/supabase-js';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy');
 
+function getLineupStatsHtml(
+    yesCount: number, 
+    maybeCount: number, 
+    noCount: number, 
+    unconfirmedCount: number, 
+    squadSize: number,
+    yesNamesHtml: string,
+    maybeNamesHtml: string,
+    noNamesHtml: string,
+    unconfirmedNamesHtml: string
+) {
+    return `
+    <div style="background-color: #fafafa; padding: 16px; border-top: 1px solid #f4f4f5;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+        <tr>
+          <td align="left"><span style="font-size: 10px; font-weight: 900; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">Lineup Status</span></td>
+          <td align="right"><span style="font-size: 10px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px;">${yesCount} / ${squadSize} Confirmed</span></td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" style="table-layout: fixed;">
+        <tr>
+          <td align="center" valign="top" width="25%" style="padding: 0 4px; overflow-wrap: break-word;">
+            <div style="font-size: 14px; font-weight: 900; color: #18181b;">${yesCount}</div>
+            <div style="font-size: 8px; font-weight: 700; color: #10b981; text-transform: uppercase; margin-top: 2px;">Avail</div>
+            <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${yesNamesHtml}</div>
+          </td>
+          <td align="center" valign="top" width="25%" style="padding: 0 4px; overflow-wrap: break-word;">
+            <div style="font-size: 14px; font-weight: 900; color: #18181b;">${maybeCount}</div>
+            <div style="font-size: 8px; font-weight: 700; color: #f59e0b; text-transform: uppercase; margin-top: 2px;">Maybe</div>
+            <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${maybeNamesHtml}</div>
+          </td>
+          <td align="center" valign="top" width="25%" style="padding: 0 4px; overflow-wrap: break-word;">
+            <div style="font-size: 14px; font-weight: 900; color: #18181b;">${noCount}</div>
+            <div style="font-size: 8px; font-weight: 700; color: #ef4444; text-transform: uppercase; margin-top: 2px;">Out</div>
+            <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${noNamesHtml}</div>
+          </td>
+          <td align="center" valign="top" width="25%" style="padding: 0 4px; overflow-wrap: break-word;">
+            <div style="font-size: 14px; font-weight: 900; color: #18181b;">${unconfirmedCount}</div>
+            <div style="font-size: 8px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; margin-top: 2px;">Unconf</div>
+            <div style="font-size: 10px; color: #71717a; margin-top: 6px; line-height: 1.4;">${unconfirmedNamesHtml}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    `;
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -78,7 +125,130 @@ export async function GET(req: Request) {
       
       const clubName = report.clubs?.name || 'Fees Please Club';
       const teamName = report.teams?.name || 'All Teams';
+      const entityName = report.report_type === 'club_summary' ? clubName : `${clubName} - ${teamName}`;
+      const subjectDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+      
+      let htmlContent = '';
+      let emailSubject = '';
 
+      const formatter = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 2 });
+      let collectedToDate = 0;
+      let cash = 0;
+      let card = 0;
+      let expensesToDate = 0;
+      let totalOutstanding = 0;
+      let teamCollections: Record<string, { name: string, amount: number }> = {};
+      let topDebtorsHtml = '';
+      let topCreditsHtml = '';
+      let fixturesHtml = '';
+
+      // --- AVAILABILITY REPORT ---
+      if (report.report_type === 'availability_report' && teamId) {
+        const { data: nextFixtures } = await supabaseAdmin.from('fixtures')
+          .select('id, match_date, opponent, location, start_time')
+          .eq('team_id', teamId)
+          .gte('match_date', new Date().toISOString().split('T')[0])
+          .order('match_date', { ascending: true })
+          .limit(3);
+
+        if (nextFixtures && nextFixtures.length > 0) {
+          
+          const { data: allTeamPlayers } = await supabaseAdmin.from('players').select('id, first_name, last_name, nickname').eq('default_team_id', teamId).eq('is_active', true);
+          const squadSize = allTeamPlayers?.length || 0;
+          const playerList = allTeamPlayers || [];
+
+          let featuredGamesHtml = '';
+          for (const f of nextFixtures) {
+            const fDate = new Date(f.match_date).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' });
+            
+            const { data: availData } = await supabaseAdmin.from('availability').select('player_id, status').eq('fixture_id', f.id);
+            const availability = availData || [];
+
+            const yesPlayers = playerList.filter(p => availability.find(a => a.player_id === p.id)?.status === 'yes');
+            const maybePlayers = playerList.filter(p => availability.find(a => a.player_id === p.id)?.status === 'maybe');
+            const noPlayers = playerList.filter(p => availability.find(a => a.player_id === p.id)?.status === 'no');
+            const pendingPlayers = playerList.filter(p => !availability.find(a => a.player_id === p.id) || availability.find(a => a.player_id === p.id)?.status === 'no_reply');
+
+            const formatNames = (players: any[]) => players.map(p => (p.nickname || `${p.first_name || ''} ${p.last_name?.charAt(0) || ''}.`).trim()).join('<br/>');
+
+            featuredGamesHtml += `
+              <div style="background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 16px;">
+                <div style="padding: 16px; border-bottom: 1px solid #f4f4f5;">
+                  <span style="background-color: #f4f4f5; color: #71717a; font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; letter-spacing: 1px;">${fDate}</span>
+                </div>
+                <div style="padding: 16px;">
+                  <div style="font-size: 14px; font-weight: 900; color: #18181b; text-transform: uppercase;">vs ${f.opponent || 'TBA'}</div>
+                  <div style="font-size: 10px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">${f.start_time ? `${f.start_time} • ` : ''}${f.location || 'Location TBA'}</div>
+                </div>
+                ${getLineupStatsHtml(yesPlayers.length, maybePlayers.length, noPlayers.length, pendingPlayers.length, squadSize, formatNames(yesPlayers), formatNames(maybePlayers), formatNames(noPlayers), formatNames(pendingPlayers))}
+              </div>
+            `;
+          }
+
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.feesplease.app';
+          const teamUrl = `${baseUrl}/t/${report.teams?.slug || teamId}`;
+          const loginUrl = `${baseUrl}/login`;
+          const teamLogoUrl = null; // Can optionally fetch team logo here if needed, but not strictly necessary since it is a general report
+
+          emailSubject = `Availability Report: ${teamName}`;
+          
+          htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+              <style>
+                @media only screen and (max-width: 500px) {
+                  .stack-column {
+                    display: block !important;
+                    width: 100% !important;
+                    border-right: none !important;
+                    border-bottom: 1px solid #f4f4f5 !important;
+                    padding: 16px 0 !important;
+                  }
+                  .stack-column:last-child {
+                    border-bottom: none !important;
+                  }
+                }
+              </style>
+            </head>
+            <body>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f4f5; padding: 20px; border-radius: 12px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="left" valign="middle">
+                    <h1 style="color: #18181b; font-size: 18px; font-weight: 900; margin: 0; text-transform: uppercase;">Availability Summary</h1>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #52525b; font-size: 16px; margin-top: 0; margin-bottom: 24px; text-align: center;">
+                Here is the latest availability for your upcoming matches.
+              </p>
+              
+              ${featuredGamesHtml}
+
+              <div style="text-align: center; margin-top: 24px;">
+                <a href="${loginUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-weight: 900; font-size: 14px; padding: 12px 24px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px;">Log In</a>
+              </div>
+
+              <div style="text-align: center; margin-top: 40px;">
+                <a href="https://feesplease.app" target="_blank" style="text-decoration: none;">
+                  <p style="font-size: 10px; font-weight: 700; color: #a1a1aa; margin-bottom: 8px; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">Powered By</p>
+                  <img src="https://app.feesplease.app/branding/logo-green-1000x300.png" alt="Fees Please" height="32" style="height: 32px; width: auto;" />
+                </a>
+              </div>
+            </div>
+            </body>
+            </html>
+          `;
+        } else {
+          console.log(`No upcoming fixtures for team ${teamId}, skipping availability report.`);
+          continue;
+        }
+      }
+
+      if (!htmlContent) {
       // --- FINANCIAL CALCULATION ---
       // Fetch all players for this club/team to associate balances
       let playersQuery = supabaseAdmin.from('players').select('id, first_name, last_name, nickname').eq('club_id', clubId);
@@ -95,13 +265,13 @@ export async function GET(req: Request) {
       }
       const { data: transactions } = await txQuery;
       
-      let collectedToDate = 0;
+      collectedToDate = 0;
       let collectedThisWeek = 0;
-      let cash = 0;
-      let card = 0;
-      let expensesToDate = 0;
+      cash = 0;
+      card = 0;
+      expensesToDate = 0;
       
-      const teamCollections: Record<string, { name: string, amount: number }> = {};
+      teamCollections = {};
       const playerBalances: Record<string, { name: string, balance: number }> = {};
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -139,7 +309,7 @@ export async function GET(req: Request) {
         }
       });
 
-      const totalOutstanding = Object.values(playerBalances).reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
+      totalOutstanding = Object.values(playerBalances).reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
       
       const sortedBalances = Object.values(playerBalances).sort((a, b) => b.balance - a.balance);
       const topDebtors = sortedBalances.filter(p => p.balance > 0).slice(0, 5);
@@ -243,9 +413,8 @@ export async function GET(req: Request) {
 
 
       // --- HTML BUILDERS ---
-      const formatter = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 2 });
       
-      let topDebtorsHtml = '';
+      topDebtorsHtml = '';
       if (topDebtors.length === 0) {
         topDebtorsHtml = '<div style="font-size: 10px; font-weight: 700; font-style: italic; color: #a1a1aa;">No outstanding debts.</div>';
       } else {
@@ -259,7 +428,7 @@ export async function GET(req: Request) {
         `).join('');
       }
 
-      let topCreditsHtml = '';
+      topCreditsHtml = '';
       if (topCredits.length === 0) {
         topCreditsHtml = '<div style="font-size: 10px; font-weight: 700; font-style: italic; color: #a1a1aa;">No players in credit.</div>';
       } else {
@@ -274,20 +443,27 @@ export async function GET(req: Request) {
       }
 
 
-      // --- RECIPIENTS ---
-      let rolesQuery = supabaseAdmin.from('user_roles').select('email, role').eq('club_id', clubId);
-      if (teamId) {
-        rolesQuery = rolesQuery.or(`and(role.eq.team_admin,team_id.eq.${teamId}),role.in.(club_admin)`);
-      } else {
-        rolesQuery = rolesQuery.in('role', ['club_admin']);
+      // End of if(!htmlContent) financial calculation block
       }
-      const { data: recipientsData } = await rolesQuery;
-      let recipientEmails = (recipientsData || []).map(r => r.email).filter(Boolean);
 
-      // Also get super admins
-      const { data: superAdmins } = await supabaseAdmin.from('profiles').select('email').eq('role', 'super_admin');
-      if (superAdmins) {
-        recipientEmails.push(...superAdmins.map(p => p.email).filter(Boolean));
+      // --- RECIPIENTS ---
+      let recipientEmails: string[] = [];
+
+      if (report.send_to_all_admins !== false) {
+        let rolesQuery = supabaseAdmin.from('user_roles').select('email, role').eq('club_id', clubId);
+        if (teamId) {
+          rolesQuery = rolesQuery.or(`and(role.eq.team_admin,team_id.eq.${teamId}),role.in.(club_admin)`);
+        } else {
+          rolesQuery = rolesQuery.in('role', ['club_admin']);
+        }
+        const { data: recipientsData } = await rolesQuery;
+        recipientEmails = (recipientsData || []).map(r => r.email).filter(Boolean);
+
+        // Also get super admins
+        const { data: superAdmins } = await supabaseAdmin.from('profiles').select('email').eq('role', 'super_admin');
+        if (superAdmins) {
+          recipientEmails.push(...superAdmins.map(p => p.email).filter(Boolean));
+        }
       }
 
       if (report.recipient_emails) {
@@ -297,9 +473,6 @@ export async function GET(req: Request) {
 
       recipientEmails = Array.from(new Set(recipientEmails));
       if (recipientEmails.length === 0) continue;
-
-      const entityName = report.report_type === 'club_summary' ? clubName : `${clubName} - ${teamName}`;
-      const subjectDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
       // Fetch team profile for logo
       let tpQuery = supabaseAdmin.from('public_team_profiles').select('club_logo_url').eq('club_id', clubId);
@@ -346,8 +519,9 @@ export async function GET(req: Request) {
       
       const teamLogoUrl = tpData?.club_logo_url || null;
 
+      if (!htmlContent) {
       // --- FINAL EMAIL HTML (LIGHT THEME) ---
-      const htmlContent = `
+      htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -475,6 +649,11 @@ export async function GET(req: Request) {
         </body>
         </html>
       `;
+      } // End of htmlContent overwrite block
+
+      if (!emailSubject) {
+         emailSubject = `Summary Report for ${entityName} ${subjectDate}`;
+      }
 
       const isTestingEnv = process.env.NODE_ENV !== 'production' || 
                            process.env.VERCEL_ENV === 'preview' || 
@@ -500,7 +679,7 @@ export async function GET(req: Request) {
         return {
           from: `Fees Please Insights <insights@mail.feesplease.app>`,
           to: targetEmail,
-          subject: `${testPrefix}Summary Report for ${entityName} ${subjectDate}`,
+          subject: `${testPrefix}${emailSubject}`,
           html: finalHtml,
         };
       });

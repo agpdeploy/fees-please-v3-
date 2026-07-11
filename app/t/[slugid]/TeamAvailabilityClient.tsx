@@ -208,6 +208,22 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
     });
     await supabase.from("availability").upsert({ player_id: activePlayerId, fixture_id: fixtureId, status: status }, { onConflict: 'player_id, fixture_id' });
     
+    // --- TRIGGER INSTANT AVAILABILITY NOTIFICATION ---
+    try {
+      fetch('/api/admin/send-availability-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fixtureId,
+          teamId,
+          playerId: activePlayerId,
+          status,
+        })
+      });
+    } catch (e) {
+      console.error('Instant notification trigger failed', e);
+    }
+    
     // --- POSTHOG TRACKING EVENT ---
     try {
       if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {

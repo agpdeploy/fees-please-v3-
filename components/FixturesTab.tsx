@@ -15,6 +15,7 @@ interface FixturesTabProps {
   profile: any;
   clubLogoUrl?: string;
   activeSeasonName?: string | null;
+  hasPlusFeatures?: boolean;
 }
 
 interface DraftFixture {
@@ -25,7 +26,7 @@ interface DraftFixture {
   notes: string;
 }
 
-export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl, activeSeasonName }: FixturesTabProps) {
+export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl, activeSeasonName, hasPlusFeatures }: FixturesTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -468,6 +469,7 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
             clubPlayers={clubPlayers}
             profile={profile}
             clubLogoUrl={clubLogoUrl}
+            hasPlusFeatures={hasPlusFeatures}
           />
         ))}
         {displayedFixtures.length === 0 && fixtureTeamId && (
@@ -481,10 +483,16 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
 }
 
 // INLINE EDITING & SQUAD COMPONENT
-function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl }: { fixture: any, teams: any[], expenseLabel: string, loadClubData: () => Promise<void>, showToast: (msg: string, type?: 'success'|'error') => void, clubPlayers: any[], profile: any, clubLogoUrl?: string }) {
+function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl, hasPlusFeatures }: { fixture: any, teams: any[], expenseLabel: string, loadClubData: () => Promise<void>, showToast: (msg: string, type?: 'success'|'error') => void, clubPlayers: any[], profile: any, clubLogoUrl?: string, hasPlusFeatures?: boolean }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSquadExpanded, setIsSquadExpanded] = useState(false);
+  
+  const [isEmailingPlayers, setIsEmailingPlayers] = useState(false);
+  const [emailSelectedPlayerIds, setEmailSelectedPlayerIds] = useState<string[]>([]);
+  const [availabilityEmailNote, setAvailabilityEmailNote] = useState("");
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [expandedEmailSections, setExpandedEmailSections] = useState<Record<string, boolean>>({ yes: true, maybe: true, no_reply: true, no: false });
   
   const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
   const [availabilityData, setAvailabilityData] = useState<any[]>([]);
@@ -544,10 +552,50 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
 
   async function handleUpdate() {
     setIsSaving(true);
+    const didChange = editForm.match_date !== fixture.match_date || editForm.start_time !== fixture.start_time || editForm.location !== fixture.location || editForm.opponent !== fixture.opponent;
+    
     const { error } = await supabase.from("fixtures").update(editForm).eq("id", fixture.id);
     setIsSaving(false);
-    if (error) showToast(error.message, "error");
-    else { showToast("Match updated!"); setIsEditing(false); loadClubData(); }
+    if (error) {
+      showToast(error.message, "error");
+    } else { 
+      showToast("Match updated!"); 
+      setIsEditing(false); 
+      loadClubData(); 
+      
+      if (hasPlusFeatures && didChange) {
+        await fetchSquadData();
+        // Select all active team players by default
+        const eligible = clubPlayers.filter(p => p.default_team_id === fixture.team_id && p.is_active !== false && p.email && p.unsubscribed !== true);
+        setEmailSelectedPlayerIds(eligible.map(p => p.id));
+        setIsEmailingPlayers(true);
+      }
+    }
+  }
+
+  async function handleSendMatchUpdate() {
+    if (emailSelectedPlayerIds.length === 0) return;
+    setIsSendingReminders(true);
+    try {
+      const res = await fetch('/api/send-match-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fixtureId: fixture.id,
+          teamId: fixture.team_id,
+          playerIds: emailSelectedPlayerIds,
+          customNote: availabilityEmailNote
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send emails');
+      showToast(`Successfully sent to ${data.sentCount} players!`);
+      setIsEmailingPlayers(false);
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setIsSendingReminders(false);
+    }
   }
 
   async function handleToggleActive() {
@@ -641,6 +689,145 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
     }
     setIsSaving(false); 
     setIsSquadExpanded(false); 
+  }
+
+  if (isEmailingPlayers) {
+    return (
+      <div className="bg-white dark:bg-zinc-900 border-2 border-blue-500 p-5 rounded-2xl flex flex-col gap-4 shadow-xl transition-colors animate-in fade-in slide-in-from-top-4">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-2">
+          <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-500 flex items-center gap-2">
+            <i className="fa-solid fa-paper-plane"></i> Notify Players of Changes
+          </h3>
+          <button onClick={() => setIsEmailingPlayers(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+          The match details have been updated. Select players to notify and prompt them to confirm their availability for the new time.
+        </p>
+
+        <textarea 
+          placeholder="Add a custom note (e.g. Game time has been moved to 7 PM!)..."
+          className="w-full text-xs p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1A1A1A] text-zinc-900 dark:text-white mb-1 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 shadow-sm focus:border-blue-500 outline-none transition-colors"
+          rows={2}
+          value={availabilityEmailNote}
+          onChange={(e) => setAvailabilityEmailNote(e.target.value)}
+        />
+
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black uppercase text-zinc-400">Select Recipients</span>
+          <button 
+            onClick={() => {
+              const eligible = clubPlayers.filter(p => p.default_team_id === fixture.team_id && p.is_active !== false && p.email && p.email.trim() !== '' && p.unsubscribed !== true);
+              if (emailSelectedPlayerIds.length === eligible.length && eligible.length > 0) {
+                 setEmailSelectedPlayerIds([]);
+              } else {
+                 setEmailSelectedPlayerIds(eligible.map(s => s.id));
+              }
+            }}
+            className="text-[9px] font-black uppercase text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-md transition-colors"
+          >
+             {emailSelectedPlayerIds.length > 0 ? "Deselect All" : "Select All"}
+          </button>
+        </div>
+
+        <div className="max-h-[300px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+          {['yes', 'maybe', 'no_reply', 'no'].map((section) => {
+            const sectionPlayers = clubPlayers.filter(p => {
+              const avail = availabilityData.find(a => a.player_id === p.id);
+              const status = avail ? avail.status : 'no_reply';
+              return p.default_team_id === fixture.team_id && p.is_active !== false && status === section;
+            });
+
+            if (sectionPlayers.length === 0) return null;
+
+            const config = {
+              yes: { label: "Said Available", color: "text-emerald-500", icon: "fa-circle-check" },
+              maybe: { label: "Said Maybe", color: "text-amber-500", icon: "fa-circle-question" },
+              no_reply: { label: "Pending", color: "text-zinc-400 dark:text-zinc-500", icon: "fa-circle" },
+              no: { label: "Said Unavailable", color: "text-red-500", icon: "fa-circle-xmark" }
+            }[section as 'yes' | 'maybe' | 'no_reply' | 'no'];
+
+            const isSecExpanded = expandedEmailSections[section];
+            const toggleSec = () => setExpandedEmailSections(prev => ({...prev, [section]: !prev[section]}));
+
+            return (
+              <div key={section} className="mb-2">
+                <button onClick={toggleSec} className="w-full flex items-center justify-between py-2 text-left group">
+                  <h3 className={`text-[10px] font-black uppercase tracking-widest ${config.color} flex items-center gap-2`}>
+                    <i className={`fa-solid ${config.icon}`}></i> {config.label} ({sectionPlayers.length})
+                  </h3>
+                  <i className={`fa-solid fa-chevron-${isSecExpanded ? 'up' : 'down'} text-[10px] text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors`}></i>
+                </button>
+                
+                {isSecExpanded && (
+                  <div className="flex flex-wrap gap-2 pt-2 pb-1 animate-in fade-in">
+                    {sectionPlayers.map(p => {
+                       const isSelected = emailSelectedPlayerIds.includes(p.id);
+                       const hasEmail = !!p.email;
+                       const isDisabled = !hasEmail || p.unsubscribed === true;
+                       
+                       return (
+                         <button 
+                           key={p.id}
+                           disabled={isDisabled}
+                           onClick={() => {
+                             if (!isDisabled) {
+                                setEmailSelectedPlayerIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
+                             }
+                           }}
+                           className={`relative flex flex-col p-3 rounded-xl border transition-all text-left min-w-[140px] flex-1 sm:flex-none ${
+                             isSelected ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-400 dark:border-blue-500/50 shadow-sm' : 
+                             isDisabled ? 'bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-60' : 
+                             'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700'
+                           }`}
+                         >
+                           <div className="flex justify-between items-start mb-2 gap-4 w-full">
+                             <span className={`text-[11px] font-black uppercase tracking-widest ${isDisabled ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                               {p.nickname || `${p.first_name} ${p.last_name?.charAt(0) || ''}.`}
+                             </span>
+                             {isSelected ? (
+                               <div className="w-5 h-5 rounded bg-blue-500 text-white flex items-center justify-center shadow-sm shrink-0">
+                                 <i className="fa-solid fa-check text-[10px]"></i>
+                               </div>
+                             ) : isDisabled ? null : (
+                               <div className="text-zinc-300 dark:text-zinc-700 text-xs font-black">+</div>
+                             )}
+                           </div>
+                           
+                           <div className="text-[8px] font-bold tracking-widest uppercase flex items-center gap-1 mt-auto">
+                             {!hasEmail ? (
+                               <span className="text-red-500"><i className="fa-solid fa-envelope-circle-xmark mr-1"></i> No Email</span>
+                             ) : p.unsubscribed ? (
+                               <span className="text-amber-500"><i className="fa-solid fa-ban mr-1"></i> Unsubscribed</span>
+                             ) : (
+                               <span className="text-blue-500"><i className="fa-regular fa-envelope mr-1"></i> Ready</span>
+                             )}
+                           </div>
+                         </button>
+                       );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="flex gap-3 mt-2">
+          <button onClick={() => setIsEmailingPlayers(false)} className="flex-1 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Skip</button>
+          <button 
+            onClick={handleSendMatchUpdate}
+            disabled={isSendingReminders || emailSelectedPlayerIds.length === 0}
+            className="flex-[2] py-3 flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+          >
+            {isSendingReminders ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
+            Send to {emailSelectedPlayerIds.length} Player{emailSelectedPlayerIds.length !== 1 ? 's' : ''}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (isEditing) {
