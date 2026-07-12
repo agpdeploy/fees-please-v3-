@@ -260,7 +260,7 @@ export default function Team() {
       setSquadMode('squad');
     } else {
       setExpandedFixtureId(fId);
-      const showAvailabilityTab = fId === nextUpcomingFixtureId;
+      const showAvailabilityTab = fId === nextUpcomingFixtureId || planTier !== 'free';
       setActiveTab(showAvailabilityTab ? 'availability' : 'squad');
       setAvailabilityMode('menu');
       setSquadMode('squad');
@@ -721,7 +721,7 @@ export default function Team() {
                        {isExpanded && (
                           <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111] animate-in slide-in-from-top-2 fade-in duration-200">
                              
-                             {canManageTeam(f.team_id) && f.id === nextUpcomingFixtureId && (
+                             {canManageTeam(f.team_id) && (f.id === nextUpcomingFixtureId || planTier !== 'free') && (
                                 <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 transition-colors mb-4 rounded-t-2xl">
                                   <div className="relative flex bg-emerald-50 dark:bg-emerald-950/40 p-1 rounded-xl">
                                     <div 
@@ -748,7 +748,7 @@ export default function Team() {
                              )}
 
                              {/* --- AVAILABILITY TAB --- */}
-                             {activeTab === 'availability' && canManageTeam(f.team_id) && f.id === nextUpcomingFixtureId && (
+                             {activeTab === 'availability' && canManageTeam(f.team_id) && (f.id === nextUpcomingFixtureId || planTier !== 'free') && (
                                <div className="animate-in fade-in slide-in-from-left-4 duration-300">
                                  {availabilityMode === 'menu' ? (
                                    <div className="flex flex-col gap-3">
@@ -1103,7 +1103,7 @@ export default function Team() {
                                            );
                                          })}
 
-                                         {canManageTeam(f.team_id) && (
+                                         {canManageTeam(f.team_id) && (f.id === nextUpcomingFixtureId || planTier !== 'free') && (
                                            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
                                              <button 
                                                onClick={async () => {
