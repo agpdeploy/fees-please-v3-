@@ -30,7 +30,7 @@ function getEmailHtml(
         ${featuredGamesHtml}
 
         <div style="text-align: center; margin-top: 24px;">
-          <a href="${baseUrl}/login" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-weight: 900; font-size: 14px; padding: 12px 24px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px;">Log In</a>
+          <a href="${baseUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-weight: 900; font-size: 14px; padding: 12px 24px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px;">Log In</a>
         </div>
 
         <div style="text-align: center; margin-top: 40px;">

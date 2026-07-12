@@ -187,7 +187,7 @@ export async function GET(req: Request) {
 
           const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.feesplease.app';
           const teamUrl = `${baseUrl}/t/${report.teams?.slug || teamId}`;
-          const loginUrl = `${baseUrl}/login`;
+          const loginUrl = `${baseUrl}`;
           const teamLogoUrl = null; // Can optionally fetch team logo here if needed, but not strictly necessary since it is a general report
 
           emailSubject = `Availability Report: ${teamName}`;
@@ -560,7 +560,7 @@ export async function GET(req: Request) {
                   <h2 style="font-size: 12px; color: #71717a; margin: 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Weekly Insights for ${entityName}</h2>
                 </td>
                 <td align="right" valign="middle">
-                  <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.feesplease.app'}/login" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Log In</a>
+                  <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.feesplease.app'}" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Log In</a>
                 </td>
               </tr>
             </table>
