@@ -111,10 +111,6 @@ export default function TeamListGraphicBuilder({
       if (team.settings.image_rotation !== undefined) setImageRotation(team.settings.image_rotation);
     }
 
-    if (fixture?.lists?.squadIds) {
-      setOrderedPlayers([...fixture.lists.squadIds]);
-    }
-
     const loadSponsorsAndClub = async () => {
       if (editMode === 'club' && clubId) {
         const { data: teamData } = await supabase.from('teams').select('id').eq('club_id', clubId).limit(1).single();
@@ -198,8 +194,10 @@ export default function TeamListGraphicBuilder({
         if (fix.matchNotesOverride !== undefined) setMatchNotesOverride(fix.matchNotesOverride);
         if (fix.matchNotesBg) setMatchNotesBg(fix.matchNotesBg);
       } catch (e) {}
+    } else if (fixture?.lists?.squadIds) {
+      setOrderedPlayers([...fixture.lists.squadIds]);
     }
-  }, [isOpen, mounted, team?.id, fixture?.id]);
+  }, [isOpen, mounted, team?.id, fixture?.id, fixture?.lists?.squadIds]);
 
   // Save to LocalStorage on change
   useEffect(() => {
