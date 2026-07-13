@@ -185,7 +185,7 @@ export default function Ledger() {
       };
     });
 
-    txData.forEach(tx => {
+    allTx.forEach(tx => {
       // Global Tracking for Season Wallet Math (Filtered strictly to current team)
       if (tx.team_id === activeTeamId) {
           if (tx.transaction_type === 'payment') {
