@@ -489,11 +489,34 @@ export default function Setup({ activeTab }: SetupProps) {
     };
     
     if (clubId && clubId !== 'new') {
-      const { error } = await supabase.from("clubs").update(payload).eq("id", clubId);
-      if (error) { showToast(error.message, "error"); return; }
-      
-      const { data: clubTeams } = await supabase.from('teams').select('id, name').eq('club_id', clubId);
-      if (clubTeams && clubTeams.length > 0) {
+        const { error } = await supabase.from("clubs").update(payload).eq("id", clubId);
+        if (error) { showToast(error.message, "error"); return; }
+        
+        const { data: clubTeams } = await supabase.from('teams').select('id, name').eq('club_id', clubId);
+
+        // Cascade Rename: If the season name was changed, update all fixtures and transactions BEFORE UI updates
+        if (clubRecord?.season_name && seasonName && clubRecord.season_name !== seasonName) {
+          const teamIds = clubTeams ? clubTeams.map(t => t.id) : [];
+          if (teamIds.length > 0) {
+            try {
+              const res = await fetch('/api/admin/rename-season', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  activeClubId: clubId,
+                  oldSeasonName: clubRecord.season_name,
+                  newSeasonName: seasonName,
+                  teamIds
+                })
+              });
+              if (!res.ok) console.error("Failed to cascade rename season");
+            } catch (err) {
+              console.error("Failed to cascade rename season:", err);
+            }
+          }
+        }
+
+        if (clubTeams && clubTeams.length > 0) {
         const storefrontPayload = clubTeams.map(t => ({ 
            team_id: t.id, 
            team_name: t.name, 

@@ -23,7 +23,7 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
   const [playersLoaded, setPlayersLoaded] = useState(false);
 
   // Financial Stats
-  const [seasonWallet, setSeasonWallet] = useState({ cash: 0, card: 0 });
+  const [seasonWallet, setSeasonWallet] = useState({ cash: 0, card: 0, cashIn: 0 });
   const [overallNet, setOverallNet] = useState(0);
   const [seasonAudit, setSeasonAudit] = useState<any[]>([]);
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
@@ -157,7 +157,7 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
         if (tx.team_id === selectedTeamId) {
             if (tx.transaction_type === 'payment') {
               if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
-              else totalCashIn += Number(tx.amount);
+              else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit') totalCashIn += Number(tx.amount);
           }
           if (tx.transaction_type === 'expense') {
             totalExpenses += Number(tx.amount);
@@ -204,7 +204,7 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
 
       setSeasonAudit(auditArray);
       
-      setSeasonWallet({ cash: totalCashIn - totalExpenses, card: totalCardIn });
+      setSeasonWallet({ cash: totalCashIn - totalExpenses, card: totalCardIn, cashIn: totalCashIn });
       setOverallNet((totalCashIn + totalCardIn) - totalExpenses);
       
       const teamFeedTransactions = filteredTx.filter(tx => tx.team_id === selectedTeamId || (tx.player_id && !tx.fixture_id));
@@ -336,11 +336,11 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Financial Health</h2>
             </div>
             
-            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-zinc-100 dark:divide-zinc-800 border-b border-zinc-100 dark:border-zinc-800/50 pb-5 mb-5">
+            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-zinc-100 dark:divide-zinc-800 border-b border-zinc-100 dark:divide-zinc-800/50 pb-5 mb-5">
                <div className="flex-1 text-center py-4 sm:py-0">
-                  <div className="text-4xl font-black text-emerald-500 mb-1">${(totalCollected + seasonWallet.cash + seasonWallet.card).toFixed(0)}</div>
+                  <div className="text-4xl font-black text-emerald-500 mb-1">${(seasonWallet.cashIn + seasonWallet.card).toFixed(0)}</div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">Fees Collected</div>
-                  <div className="text-[10px] text-zinc-500 font-bold mt-1">${seasonWallet.cash.toFixed(0)} Cash | ${seasonWallet.card.toFixed(0)} Card</div>
+                  <div className="text-[10px] text-zinc-500 font-bold mt-1">${seasonWallet.cashIn.toFixed(0)} Cash | ${seasonWallet.card.toFixed(0)} Card</div>
                </div>
                <div className="flex-1 text-center py-4 sm:py-0">
                   <div className="text-4xl font-black text-amber-500 mb-1">${overallNet.toFixed(0)}</div>

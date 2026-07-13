@@ -78,7 +78,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
     let totalAllExpenses = 0;
 
     txs.forEach(tx => {
-      if (tx.transaction_type === 'payment' && tx.payment_method !== 'kitty') totalRealIncome += Number(tx.amount);
+      if (tx.transaction_type === 'payment' && tx.payment_method !== 'kitty' && tx.payment_method !== 'write_off' && tx.payment_method !== 'credit') totalRealIncome += Number(tx.amount);
       if (tx.transaction_type === 'expense') totalAllExpenses += Number(tx.amount);
 
       if (tx.player_id && tx.players) {

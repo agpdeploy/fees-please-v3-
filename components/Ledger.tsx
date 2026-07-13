@@ -16,6 +16,7 @@ export default function Ledger() {
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [allTimeTransactions, setAllTimeTransactions] = useState<any[]>([]);
   
   const [seasonAudit, setSeasonAudit] = useState<any[]>([]);
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
@@ -157,6 +158,7 @@ export default function Ledger() {
     const fixData = allFixtures.filter(f => !clubSeason || f.season_name === clubSeason);
     const txData = allTx.filter(t => !clubSeason || t.season_name === clubSeason);
 
+    setAllTimeTransactions(allTx);
     setAllTransactions(txData);
     setFixtures(fixData);
     
@@ -188,9 +190,9 @@ export default function Ledger() {
     allTx.forEach(tx => {
       // Global Tracking for Season Wallet Math (Filtered strictly to current team)
       if (tx.team_id === activeTeamId) {
-          if (tx.transaction_type === 'payment') {
-            if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
-            else totalCashIn += Number(tx.amount);
+        if (tx.transaction_type === 'payment') {
+          if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
+          else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit') totalCashIn += Number(tx.amount);
         }
         if (tx.transaction_type === 'expense') {
           totalExpenses += Number(tx.amount);
@@ -270,7 +272,7 @@ export default function Ledger() {
     const map = new Map();
     const groups: any[] = [];
     
-    allTransactions.forEach(tx => {
+    allTimeTransactions.forEach(tx => {
       if (!tx.player_id) return; // Only for player ledger
       const dateObj = new Date(tx.created_at);
       const dateKey = dateObj.toLocaleDateString('en-GB'); 
@@ -303,7 +305,7 @@ export default function Ledger() {
     });
 
     return groups.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [allTransactions]);
+  }, [allTimeTransactions]);
 
   // --- DERIVED GROUPED FEED (Current Team Only) ---
   const groupedFeed = useMemo(() => {

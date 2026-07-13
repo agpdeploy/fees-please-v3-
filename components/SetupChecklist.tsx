@@ -959,6 +959,30 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       return;
     }
 
+    // Cascade Rename: If the season name was changed, update all fixtures and transactions BEFORE UI updates
+    if (clubInfo?.season_name && seasonName && clubInfo.season_name !== seasonName) {
+      const teamIds = teams && Array.isArray(teams) ? teams.map(t => t.id).filter(Boolean) : [];
+      if (teamIds.length > 0) {
+        try {
+          const res = await fetch('/api/admin/rename-season', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              activeClubId,
+              oldSeasonName: clubInfo.season_name,
+              newSeasonName: seasonName,
+              teamIds
+            })
+          });
+          if (!res.ok) {
+            console.error("Failed to cascade rename season");
+          }
+        } catch (err) {
+          console.error("Failed to cascade rename season:", err);
+        }
+      }
+    }
+
     // Update the parent component's state so the UI reflects the completion INSTANTLY
     if (onUpdateClubInfo) {
       onUpdateClubInfo({ 
