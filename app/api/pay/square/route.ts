@@ -179,6 +179,7 @@ export async function POST(request: Request) {
           amount: feeAmount,
           transaction_type: 'fee',
           status: 'paid', // Mark as paid so it doesn't show as unpaid debt
+          square_payment_id: data.payment.id,
           season_name: transaction.season_name || null
         });
       }

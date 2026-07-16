@@ -112,17 +112,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: data.errors?.[0]?.detail || "Refund failed at Square" }, { status: 400 });
     }
 
-    // Refund succeeded at Square. We must now delete the payment and the original fee from the ledger.
-    // By deleting everything matching this square_payment_id, we restore the ledger balance.
+    // Refund succeeded at Square. Delete the payment and checkout_link transactions.
     const { error: deleteError } = await serviceRoleClient
       .from('transactions')
       .delete()
-      .eq('square_payment_id', squarePaymentId);
+      .eq('square_payment_id', squarePaymentId)
+      .in('transaction_type', ['payment', 'checkout_link']);
 
     if (deleteError) {
       console.error("Failed to delete refunded transactions:", deleteError);
       return NextResponse.json({ error: "Refund processed at Square, but failed to update ledger." }, { status: 500 });
     }
+
+    // Revert associated fees and expenses back to unpaid
+    await serviceRoleClient
+      .from('transactions')
+      .update({ status: 'unpaid', square_payment_id: null })
+      .eq('square_payment_id', squarePaymentId)
+      .in('transaction_type', ['fee', 'expense']);
 
     return NextResponse.json({ success: true, refundId: data.refund.id });
   } catch (error: any) {

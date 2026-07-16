@@ -738,6 +738,15 @@ export default function GameDay() {
           .in("player_id", playersToRemove);
           
         if (removeError) throw removeError;
+
+        // Clean up any unpaid fees for removed players (e.g. from refunded payments or online checkout links)
+        await supabase
+          .from("transactions")
+          .delete()
+          .eq("fixture_id", activeFixture.id)
+          .eq("transaction_type", "fee")
+          .eq("status", "unpaid")
+          .in("player_id", playersToRemove);
       }
 
       // 5. Update Fixture Status
