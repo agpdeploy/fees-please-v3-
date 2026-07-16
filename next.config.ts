@@ -6,7 +6,7 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
-});
+} as any);
 
 const nextConfig: any = {
   allowedDevOrigins: ["192.168.1.107", "192.168.1.107:3000", "localhost:3000"],

@@ -124,12 +124,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Refund processed at Square, but failed to update ledger." }, { status: 500 });
     }
 
-    // Revert associated fees and expenses back to unpaid
-    await serviceRoleClient
+    // Fetch associated fees and expenses to determine whether to delete or revert them
+    const { data: linkedFees } = await serviceRoleClient
       .from('transactions')
-      .update({ status: 'unpaid', square_payment_id: null })
+      .select('id, fixture_id')
       .eq('square_payment_id', squarePaymentId)
       .in('transaction_type', ['fee', 'expense']);
+
+    if (linkedFees && linkedFees.length > 0) {
+      const feesToDelete = [];
+      const feesToRevert = [];
+      
+      for (const fee of linkedFees) {
+        if (fee.fixture_id) {
+          const { data: fixture } = await serviceRoleClient
+            .from('fixtures')
+            .select('status')
+            .eq('id', fee.fixture_id)
+            .single();
+            
+          if (fixture && fixture.status !== 'completed') {
+             // Fixture is not yet finalised, so this fee was dynamically created for this payment. It should be deleted.
+            feesToDelete.push(fee.id);
+          } else {
+             // Fixture is finalised (or past), so this was a real debt that they were paying off. Revert it.
+            feesToRevert.push(fee.id);
+          }
+        } else {
+          feesToRevert.push(fee.id);
+        }
+      }
+      
+      if (feesToDelete.length > 0) {
+        await serviceRoleClient.from('transactions').delete().in('id', feesToDelete);
+      }
+      if (feesToRevert.length > 0) {
+        await serviceRoleClient.from('transactions').update({ status: 'unpaid', square_payment_id: null }).in('id', feesToRevert);
+      }
+    }
 
     return NextResponse.json({ success: true, refundId: data.refund.id });
   } catch (error: any) {

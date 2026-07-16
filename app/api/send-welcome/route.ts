@@ -68,7 +68,8 @@ export async function POST(req: Request) {
     for (const admin of admins) {
       if (!admin.email) continue;
       
-      const firstName = (Array.isArray(admin.profiles) ? admin.profiles[0]?.first_name : admin.profiles?.first_name) || 'there';
+      const profiles: any = admin.profiles;
+      const firstName = (Array.isArray(profiles) ? profiles[0]?.first_name : profiles?.first_name) || 'there';
       const clubName = club.name || 'your club';
 
       let subject = '';
