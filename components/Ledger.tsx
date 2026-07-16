@@ -469,9 +469,12 @@ export default function Ledger() {
   const displayedAudit = showAllAudit ? relevantAudit : relevantAudit.slice(0, 4);
 
   const [isRefunding, setIsRefunding] = useState<string | null>(null);
+  const [refundConfirmId, setRefundConfirmId] = useState<string | null>(null);
 
-  const handleRefund = async (squarePaymentId: string) => {
-    if (!confirm("Are you sure you want to refund this payment? This will refund the card and remove the payment from the ledger.")) return;
+  const processRefund = async () => {
+    if (!refundConfirmId) return;
+    const squarePaymentId = refundConfirmId;
+    setRefundConfirmId(null);
     setIsRefunding(squarePaymentId);
     try {
       const res = await fetch('/api/pay/square/refund', {
@@ -495,6 +498,36 @@ export default function Ledger() {
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">
       
+      {refundConfirmId && (
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 transition-colors">
+          <div className="bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-zinc-200 dark:border-zinc-800 w-full max-w-[340px] rounded-[30px] overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="fa-solid fa-rotate-left text-2xl"></i>
+              </div>
+              <h3 className="text-xl font-black italic uppercase tracking-tighter text-zinc-900 dark:text-white mb-2">Refund Payment?</h3>
+              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-6">
+                Are you sure you want to refund this payment? This will refund the card and remove the payment from the ledger.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setRefundConfirmId(null)}
+                  className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-800/50 hover:bg-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={processRefund}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md hover:shadow-lg transition-all active:scale-95"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[100] animate-in slide-in-from-bottom-5 fade-in ${toast.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'} font-black uppercase tracking-widest text-[10px] whitespace-nowrap flex items-center gap-2`}>
           <i className={`fa-solid ${toast.type === 'success' ? 'fa-check' : 'fa-triangle-exclamation'}`}></i>
@@ -877,7 +910,7 @@ export default function Ledger() {
                                         {group.raw_transactions.filter((t: any) => t.square_payment_id && t.transaction_type === 'payment').map((t: any) => (
                                           <button 
                                             key={t.id}
-                                            onClick={() => handleRefund(t.square_payment_id)}
+                                            onClick={() => setRefundConfirmId(t.square_payment_id)}
                                             disabled={isRefunding === t.square_payment_id}
                                             className="w-full py-2 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 font-black uppercase tracking-widest text-[9px] rounded-lg transition-colors flex items-center justify-center gap-2"
                                           >

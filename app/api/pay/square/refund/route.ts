@@ -67,16 +67,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Club Square account not connected" }, { status: 400 });
     }
 
+    const squareBaseUrl = process.env.NEXT_PUBLIC_SQUARE_APP_ID?.startsWith("sandbox")
+      ? "https://connect.squareupsandbox.com"
+      : "https://connect.squareup.com";
+
+    // Fetch the original payment from Square to get the exact amount_money
+    const paymentResponse = await fetch(`${squareBaseUrl}/v2/payments/${squarePaymentId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${club.square_access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const paymentData = await paymentResponse.json();
+
+    if (!paymentResponse.ok) {
+      console.error("Square Get Payment Error:", paymentData);
+      return NextResponse.json({ error: "Could not find original payment in Square" }, { status: 400 });
+    }
+
     const idempotencyKey = crypto.randomUUID();
 
     const squarePayload = {
       idempotency_key: idempotencyKey,
-      payment_id: squarePaymentId
+      payment_id: squarePaymentId,
+      amount_money: paymentData.payment.amount_money
     };
-
-    const squareBaseUrl = process.env.NEXT_PUBLIC_SQUARE_APP_ID?.startsWith("sandbox")
-      ? "https://connect.squareupsandbox.com"
-      : "https://connect.squareup.com";
 
     // Call Square Refund API
     const response = await fetch(`${squareBaseUrl}/v2/refunds`, {
