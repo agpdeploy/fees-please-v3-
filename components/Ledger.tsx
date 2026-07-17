@@ -506,9 +506,17 @@ export default function Ledger() {
                 <i className="fa-solid fa-rotate-left text-2xl"></i>
               </div>
               <h3 className="text-xl font-black italic uppercase tracking-tighter text-zinc-900 dark:text-white mb-2">Refund Payment?</h3>
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-6">
+              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-4">
                 Are you sure you want to refund this payment? This will refund the card and remove the payment from the ledger.
               </p>
+              <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 p-3 rounded-xl text-left mb-6 flex gap-3 border border-amber-200/50 dark:border-amber-500/20">
+                <i className="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                <div className="text-[10px] leading-relaxed font-medium">
+                  <strong>HEADS UP:</strong> Square does not refund processing fees. Your club will absorb the fee cost on this refund. 
+                  <br/><br/>
+                  If this is for a cancelled match, we recommend keeping this payment as a credit instead!
+                </div>
+              </div>
               <div className="flex gap-3">
                 <button 
                   onClick={() => setRefundConfirmId(null)}
