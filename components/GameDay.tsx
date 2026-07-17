@@ -729,7 +729,16 @@ export default function GameDay() {
         if (debtError) throw debtError;
       }
 
-      // 4. Execute Removals
+      // 4. Execute Removals & Fee Cleanup
+      if (!shouldChargeFees) {
+        // If match is abandoned without charging fees, delete all fees for this fixture
+        await supabase
+          .from("transactions")
+          .delete()
+          .eq("fixture_id", activeFixture.id)
+          .eq("transaction_type", "fee");
+      }
+
       if (playersToRemove.length > 0) {
         const { error: removeError } = await supabase
           .from("match_squads")
@@ -739,14 +748,15 @@ export default function GameDay() {
           
         if (removeError) throw removeError;
 
-        // Clean up any unpaid fees for removed players (e.g. from refunded payments or online checkout links)
-        await supabase
-          .from("transactions")
-          .delete()
-          .eq("fixture_id", activeFixture.id)
-          .eq("transaction_type", "fee")
-          .eq("status", "unpaid")
-          .in("player_id", playersToRemove);
+        if (shouldChargeFees) {
+          // If we are charging fees, only clean up fees for specifically removed players
+          await supabase
+            .from("transactions")
+            .delete()
+            .eq("fixture_id", activeFixture.id)
+            .eq("transaction_type", "fee")
+            .in("player_id", playersToRemove);
+        }
       }
 
       // 5. Update Fixture Status
