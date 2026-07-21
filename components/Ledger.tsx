@@ -929,6 +929,44 @@ export default function Ledger() {
                                         ))}
                                       </div>
                                     )}
+
+                                    {/* Copy Payment Link for Unpaid Fees */}
+                                    {net < 0 && group.raw_transactions.some((t: any) => t.transaction_type === 'fee') && (
+                                      <div className="pt-2 border-t border-zinc-100 dark:border-zinc-700/50 flex flex-col gap-2">
+                                        {(() => {
+                                          const feeTx = group.raw_transactions.find((t: any) => t.transaction_type === 'fee');
+                                          if (!feeTx) return null;
+                                          return (
+                                            <button 
+                                              onClick={() => {
+                                                const url = `${window.location.origin}/pay/${feeTx.id}`;
+                                                if (navigator.clipboard && window.isSecureContext) {
+                                                  navigator.clipboard.writeText(url);
+                                                  showToast("Payment link copied!", "success");
+                                                } else {
+                                                  const textArea = document.createElement("textarea");
+                                                  textArea.value = url;
+                                                  textArea.style.position = "fixed";
+                                                  textArea.style.left = "-999999px";
+                                                  document.body.appendChild(textArea);
+                                                  textArea.select();
+                                                  try {
+                                                    document.execCommand('copy');
+                                                    showToast("Payment link copied!", "success");
+                                                  } catch (error) {
+                                                    showToast("Failed to copy link.", "error");
+                                                  }
+                                                  textArea.remove();
+                                                }
+                                              }}
+                                              className="w-full py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-widest text-[9px] rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            >
+                                              <i className="fa-solid fa-link"></i> Copy Payment Link
+                                            </button>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
