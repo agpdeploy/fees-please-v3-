@@ -188,8 +188,8 @@ export default function Ledger() {
     });
 
     allTx.forEach(tx => {
-      // Global Tracking for Season Wallet Math (Filtered strictly to current team)
-      if (tx.team_id === activeTeamId) {
+      // Global Tracking for Season Wallet Math (Filtered strictly to current team and active season)
+      if (tx.team_id === activeTeamId && (!clubSeason || tx.season_name === clubSeason)) {
         if (tx.transaction_type === 'payment') {
           if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
           else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit' && tx.payment_method !== 'kitty') totalCashIn += Number(tx.amount);
