@@ -22,6 +22,7 @@ export default function Ledger() {
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
   const [overallNet, setOverallNet] = useState(0);
   const [seasonWallet, setSeasonWallet] = useState({ cash: 0, card: 0 });
+  const [otherAudit, setOtherAudit] = useState({ cash: 0, card: 0, fee: 0, net: 0 });
   const [financialHealth, setFinancialHealth] = useState({ collected: 0, cashIn: 0, cardIn: 0, outstanding: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -169,6 +170,9 @@ export default function Ledger() {
     let totalCashIn = 0;
     let totalCardIn = 0;
     let totalExpenses = 0;
+    let otherExpenses = 0;
+    let otherCash = 0;
+    let otherCard = 0;
 
     const auditMap: Record<string, any> = {};
     fixData.forEach(f => { auditMap[f.id] = { ...f, cash: 0, card: 0, fee: 0, net: 0 }; });
@@ -191,11 +195,18 @@ export default function Ledger() {
       // Global Tracking for Season Wallet Math (Filtered strictly to current team and active season)
       if (tx.team_id === activeTeamId && (!clubSeason || tx.season_name === clubSeason)) {
         if (tx.transaction_type === 'payment') {
-          if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
-          else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit' && tx.payment_method !== 'kitty') totalCashIn += Number(tx.amount);
+          if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) {
+            totalCardIn += Number(tx.amount);
+            if (!tx.fixture_id) otherCard += Number(tx.amount);
+          }
+          else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit' && tx.payment_method !== 'kitty') {
+            totalCashIn += Number(tx.amount);
+            if (!tx.fixture_id) otherCash += Number(tx.amount);
+          }
         }
         if (tx.transaction_type === 'expense') {
           totalExpenses += Number(tx.amount);
+          if (!tx.fixture_id) otherExpenses += Number(tx.amount);
         }
       }
 
@@ -242,6 +253,7 @@ export default function Ledger() {
     }).sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
     setSeasonAudit(auditArray);
+    setOtherAudit({ cash: otherCash, card: otherCard, fee: otherExpenses, net: (otherCash + otherCard) - otherExpenses });
     
     setSeasonWallet({ cash: totalCashIn - totalExpenses, card: totalCardIn });
     setOverallNet((totalCashIn + totalCardIn) - totalExpenses);
@@ -768,6 +780,26 @@ export default function Ledger() {
               {relevantAudit.length === 0 && (
                 <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-widest">
                   No fixtures found
+                </div>
+              )}
+              
+              {(otherAudit.fee > 0 || otherAudit.cash > 0 || otherAudit.card > 0) && (
+                <div className="grid grid-cols-12 gap-2 items-center py-3 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-2 bg-zinc-50 dark:bg-zinc-900/50 -mx-5 px-5">
+                  <div className="col-span-5 flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Other (Rewards / General)</span>
+                  </div>
+                  <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.fee > 0 ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-600'}`}>
+                    ${otherAudit.fee.toFixed(0)}
+                  </div>
+                  <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.cash > 0 ? 'text-emerald-500' : 'text-emerald-500/40'}`}>
+                    ${otherAudit.cash.toFixed(0)}
+                  </div>
+                  <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.card > 0 ? 'text-blue-500' : 'text-blue-500/40'}`}>
+                    ${otherAudit.card.toFixed(0)}
+                  </div>
+                  <div className={`col-span-1 text-right text-[11px] font-black ${otherAudit.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {otherAudit.net >= 0 ? '+' : '-'}${Math.abs(otherAudit.net).toFixed(0)}
+                  </div>
                 </div>
               )}
             </div>
