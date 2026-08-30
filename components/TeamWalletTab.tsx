@@ -425,8 +425,9 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
                                         <button 
                                           onClick={() => {
                                             setInlineAction({ playerId: p.id, type: 'reward' });
-                                            const avgCost = p.games_played > 0 ? Math.floor(p.expected_cost / p.games_played).toString() : '';
-                                            setInlineForm({ name: '', amount: avgCost });
+                                            const activeTeam = manageableTeams.find(t => t.id === selectedTeamId);
+                                            const defaultFee = activeTeam?.member_fee || 20;
+                                            setInlineForm({ name: '', amount: defaultFee.toString() });
                                           }}
                                           className="flex-1 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-2"
                                         >
