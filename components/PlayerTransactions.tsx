@@ -81,18 +81,22 @@ export default function PlayerTransactions() {
       // Calculate totals
       let totalCharged = 0;
       let totalPaid = 0;
+      let actualCharged = 0;
+      let actualPaid = 0;
 
       txData.forEach(tx => {
         if (tx.transaction_type === 'fee') {
           totalCharged += Number(tx.amount);
+          if (tx.description !== 'Credit Write-off') actualCharged += Number(tx.amount);
         } else if (tx.transaction_type === 'payment') {
           totalPaid += Number(tx.amount);
+          if (tx.payment_method !== 'write_off') actualPaid += Number(tx.amount);
         }
       });
 
       setFinancials({
-        charged: totalCharged,
-        paid: totalPaid,
+        charged: actualCharged,
+        paid: actualPaid,
         outstanding: totalCharged - totalPaid
       });
 

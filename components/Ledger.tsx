@@ -192,7 +192,7 @@ export default function Ledger() {
       if (tx.team_id === activeTeamId) {
         if (tx.transaction_type === 'payment') {
           if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) totalCardIn += Number(tx.amount);
-          else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit') totalCashIn += Number(tx.amount);
+          else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit' && tx.payment_method !== 'kitty') totalCashIn += Number(tx.amount);
         }
         if (tx.transaction_type === 'expense') {
           totalExpenses += Number(tx.amount);
@@ -223,11 +223,15 @@ export default function Ledger() {
         }
         if (tx.transaction_type === 'fee') {
           balances[tx.player_id].owed += Number(tx.amount);
-          balances[tx.player_id].total_fees += Number(tx.amount);
+          if (tx.description !== 'Credit Write-off') {
+            balances[tx.player_id].total_fees += Number(tx.amount);
+          }
         }
         if (tx.transaction_type === 'payment') {
           balances[tx.player_id].owed -= Number(tx.amount);
-          balances[tx.player_id].total_paid += Number(tx.amount);
+          if (tx.payment_method !== 'write_off') {
+            balances[tx.player_id].total_paid += Number(tx.amount);
+          }
         }
       }
     });
@@ -299,8 +303,8 @@ export default function Ledger() {
 
       const g = map.get(groupKey);
       g.raw_transactions.push(tx);
-      if (tx.transaction_type === 'payment') g.paid += Number(tx.amount);
-      if (tx.transaction_type === 'fee') g.fee += Number(tx.amount);
+      if (tx.transaction_type === 'payment' && tx.payment_method !== 'write_off') g.paid += Number(tx.amount);
+      if (tx.transaction_type === 'fee' && tx.description !== 'Credit Write-off') g.fee += Number(tx.amount);
       if (tx.transaction_type === 'expense') g.expense += Number(tx.amount);
     });
 
@@ -337,8 +341,8 @@ export default function Ledger() {
 
       const g = map.get(groupKey);
       g.raw_transactions.push(tx);
-      if (tx.transaction_type === 'payment') g.paid += Number(tx.amount);
-      if (tx.transaction_type === 'fee') g.fee += Number(tx.amount);
+      if (tx.transaction_type === 'payment' && tx.payment_method !== 'write_off') g.paid += Number(tx.amount);
+      if (tx.transaction_type === 'fee' && tx.description !== 'Credit Write-off') g.fee += Number(tx.amount);
       if (tx.transaction_type === 'expense') g.expense += Number(tx.amount);
     });
 
@@ -361,8 +365,8 @@ export default function Ledger() {
         });
       }
       const p = fixturePlayerMap.get(tx.player_id);
-      if (tx.transaction_type === 'payment') p.paid += Number(tx.amount);
-      if (tx.transaction_type === 'fee') p.fee += Number(tx.amount);
+      if (tx.transaction_type === 'payment' && tx.payment_method !== 'write_off') p.paid += Number(tx.amount);
+      if (tx.transaction_type === 'fee' && tx.description !== 'Credit Write-off') p.fee += Number(tx.amount);
     } else {
       fixtureOtherTx.push(tx);
     }

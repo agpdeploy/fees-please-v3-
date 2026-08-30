@@ -188,11 +188,15 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
           }
           if (tx.transaction_type === 'fee') {
             balances[tx.player_id].owed += Number(tx.amount);
-            balances[tx.player_id].total_fees += Number(tx.amount);
+            if (tx.description !== 'Credit Write-off') {
+              balances[tx.player_id].total_fees += Number(tx.amount);
+            }
           }
           if (tx.transaction_type === 'payment') {
             balances[tx.player_id].owed -= Number(tx.amount);
-            balances[tx.player_id].total_paid += Number(tx.amount);
+            if (tx.payment_method !== 'write_off') {
+              balances[tx.player_id].total_paid += Number(tx.amount);
+            }
           }
         }
       });

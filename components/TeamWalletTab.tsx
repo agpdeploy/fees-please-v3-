@@ -69,6 +69,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
         match_cost_share: 0,
         kitty_expenses: 0,
         kitty_rewards: 0,
+        write_offs: 0,
         surplus: 0,
         nkc: 0
       };
@@ -86,13 +87,13 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
           balances[tx.player_id] = { 
             id: tx.player_id, 
             name: tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim(), 
-            real_paid: 0, expected_cost: 0, games_played: 0, match_cost_share: 0, kitty_expenses: 0, kitty_rewards: 0, surplus: 0, nkc: 0
+            real_paid: 0, expected_cost: 0, games_played: 0, match_cost_share: 0, kitty_expenses: 0, kitty_rewards: 0, write_offs: 0, surplus: 0, nkc: 0
           };
         }
         
         const b = balances[tx.player_id];
         
-        if (tx.transaction_type === 'fee') {
+        if (tx.transaction_type === 'fee' && tx.description !== 'Credit Write-off') {
             b.expected_cost += Number(tx.amount);
             if (tx.fixture_id && Number(tx.amount) >= 0) {
                 b.games_played += 1;
@@ -103,9 +104,14 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
             }
         }
         
+        if (tx.transaction_type === 'fee' && tx.description === 'Credit Write-off') {
+            b.write_offs -= Number(tx.amount);
+        }
+
         if (tx.transaction_type === 'payment') {
             if (tx.payment_method === 'kitty') b.kitty_rewards += Number(tx.amount);
-            else b.real_paid += Number(tx.amount);
+            else if (tx.payment_method === 'write_off') b.write_offs += Number(tx.amount);
+            else if (tx.payment_method !== 'credit') b.real_paid += Number(tx.amount);
         }
 
         if (tx.transaction_type === 'expense' && tx.payment_method === 'kitty') {
@@ -116,7 +122,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
 
     let totalDebts = 0;
     Object.values(balances).forEach(b => {
-      b.surplus = (b.real_paid + b.kitty_rewards) - b.expected_cost;
+      b.surplus = (b.real_paid + b.kitty_rewards + b.write_offs) - b.expected_cost;
       b.nkc = b.real_paid - b.match_cost_share - b.kitty_expenses;
       if (b.surplus < 0) totalDebts += Math.abs(b.surplus);
     });
@@ -419,7 +425,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
                                         <button 
                                           onClick={() => {
                                             setInlineAction({ playerId: p.id, type: 'reward' });
-                                            const avgCost = p.games_played > 0 ? Math.floor(p.match_cost_share / p.games_played).toString() : '';
+                                            const avgCost = p.games_played > 0 ? Math.floor(p.expected_cost / p.games_played).toString() : '';
                                             setInlineForm({ name: '', amount: avgCost });
                                           }}
                                           className="flex-1 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-2"
