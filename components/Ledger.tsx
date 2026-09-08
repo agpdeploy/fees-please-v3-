@@ -1135,9 +1135,10 @@ export default function Ledger() {
 
                    <select value={globalSelectedPlayerId} onChange={e => setGlobalSelectedPlayerId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
                      <option value="team">-- No Player (Team Expense / Revenue) --</option>
-                     {allPlayers.map(p => (
-                       <option key={p.id} value={p.id}>{p.nickname || `${p.first_name} ${p.last_name}`}</option>
-                     ))}
+                     {allPlayers.map(p => {
+                       const formattedName = p.nickname || (p.last_name ? `${p.first_name} ${p.last_name.charAt(0)}.` : p.first_name);
+                       return <option key={p.id} value={p.id}>{formattedName}</option>;
+                     })}
                    </select>
 
                    <select value={manualFixtureId} onChange={e => setManualFixtureId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
