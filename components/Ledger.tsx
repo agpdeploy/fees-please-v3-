@@ -22,7 +22,7 @@ export default function Ledger() {
   const [playerBalances, setPlayerBalances] = useState<any[]>([]);
   const [overallNet, setOverallNet] = useState(0);
   const [seasonWallet, setSeasonWallet] = useState({ cash: 0, card: 0 });
-  const [otherAudit, setOtherAudit] = useState({ cash: 0, card: 0, fee: 0, net: 0 });
+  const [otherAudit, setOtherAudit] = useState<{cash: number, card: number, fee: number, net: number, txs: any[]}>({ cash: 0, card: 0, fee: 0, net: 0, txs: [] });
   const [financialHealth, setFinancialHealth] = useState({ collected: 0, cashIn: 0, cardIn: 0, outstanding: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,6 +39,7 @@ export default function Ledger() {
 
   // Accordion States (Replacing Modals)
   const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
+  const [expandedOther, setExpandedOther] = useState(false);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [isInlineManualFormOpen, setIsInlineManualFormOpen] = useState(false);
   const [isWalletExpanded, setIsWalletExpanded] = useState(false);
@@ -173,6 +174,7 @@ export default function Ledger() {
     let otherExpenses = 0;
     let otherCash = 0;
     let otherCard = 0;
+    const otherTxs: any[] = [];
 
     const auditMap: Record<string, any> = {};
     fixData.forEach(f => { auditMap[f.id] = { ...f, cash: 0, card: 0, fee: 0, net: 0 }; });
@@ -197,16 +199,25 @@ export default function Ledger() {
         if (tx.transaction_type === 'payment') {
           if (tx.payment_method?.toLowerCase().includes('card') || tx.payment_method?.toLowerCase().includes('square')) {
             totalCardIn += Number(tx.amount);
-            if (!tx.fixture_id) otherCard += Number(tx.amount);
+            if (!tx.fixture_id) {
+              otherCard += Number(tx.amount);
+              otherTxs.push(tx);
+            }
           }
           else if (tx.payment_method !== 'write_off' && tx.payment_method !== 'credit' && tx.payment_method !== 'kitty') {
             totalCashIn += Number(tx.amount);
-            if (!tx.fixture_id) otherCash += Number(tx.amount);
+            if (!tx.fixture_id) {
+              otherCash += Number(tx.amount);
+              otherTxs.push(tx);
+            }
           }
         }
         if (tx.transaction_type === 'expense') {
           totalExpenses += Number(tx.amount);
-          if (!tx.fixture_id) otherExpenses += Number(tx.amount);
+          if (!tx.fixture_id) {
+            otherExpenses += Number(tx.amount);
+            otherTxs.push(tx);
+          }
         }
       }
 
@@ -253,7 +264,7 @@ export default function Ledger() {
     }).sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
     setSeasonAudit(auditArray);
-    setOtherAudit({ cash: otherCash, card: otherCard, fee: otherExpenses, net: (otherCash + otherCard) - otherExpenses });
+    setOtherAudit({ cash: otherCash, card: otherCard, fee: otherExpenses, net: (otherCash + otherCard) - otherExpenses, txs: otherTxs });
     
     setSeasonWallet({ cash: totalCashIn - totalExpenses, card: totalCardIn });
     setOverallNet((totalCashIn + totalCardIn) - totalExpenses);
@@ -784,23 +795,57 @@ export default function Ledger() {
               )}
               
               {(otherAudit.fee > 0 || otherAudit.cash > 0 || otherAudit.card > 0) && (
-                <div className="grid grid-cols-12 gap-2 items-center py-3 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-2 bg-zinc-50 dark:bg-zinc-900/50 -mx-5 px-5">
-                  <div className="col-span-5 flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Other (Rewards / General)</span>
+                <>
+                  <div 
+                    onClick={() => setExpandedOther(!expandedOther)}
+                    className="grid grid-cols-12 gap-2 items-center py-3 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-2 bg-zinc-50 dark:bg-zinc-900/50 -mx-5 px-5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
+                  >
+                    <div className="col-span-5 flex items-center gap-2">
+                      <i className={`fa-solid fa-chevron-${expandedOther ? 'up' : 'down'} text-[9px] text-zinc-400 shrink-0 w-3`}></i>
+                      <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Miscellaneous</span>
+                    </div>
+                    <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.fee > 0 ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-600'}`}>
+                      ${otherAudit.fee.toFixed(0)}
+                    </div>
+                    <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.cash > 0 ? 'text-emerald-500' : 'text-emerald-500/40'}`}>
+                      ${otherAudit.cash.toFixed(0)}
+                    </div>
+                    <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.card > 0 ? 'text-blue-500' : 'text-blue-500/40'}`}>
+                      ${otherAudit.card.toFixed(0)}
+                    </div>
+                    <div className={`col-span-1 text-right text-[11px] font-black ${otherAudit.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {otherAudit.net >= 0 ? '+' : '-'}${Math.abs(otherAudit.net).toFixed(0)}
+                    </div>
                   </div>
-                  <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.fee > 0 ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-600'}`}>
-                    ${otherAudit.fee.toFixed(0)}
-                  </div>
-                  <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.cash > 0 ? 'text-emerald-500' : 'text-emerald-500/40'}`}>
-                    ${otherAudit.cash.toFixed(0)}
-                  </div>
-                  <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.card > 0 ? 'text-blue-500' : 'text-blue-500/40'}`}>
-                    ${otherAudit.card.toFixed(0)}
-                  </div>
-                  <div className={`col-span-1 text-right text-[11px] font-black ${otherAudit.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {otherAudit.net >= 0 ? '+' : '-'}${Math.abs(otherAudit.net).toFixed(0)}
-                  </div>
-                </div>
+
+                  {expandedOther && (
+                    <div className="bg-zinc-50/50 dark:bg-[#111] border-b border-zinc-200 dark:border-zinc-800 -mx-5">
+                      <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200 ml-5 pr-5">
+                        <div className="space-y-2">
+                          {otherAudit.txs.map((tx: any) => {
+                            const isExpense = tx.transaction_type === 'expense';
+                            const amount = Number(tx.amount).toFixed(0);
+                            let title = isExpense ? (tx.description || 'General Expense') : (tx.players?.nickname || tx.players?.first_name || tx.description || 'Manual Payment');
+                            
+                            return (
+                              <div key={tx.id} className="bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-3 rounded-xl flex justify-between items-center shadow-sm transition-colors">
+                                <div className="text-xs font-bold text-zinc-900 dark:text-white flex flex-col">
+                                  {title}
+                                  <span className="text-[9px] font-medium text-zinc-400 mt-0.5">
+                                    {isExpense ? 'Team Kitty Expense' : (tx.payment_method?.includes('card') || tx.payment_method?.includes('square') ? 'Card Payment' : 'Cash Payment')}
+                                  </span>
+                                </div>
+                                <span className={`text-sm font-black ${isExpense ? 'text-red-500' : (tx.payment_method?.includes('card') || tx.payment_method?.includes('square') ? 'text-blue-500' : 'text-emerald-500')}`}>
+                                  {isExpense ? `-$${amount}` : `+$${amount}`}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
