@@ -89,7 +89,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [payId, setPayId] = useState(clubInfo?.pay_id_value || "");
   const [acceptsCash, setAcceptsCash] = useState(clubInfo?.accepts_cash ?? true);
   const [acceptsCard, setAcceptsCard] = useState(clubInfo?.accepts_card ?? true);
-  const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "");
+  const [expenseLabel, setExpenseLabel] = useState(clubInfo?.expense_label || "Match");
   const initialUmpireFeeRaw = clubInfo?.default_umpire_fee;
   const initialUmpireFee = (initialUmpireFeeRaw == null || initialUmpireFeeRaw === 0) ? "" : initialUmpireFeeRaw;
   const [defaultUmpireFee, setDefaultUmpireFee] = useState<number | "">(initialUmpireFee);
@@ -108,7 +108,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
       setPayId(clubInfo.pay_id_value || "");
       setAcceptsCash(clubInfo.accepts_cash ?? true);
       setAcceptsCard(clubInfo.accepts_card ?? true);
-      setExpenseLabel(clubInfo.expense_label || "");
+      setExpenseLabel(clubInfo.expense_label || "Match");
       setDefaultUmpireFee((clubInfo.default_umpire_fee == null || clubInfo.default_umpire_fee === 0) ? "" : clubInfo.default_umpire_fee);
       setSquareToken(clubInfo.square_access_token || "");
       setSquareLocationId(clubInfo.square_location_id || "");
@@ -1577,13 +1577,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         </div>
 
                         <div>
-                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Match Expense Label</label>
-                          <input type="text" placeholder="e.g. Match Fees" value={expenseLabel} onChange={(e) => setExpenseLabel(e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
-                          <p className="text-[10px] text-zinc-400 mt-1.5 font-bold leading-snug">This is for your match expenses that are not player fees (e.g., ground/court hire, umpire fees).</p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Match Expense Amount ($)</label>
+                          <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Match Expense ($)</label>
                           <input type="number" value={defaultUmpireFee} onChange={(e) => setDefaultUmpireFee(e.target.value === "" ? "" : Number(e.target.value))} className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
                           <p className="text-[9px] text-zinc-400 mt-1.5 uppercase tracking-widest font-black leading-tight">E.G. GROUND FEES, COURT HIRE, UMPIRE FEES</p>
                         </div>

@@ -16,6 +16,15 @@ const TENANT_MAP: Record<string, string> = {
 
 const TEAM_FIXTURE_QUERY = `
 query teamFixture($teamID: ID!) {
+  discoverTeam(teamID: $teamID) {
+    id
+    name
+    logo {
+      sizes {
+        url
+      }
+    }
+  }
   discoverTeamFixture(teamID: $teamID) {
     id
     name
@@ -64,7 +73,7 @@ query teamFixture($teamID: ID!) {
         }
       }
     }
-}
+  }
 }
 `;
 
@@ -138,23 +147,25 @@ export async function POST(req: Request) {
     }
 
     const rounds = data?.data?.discoverTeamFixture;
-    if (!rounds || !Array.isArray(rounds)) {
+    const teamData = data?.data?.discoverTeam;
+
+    if (!teamData && (!rounds || !Array.isArray(rounds))) {
       return NextResponse.json({ error: 'Team not found or has no fixture data' }, { status: 404 });
     }
 
-    const allGames = rounds.flatMap((round: any) => round.fixture?.games || []);
+    const allGames = (rounds || []).flatMap((round: any) => round.fixture?.games || []);
     
-    let clubName = 'Unknown Team';
-    let logoUrl = null;
+    let clubName = teamData?.name || 'Unknown Team';
+    let logoUrl = teamData?.logo?.sizes?.[0]?.url || null;
 
     for (const game of allGames) {
       if (game.home?.id === teamId) {
-        clubName = game.home.name;
-        if (game.home.logo?.sizes?.[0]?.url) logoUrl = game.home.logo.sizes[0].url;
+        if (!clubName || clubName === 'Unknown Team') clubName = game.home.name;
+        if (!logoUrl && game.home.logo?.sizes?.[0]?.url) logoUrl = game.home.logo.sizes[0].url;
       }
       if (game.away?.id === teamId) {
-        clubName = game.away.name;
-        if (game.away.logo?.sizes?.[0]?.url) logoUrl = game.away.logo.sizes[0].url;
+        if (!clubName || clubName === 'Unknown Team') clubName = game.away.name;
+        if (!logoUrl && game.away.logo?.sizes?.[0]?.url) logoUrl = game.away.logo.sizes[0].url;
       }
     }
 
