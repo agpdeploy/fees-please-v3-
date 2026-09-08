@@ -809,8 +809,14 @@ export default function Ledger() {
                             {otherAudit.txs.map((tx: any) => {
                               const isExpense = tx.transaction_type === 'expense';
                               const amount = Number(tx.amount).toFixed(0);
-                              const playerName = tx.players ? `${tx.players.first_name} ${tx.players.last_name || ''}`.trim() : null;
-                              const title = isExpense ? (tx.description || 'Team Kitty Expense') : (playerName || tx.description || 'Manual Payment');
+                              const playerName = tx.players ? (tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim()) : null;
+                              let title = isExpense ? (tx.description || 'Team Kitty Expense') : (playerName || tx.description || 'Manual Payment');
+                              
+                              if (title.toLowerCase().includes('free game')) {
+                                title = 'Player Reward';
+                              } else {
+                                title = title.replace(/\s*\(Cost\)\s*/i, '').trim();
+                              }
                               
                               let typeDesc = isExpense ? 'Kitty Expense' : 'Payment';
                               if (tx.payment_method?.includes('card') || tx.payment_method?.includes('square')) typeDesc = 'Card Payment';
