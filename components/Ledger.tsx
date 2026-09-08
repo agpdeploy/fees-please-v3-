@@ -786,68 +786,72 @@ export default function Ledger() {
                       </Fragment>
                     );
                   })}
-                </tbody>
-              </table>
-              {relevantAudit.length === 0 && (
-                <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-widest">
-                  No fixtures found
-                </div>
-              )}
-              
               {(otherAudit.fee > 0 || otherAudit.cash > 0 || otherAudit.card > 0) && (
-                <>
-                  <div 
-                    onClick={() => setExpandedOther(!expandedOther)}
-                    className="grid grid-cols-12 gap-2 items-center py-3 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-2 bg-zinc-50 dark:bg-zinc-900/50 -mx-5 px-5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
-                  >
-                    <div className="col-span-5 flex items-center gap-2">
-                      <i className={`fa-solid fa-chevron-${expandedOther ? 'up' : 'down'} text-[9px] text-zinc-400 shrink-0 w-3`}></i>
+                <Fragment>
+                  <tr onClick={() => setExpandedOther(!expandedOther)} className="border-t border-dashed border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
+                    <td className="py-4 text-zinc-900 dark:text-white flex items-center gap-2 pr-2">
+                      <i className={`fa-solid fa-chevron-${expandedOther ? 'up' : 'down'} text-[9px] text-zinc-400 shrink-0`}></i>
                       <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Miscellaneous</span>
-                    </div>
-                    <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.fee > 0 ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-600'}`}>
-                      ${otherAudit.fee.toFixed(0)}
-                    </div>
-                    <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.cash > 0 ? 'text-emerald-500' : 'text-emerald-500/40'}`}>
-                      ${otherAudit.cash.toFixed(0)}
-                    </div>
-                    <div className={`col-span-2 text-right text-[11px] font-medium ${otherAudit.card > 0 ? 'text-blue-500' : 'text-blue-500/40'}`}>
-                      ${otherAudit.card.toFixed(0)}
-                    </div>
-                    <div className={`col-span-1 text-right text-[11px] font-black ${otherAudit.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    </td>
+                    <td className={`py-4 text-center ${otherAudit.fee > 0 ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-600'}`}>${otherAudit.fee.toFixed(0)}</td>
+                    <td className={`py-4 text-center ${otherAudit.cash > 0 ? 'text-emerald-500' : 'text-emerald-500/40'}`}>${otherAudit.cash.toFixed(0)}</td>
+                    <td className={`py-4 text-center ${otherAudit.card > 0 ? 'text-blue-500' : 'text-blue-500/40'}`}>${otherAudit.card.toFixed(0)}</td>
+                    <td className={`py-4 text-right ${otherAudit.net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                       {otherAudit.net >= 0 ? '+' : '-'}${Math.abs(otherAudit.net).toFixed(0)}
-                    </div>
-                  </div>
-
+                    </td>
+                  </tr>
+                  
                   {expandedOther && (
-                    <div className="bg-zinc-50/50 dark:bg-[#111] border-b border-zinc-200 dark:border-zinc-800 -mx-5">
-                      <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200 ml-5 pr-5">
-                        <div className="space-y-2">
-                          {otherAudit.txs.map((tx: any) => {
-                            const isExpense = tx.transaction_type === 'expense';
-                            const amount = Number(tx.amount).toFixed(0);
-                            let title = isExpense ? (tx.description || 'General Expense') : (tx.players?.nickname || tx.players?.first_name || tx.description || 'Manual Payment');
-                            
-                            return (
-                              <div key={tx.id} className="bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-3 rounded-xl flex justify-between items-center shadow-sm transition-colors">
-                                <div className="text-xs font-bold text-zinc-900 dark:text-white flex flex-col">
-                                  {title}
-                                  <span className="text-[9px] font-medium text-zinc-400 mt-0.5">
-                                    {isExpense ? 'Team Kitty Expense' : (tx.payment_method?.includes('card') || tx.payment_method?.includes('square') ? 'Card Payment' : 'Cash Payment')}
+                    <tr className="bg-zinc-50/50 dark:bg-[#111] border-b border-zinc-200 dark:border-zinc-800">
+                      <td colSpan={5} className="p-0">
+                        <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                          <div className="space-y-2">
+                            {otherAudit.txs.map((tx: any) => {
+                              const isExpense = tx.transaction_type === 'expense';
+                              const amount = Number(tx.amount).toFixed(0);
+                              const playerName = tx.players ? `${tx.players.first_name} ${tx.players.last_name || ''}`.trim() : null;
+                              const title = isExpense ? (tx.description || 'Team Kitty Expense') : (playerName || tx.description || 'Manual Payment');
+                              
+                              let typeDesc = isExpense ? 'Kitty Expense' : 'Payment';
+                              if (tx.payment_method?.includes('card') || tx.payment_method?.includes('square')) typeDesc = 'Card Payment';
+                              else if (tx.payment_method?.includes('cash')) typeDesc = 'Cash Payment';
+                              else if (tx.payment_method === 'credit') typeDesc = 'Credit Applied';
+                              
+                              if (playerName && isExpense && tx.description) {
+                                typeDesc = `Expense for ${playerName}`;
+                              } else if (!isExpense && tx.description && tx.description !== 'Owed') {
+                                typeDesc += ` • ${tx.description}`;
+                              }
+
+                              return (
+                                <div key={tx.id} className="bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 p-3 rounded-xl flex justify-between items-center shadow-sm transition-colors">
+                                  <div className="text-xs font-bold text-zinc-900 dark:text-white flex flex-col">
+                                    {title}
+                                    <span className="text-[9px] font-medium text-zinc-400 mt-0.5">
+                                      {typeDesc}
+                                    </span>
+                                  </div>
+                                  <span className={`text-sm font-black ${isExpense ? 'text-red-500' : (tx.payment_method?.includes('card') || tx.payment_method?.includes('square') ? 'text-blue-500' : 'text-emerald-500')}`}>
+                                    {isExpense ? `-$${amount}` : `+$${amount}`}
                                   </span>
                                 </div>
-                                <span className={`text-sm font-black ${isExpense ? 'text-red-500' : (tx.payment_method?.includes('card') || tx.payment_method?.includes('square') ? 'text-blue-500' : 'text-emerald-500')}`}>
-                                  {isExpense ? `-$${amount}` : `+$${amount}`}
-                                </span>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   )}
-                </>
+                </Fragment>
               )}
+            </tbody>
+          </table>
+          {relevantAudit.length === 0 && (
+            <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-widest">
+              No fixtures found
             </div>
+          )}
+        </div>
 
             {relevantAudit.length > 4 && (
               <button 
