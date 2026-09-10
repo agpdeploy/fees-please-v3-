@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { PaymentForm, CreditCard, ApplePay, GooglePay } from 'react-square-web-payments-sdk';
 import { useRouter } from 'next/navigation';
-import { calculateSquareOnlineGross } from '@/lib/fees';
+
 
 export default function CheckoutForm({ transaction, club, player, team, fixture, balance, outstandingList, appId, locationId }: any) {
   const router = useRouter();
@@ -12,7 +12,6 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
   const [error, setError] = useState<string | null>(null);
 
   const totalToCollect = transaction.amount;
-  const grossAmount = calculateSquareOnlineGross(totalToCollect, club);
 
   const handlePayment = async (token: any) => {
     setIsProcessing(true);
@@ -123,19 +122,6 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
              </div>
              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500">${totalToCollect.toFixed(2)}</p>
            </div>
-           
-           {club?.is_square_enabled && totalToCollect > 0 && (
-             <div className="flex justify-between items-center pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 mt-1">
-               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Card Processing Fee</p>
-               <p className="text-xs font-bold text-zinc-500">${(grossAmount - totalToCollect).toFixed(2)}</p>
-             </div>
-           )}
-           {club?.is_square_enabled && totalToCollect > 0 && (
-             <div className="flex justify-between items-center pt-1">
-               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Total Charge</p>
-               <p className="text-sm font-black text-emerald-600 dark:text-emerald-500">${grossAmount.toFixed(2)}</p>
-             </div>
-           )}
         </div>
 
         <div className="p-4 flex flex-col gap-2.5 bg-zinc-50 dark:bg-zinc-950/50 ml-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/50">
@@ -163,7 +149,7 @@ export default function CheckoutForm({ transaction, club, player, team, fixture,
                     countryCode: 'AU',
                     currencyCode: 'AUD',
                     total: {
-                      amount: grossAmount.toFixed(2),
+                      amount: totalToCollect.toFixed(2),
                       label: team?.name || club?.name || 'Match Fees',
                     },
                   })}

@@ -92,16 +92,16 @@ export default function SeasonHistory({ planTier }: { planTier?: string }) {
       const seasonsSet = new Set<string>();
       allFixtures.forEach(f => {
         if (f.season_name) seasonsSet.add(f.season_name);
-        else if (clubSeason) {
-          f.season_name = clubSeason;
-          seasonsSet.add(clubSeason);
+        else {
+          f.season_name = 'Legacy Matches';
+          seasonsSet.add('Legacy Matches');
         }
       });
       allTx.forEach(t => {
         if (t.season_name) seasonsSet.add(t.season_name);
-        else if (clubSeason) {
-          t.season_name = clubSeason;
-          seasonsSet.add(clubSeason);
+        else {
+          t.season_name = 'Legacy Matches';
+          seasonsSet.add('Legacy Matches');
         }
       });
       

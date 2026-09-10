@@ -54,6 +54,14 @@ export async function POST(req: Request) {
       if (rosterAction === 'clear') {
         await supabase.from('players').update({ default_team_id: null }).eq('default_team_id', teamId);
       }
+
+      // Clear PlayHQ URL
+      const { data: teamData } = await supabase.from('teams').select('settings').eq('id', teamId).single();
+      if (teamData?.settings && teamData.settings.playhq_url) {
+        const newSettings = { ...teamData.settings };
+        delete newSettings.playhq_url;
+        await supabase.from('teams').update({ settings: newSettings }).eq('id', teamId);
+      }
     }
 
     // 3. Clear global season from club

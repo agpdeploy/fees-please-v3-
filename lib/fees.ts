@@ -1,41 +1,35 @@
 /**
- * Calculates the gross amount to charge via Square Online (QR/Web)
- * Note: Square Australia online rate is a flat 2.2% (no 30c fixed fee).
- * Fees Please bundled rate varies by club plan:
- * Free Tier: 2.2% (Square wholesale) + 2.5% platform clip = 4.7%
- * Plus Tier: 2.2% (Square wholesale) + $0.30 platform clip
- * Pro Tier: 2.2% (Square wholesale) + $0.15 platform clip
- * Override: 2.2% (Square wholesale only)
- * Formula: Gross = (Net + Fixed) / (1 - Rate)
+ * Calculates the fee deductions for a given charge amount.
+ * The player is charged exactly the `chargeAmount` (no surcharge).
+ * Square deducts 2.2% of the chargeAmount.
+ * Fees Please deducts a platform clip based on the club's plan.
  */
-export const calculateSquareOnlineGross = (netAmount: number, club?: any): number => {
-  if (netAmount <= 0) return 0;
+export const calculateFeeDeductions = (chargeAmount: number, club?: any) => {
+  if (chargeAmount <= 0) return { squareFee: 0, platformFee: 0, netToClub: 0 };
   
   const planTier = club?.plan_tier || 'free';
   const hasOverride = club?.override_platform_fee === true;
   
-  let fpRate = 0.022; 
-  let fixedFee = 0.00;
+  // Square online rate is 2.2%
+  const squareFee = Math.round((chargeAmount * 0.022) * 100) / 100;
+  
+  let platformFee = 0;
   
   if (hasOverride) {
-    // Square wholesale only: 2.2%
-    fpRate = 0.022;
-    fixedFee = 0.00;
+    platformFee = 0;
   } else if (planTier === 'free') {
-    // 2.2% (Square) + 2.5% platform clip = 4.7%
-    fpRate = 0.022 + 0.025;
-    fixedFee = 0.00;
-  } else if (planTier === 'plus') {
-    // 2.2% (Square) + 30c platform clip
-    fpRate = 0.022;
-    fixedFee = 0.30;
-  } else if (planTier === 'pro') {
-    // 2.2% (Square) + 15c platform clip
-    fpRate = 0.022;
-    fixedFee = 0.15;
+    // Free Tier: 2.8% platform clip
+    platformFee = Math.round((chargeAmount * 0.028) * 100) / 100;
+  } else if (planTier === 'plus' || planTier === 'pro') {
+    // Paid Tiers: 0% platform clip
+    platformFee = 0;
   }
   
-  const grossAmount = (netAmount + fixedFee) / (1 - fpRate);
+  const netToClub = Math.round((chargeAmount - squareFee - platformFee) * 100) / 100;
   
-  return Math.ceil(grossAmount * 100) / 100;
+  return {
+    squareFee,
+    platformFee,
+    netToClub
+  };
 };

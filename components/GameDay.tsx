@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
-import { calculateSquareOnlineGross } from '@/lib/fees';
+
 import { QRCodeSVG } from 'qrcode.react';
 import { Mark } from './Brand';
 
@@ -674,7 +674,7 @@ export default function GameDay() {
                   amount: player.is_member ? teamFees.member : teamFees.casual,
                   transaction_type: 'fee',
                   status: 'unpaid',
-                  season_name: clubInfo.season_name || null
+                  season_name: activeFixture?.season_name || clubInfo?.season_name || null
                 });
               }
             } else if (action === 'paid') {
@@ -687,7 +687,7 @@ export default function GameDay() {
                   amount: player.is_member ? teamFees.member : teamFees.casual,
                   transaction_type: 'fee',
                   status: 'paid',
-                  season_name: clubInfo.season_name || null
+                  season_name: activeFixture?.season_name || clubInfo?.season_name || null
                 });
               }
               batchTxPayload.push({
@@ -700,7 +700,7 @@ export default function GameDay() {
                 payment_method: 'cash',
                 description: 'Match Fees',
                 status: 'completed',
-                season_name: clubInfo.season_name || null
+                season_name: activeFixture?.season_name || clubInfo?.season_name || null
               });
             } else if (action === 'remove') {
               playersToRemove.push(player.id);
@@ -719,7 +719,7 @@ export default function GameDay() {
           transaction_type: 'expense', 
           payment_method: 'cash', 
           description: clubInfo.expense_label || 'Match Expense',
-          season_name: clubInfo.season_name || null
+          season_name: activeFixture?.season_name || clubInfo?.season_name || null
         });
       }
 
@@ -835,14 +835,14 @@ export default function GameDay() {
         transaction_type: 'checkout_link',
         status: 'unpaid',
         description: matchNotes,
-        season_name: clubInfo.season_name || null
+        season_name: activeFixture?.season_name || clubInfo?.season_name || null
       }).select().single();
       
       if (txError) throw txError;
       
       setQrTxId(newTx.id);
       setQrModalPlayer(player);
-      setQrTxAmount(calculateSquareOnlineGross(netAmount, clubInfo));
+      setQrTxAmount(netAmount);
       setIsQrModalOpen(true);
     } catch (err: any) {
       console.error(err);
@@ -939,12 +939,12 @@ export default function GameDay() {
 
       // Only charge the match fee if it hasn't already been charged (e.g. during Match Finalization)
       if (!playersWithExistingFees.includes(player.id)) {
-        offlinePayload.push({ player_id: player.id, team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, amount: fee, transaction_type: 'fee', season_name: clubInfo.season_name || null });
+        offlinePayload.push({ player_id: player.id, team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, amount: fee, transaction_type: 'fee', season_name: activeFixture?.season_name || clubInfo?.season_name || null });
       }
       
       // Only log a payment if they actually handed over cash/card today
       if (amount > 0) {
-        offlinePayload.push({ player_id: player.id, team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method, season_name: clubInfo.season_name || null });
+        offlinePayload.push({ player_id: player.id, team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, amount: amount, transaction_type: 'payment', payment_method: method, season_name: activeFixture?.season_name || clubInfo?.season_name || null });
       }
     }
     
@@ -953,7 +953,7 @@ export default function GameDay() {
         team_id: activeFixture.team_id || selectedTeamId, fixture_id: activeFixture.id, club_id: activeFixture.club_id || resolvedClubId, 
         amount: (activeFixture.umpire_fee || clubInfo?.default_umpire_fee || 0), transaction_type: 'expense', 
         payment_method: 'cash', description: clubInfo.expense_label || 'Match Expense',
-        season_name: clubInfo.season_name || null 
+        season_name: activeFixture?.season_name || clubInfo?.season_name || null 
       });
     }
 

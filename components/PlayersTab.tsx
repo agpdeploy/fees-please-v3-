@@ -241,22 +241,55 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
     if (!addTeamId) return showToast("Please select a valid Team first.", "error");
     
     setIsSaving(true);
-    const payload = validPlayers.map(p => ({ 
-      first_name: p.first_name,
-      last_name: p.last_name,
-      nickname: p.nickname || null,
-      mobile_number: p.mobile_number || null,
-      email: p.email || null,
-      is_member: p.is_member,
-      club_id: clubId,
-      default_team_id: addTeamId, 
-    }));
+    const playersToInsert = [];
+    const playersToUpdate = [];
 
-    const { error } = await supabase.from("players").insert(payload);
+    validPlayers.forEach(p => {
+      // Find existing player by email
+      const existingPlayer = p.email ? players.find((ep: any) => ep.email && ep.email.toLowerCase() === p.email.toLowerCase()) : undefined;
+
+      if (existingPlayer) {
+        playersToUpdate.push({
+          id: existingPlayer.id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          nickname: p.nickname || existingPlayer.nickname || null,
+          mobile_number: p.mobile_number || existingPlayer.mobile_number || null,
+          email: p.email.toLowerCase(),
+          is_member: p.is_member,
+          club_id: clubId,
+          default_team_id: addTeamId, 
+        });
+      } else {
+        playersToInsert.push({ 
+          first_name: p.first_name,
+          last_name: p.last_name,
+          nickname: p.nickname || null,
+          mobile_number: p.mobile_number || null,
+          email: p.email ? p.email.toLowerCase() : null,
+          is_member: p.is_member,
+          club_id: clubId,
+          default_team_id: addTeamId, 
+        });
+      }
+    });
+
+    let hasError = false;
+    let errorMsg = "";
+
+    if (playersToInsert.length > 0) {
+      const { error } = await supabase.from("players").insert(playersToInsert);
+      if (error) { hasError = true; errorMsg = error.message; }
+    }
+
+    if (playersToUpdate.length > 0 && !hasError) {
+      const { error } = await supabase.from("players").upsert(playersToUpdate);
+      if (error) { hasError = true; errorMsg = error.message; }
+    }
     
     setIsSaving(false);
-    if (error) {
-      showToast(error.message, "error");
+    if (hasError) {
+      showToast(errorMsg, "error");
     } else { 
       showToast(`Imported ${validPlayers.length} players!`); 
       setDraftPlayers([]); 

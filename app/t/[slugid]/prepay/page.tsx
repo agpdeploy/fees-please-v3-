@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import PrepaySquareForm from './PrepaySquareForm';
-import { calculateSquareOnlineGross } from '@/lib/fees';
+
 
 export default async function PrePayPage({ params, searchParams }: { params: Promise<{ slugid: string }>, searchParams: Promise<{ f?: string, p?: string }> }) {
   const { slugid } = await params;
@@ -225,7 +225,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
             </div>
           )}
 
-          <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 flex flex-col gap-2">
+           <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 flex flex-col gap-2">
              <div className="flex justify-between items-center">
                <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Total Owed</p>
@@ -233,19 +233,6 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
                </div>
                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500">${totalToCollect.toFixed(2)}</p>
              </div>
-             
-             {club.is_square_enabled && totalToCollect > 0 && (
-               <div className="flex justify-between items-center pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 mt-1">
-                 <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Card Processing Fee</p>
-                 <p className="text-xs font-bold text-zinc-500">${(calculateSquareOnlineGross(totalToCollect, club) - totalToCollect).toFixed(2)}</p>
-               </div>
-             )}
-             {club.is_square_enabled && totalToCollect > 0 && (
-               <div className="flex justify-between items-center pt-1">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Total Charge</p>
-                 <p className="text-sm font-black text-emerald-600 dark:text-emerald-500">${calculateSquareOnlineGross(totalToCollect, club).toFixed(2)}</p>
-               </div>
-             )}
           </div>
 
           <div className="p-4 flex flex-col gap-2.5 bg-zinc-50 dark:bg-zinc-950/50 ml-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/50">
@@ -256,7 +243,7 @@ export default async function PrePayPage({ params, searchParams }: { params: Pro
                   appId={appId} 
                   locationId={club.square_location_id} 
                   amount={totalToCollect} 
-                  grossAmount={calculateSquareOnlineGross(totalToCollect, club)}
+                  grossAmount={totalToCollect}
                 />
               ) : (
                 <div className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl text-center">

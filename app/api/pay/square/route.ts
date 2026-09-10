@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-import { calculateSquareOnlineGross } from '@/lib/fees';
+import { calculateFeeDeductions } from '@/lib/fees';
 import { ensureValidSquareToken } from '@/lib/squareToken';
 
 export async function POST(request: Request) {
@@ -39,15 +39,12 @@ export async function POST(request: Request) {
     }
 
     // Process Square Payment
-    const grossAmount = calculateSquareOnlineGross(transaction.amount, club);
+    const grossAmount = transaction.amount;
     const amountCents = Math.round(grossAmount * 100);
     
-    // Square charges a flat 2.2% on the gross amount for online payments in Australia
-    const squareFeeCents = Math.round((grossAmount * 0.022) * 100);
-    const netAmountCents = Math.round(transaction.amount * 100);
-    
-    // The platform fee is what's left over after Square takes their cut and the club gets their net amount
-    const platformFeeCents = amountCents - netAmountCents - squareFeeCents;
+    // Calculate deductions
+    const deductions = calculateFeeDeductions(grossAmount, club);
+    const platformFeeCents = Math.round(deductions.platformFee * 100);
     
     // Generate idempotency key tied to txId and sourceId to prevent double charging on retry
     // Square requires idempotency_key to be <= 45 characters, so we hash it to 32 chars

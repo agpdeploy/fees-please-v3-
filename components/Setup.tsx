@@ -2001,10 +2001,26 @@ export default function Setup({ activeTab }: SetupProps) {
                                     umpire_fee: clubRecord?.default_umpire_fee || 0,
                                     status: isPast ? 'completed' : 'upcoming',
                                     is_active: true,
-                                    season_name: targetSeasonName || null
+                                    season_name: data.seasonName || targetSeasonName || null
                                   };
                                 });
-                                await supabase.from("fixtures").insert(payload);
+
+                                const { data: existingFixtures } = await supabase
+                                  .from('fixtures')
+                                  .select('opponent, match_date, start_time')
+                                  .eq('team_id', t.id);
+
+                                const newFixtures = payload.filter((newFix: any) => {
+                                  return !existingFixtures?.some((ef: any) => 
+                                    ef.opponent === newFix.opponent && 
+                                    ef.match_date === newFix.match_date &&
+                                    ef.start_time === newFix.start_time
+                                  );
+                                });
+
+                                if (newFixtures.length > 0) {
+                                  await supabase.from("fixtures").insert(newFixtures);
+                                }
                               }
 
                               showToast('PlayHQ Team Synced Successfully! Reloading...');

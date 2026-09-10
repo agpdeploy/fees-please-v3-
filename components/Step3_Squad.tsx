@@ -169,19 +169,51 @@ export default function Step3_Squad({ onNext, clubId }: { onNext: () => void, cl
       const { data: team } = await supabase.from('teams').select('id').eq('club_id', clubId).single();
       const teamId = team ? team.id : null;
 
-      const playersToInsert = validPlayers.map(p => ({
-        default_team_id: teamId,
-        club_id: clubId,
-        first_name: p.firstName,
-        last_name: p.lastName,
-        nickname: p.nickname || null,
-        email: p.email ? p.email.toLowerCase().trim() : null,
-        mobile_number: p.mobile || null,
-        is_member: true
-      }));
+      // Fetch existing players to check for emails
+      const { data: existingPlayers } = await supabase.from('players').select('id, email, nickname, mobile_number').eq('club_id', clubId);
 
-      const { error } = await supabase.from('players').insert(playersToInsert);
-      if (error) throw error;
+      const playersToInsert = [];
+      const playersToUpdate = [];
+
+      validPlayers.forEach(p => {
+        const existingPlayer = p.email && existingPlayers ? existingPlayers.find((ep: any) => ep.email && ep.email.toLowerCase() === p.email.toLowerCase()) : undefined;
+
+        if (existingPlayer) {
+          playersToUpdate.push({
+            id: existingPlayer.id,
+            club_id: clubId,
+            default_team_id: teamId,
+            first_name: p.firstName,
+            last_name: p.lastName,
+            nickname: p.nickname || existingPlayer.nickname || null,
+            email: p.email.toLowerCase().trim(),
+            mobile_number: p.mobile || existingPlayer.mobile_number || null,
+            is_member: true
+          });
+        } else {
+          playersToInsert.push({
+            default_team_id: teamId,
+            club_id: clubId,
+            first_name: p.firstName,
+            last_name: p.lastName,
+            nickname: p.nickname || null,
+            email: p.email ? p.email.toLowerCase().trim() : null,
+            mobile_number: p.mobile || null,
+            is_member: true
+          });
+        }
+      });
+
+      if (playersToInsert.length > 0) {
+        const { error } = await supabase.from('players').insert(playersToInsert);
+        if (error) throw error;
+      }
+
+      if (playersToUpdate.length > 0) {
+        const { error } = await supabase.from('players').upsert(playersToUpdate);
+        if (error) throw error;
+      }
+
       onNext(); 
     } catch (err) {
       alert("An unexpected error occurred while saving.");
