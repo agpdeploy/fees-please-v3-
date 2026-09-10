@@ -2005,22 +2005,46 @@ export default function Setup({ activeTab }: SetupProps) {
                                   };
                                 });
 
-                                const { data: existingFixtures } = await supabase
-                                  .from('fixtures')
-                                  .select('opponent, match_date, start_time')
-                                  .eq('team_id', t.id);
+                                  const { data: existingFixtures } = await supabase
+                                    .from('fixtures')
+                                    .select('id, opponent, match_date, start_time')
+                                    .eq('team_id', t.id);
 
-                                const newFixtures = payload.filter((newFix: any) => {
-                                  return !existingFixtures?.some((ef: any) => 
-                                    ef.opponent === newFix.opponent && 
-                                    ef.match_date === newFix.match_date &&
-                                    ef.start_time === newFix.start_time
-                                  );
-                                });
+                                  const newFixtures: any[] = [];
+                                  const updatePromises: any[] = [];
 
-                                if (newFixtures.length > 0) {
-                                  await supabase.from("fixtures").insert(newFixtures);
-                                }
+                                  payload.forEach((newFix: any) => {
+                                    const sameDateMatches = existingFixtures?.filter(ef => ef.match_date === newFix.match_date) || [];
+                                    let existing = null;
+                                    
+                                    if (sameDateMatches.length === 1) {
+                                      existing = sameDateMatches[0];
+                                    } else if (sameDateMatches.length > 1) {
+                                      existing = sameDateMatches.find(ef => ef.opponent === newFix.opponent) || sameDateMatches[0];
+                                    }
+
+                                    if (existing) {
+                                      updatePromises.push(
+                                        supabase.from("fixtures").update({
+                                          opponent: newFix.opponent,
+                                          opponent_logo_url: newFix.opponent_logo_url,
+                                          start_time: newFix.start_time,
+                                          location: newFix.location,
+                                          status: newFix.status,
+                                          season_name: newFix.season_name
+                                        }).eq('id', existing.id)
+                                      );
+                                    } else {
+                                      newFixtures.push(newFix);
+                                    }
+                                  });
+
+                                  if (newFixtures.length > 0) {
+                                    await supabase.from("fixtures").insert(newFixtures);
+                                  }
+                                  if (updatePromises.length > 0) {
+                                    await Promise.all(updatePromises);
+                                  }
                               }
 
                               showToast('PlayHQ Team Synced Successfully! Reloading...');
