@@ -309,7 +309,7 @@ export default function Setup({ activeTab }: SetupProps) {
     }
     setSponsorStats({ impressions: imp, clicks: clk, ctr: imp > 0 ? (clk / imp) * 100 : 0, details });
 
-    const { data: fixData } = await supabase.from("fixtures").select("*, teams(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
+    const { data: fixData } = await supabase.from("fixtures").select("*, teams!team_id(name)").in("team_id", teamData?.map(t => t.id) || []).order("match_date", { ascending: true });
     if (fixData) {
       const filteredFix = fixData.filter(f => !clubData?.season_name || f.season_name === clubData.season_name || !f.season_name);
       setFixtures(filteredFix);
