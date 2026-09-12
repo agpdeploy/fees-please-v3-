@@ -105,7 +105,7 @@ export default function Setup({ activeTab }: SetupProps) {
 
   const [playerSearch, setPlayerSearch] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isSyncingPlayhq, setIsSyncingPlayhq] = useState(false);
+  const [syncingPlayhqTeamId, setSyncingPlayhqTeamId] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
   const [newSeasons, setNewSeasons] = useState<any[]>([]);
@@ -1935,7 +1935,7 @@ export default function Setup({ activeTab }: SetupProps) {
                           <button onClick={async () => {
                             const url = (document.getElementById(`playhq-sync-${t.id}`) as HTMLInputElement)?.value;
                             if (!url) return showToast('Please enter a PlayHQ Team URL', 'error');
-                            setIsSyncingPlayhq(true);
+                            setSyncingPlayhqTeamId(t.id);
                             try {
                               const res = await fetch('/api/playhq-sync', {
                                 method: 'POST',
@@ -2051,10 +2051,10 @@ export default function Setup({ activeTab }: SetupProps) {
                               setTimeout(() => window.location.reload(), 1500);
                             } catch (e: any) {
                               showToast(e.message, 'error');
-                              setIsSyncingPlayhq(false);
+                              setSyncingPlayhqTeamId(null);
                             }
-                          }} className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#0051e5] hover:bg-blue-600 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
-                            {isSyncingPlayhq ? (
+                          }} disabled={syncingPlayhqTeamId !== null} className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#0051e5] hover:bg-blue-600 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
+                            {syncingPlayhqTeamId === t.id ? (
                               <><i className="fa-solid fa-spinner fa-spin"></i> IMPORTING...</>
                             ) : (
                               <>Import</>
