@@ -554,7 +554,18 @@ function FixtureRow({ fixture, teams, expenseLabel, loadClubData, showToast, clu
     setIsSaving(true);
     const didChange = editForm.match_date !== fixture.match_date || editForm.start_time !== fixture.start_time || editForm.location !== fixture.location || editForm.opponent !== fixture.opponent;
     
-    const { error } = await supabase.from("fixtures").update(editForm).eq("id", fixture.id);
+    // Auto-fix status if they push a "completed" match into the future
+    let finalUpdateData = { ...editForm };
+    if (didChange && editForm.match_date) {
+      const newDate = new Date(editForm.match_date);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      if (newDate >= today && fixture.status === 'completed') {
+        finalUpdateData = { ...finalUpdateData, status: 'upcoming' as any };
+      }
+    }
+
+    const { error } = await supabase.from("fixtures").update(finalUpdateData).eq("id", fixture.id);
     setIsSaving(false);
     if (error) {
       showToast(error.message, "error");

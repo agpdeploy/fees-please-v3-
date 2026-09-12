@@ -38,15 +38,21 @@ export async function POST(req: Request) {
     ];
     const systemInstruction = "You are an expert sports data extraction assistant. Return ONLY a valid JSON array of objects. Do not include conversational text. Keys must be exactly: 'match_date', 'start_time', 'opponent', 'location', 'notes'.";
 
-    // THE FIX: Added STRICT MATCHING RULE
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // 1-12
+
+    // THE FIX: Added STRICT MATCHING RULE and Future Date Logic
     let promptArr: any[] = [
       `I am providing a master grade fixture list. Extract ONLY the matches involving the team: "${teamName}".
       
       STRICT MATCHING RULE: Do NOT guess or heavily fuzzy-match the team name. If you cannot confidently find an exact match for "${teamName}" (or a very obvious direct abbreviation) in the list of teams, return an empty array [].
       
+      DATE INFERENCE RULE: The current date is ${currentYear}-${currentMonth.toString().padStart(2, '0')}. If a date in the document is missing a year (e.g. "27-Sep" or "12 Jan"), you MUST assume it is for an upcoming sporting season. If the month has already passed in the current year, increment the year. For example, if the current date is September 2026 and you see "Jan", it must be extracted as 2027.
+      
       For each match confidently found for "${teamName}":
       1. Determine the "opponent" (the other team playing).
-      2. Set "match_date" to the start date formatted strictly as YYYY-MM-DD.
+      2. Set "match_date" to the start date formatted strictly as YYYY-MM-DD (applying the DATE INFERENCE RULE above).
       3. Set "start_time" (e.g. "11:00 AM").
       4. Set "location" to the Venue.
       5. Set "notes" to indicate the Round/Fix number and if they are Home or Away (e.g., "Round 1 - Home").
