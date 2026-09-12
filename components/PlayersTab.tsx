@@ -75,7 +75,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
     
     const payload = { 
       club_id: clubId,
-      default_team_id: addTeamId, 
+      default_team_id: addTeamId === 'unassigned' ? null : addTeamId, 
       first_name: firstName, 
       last_name: lastName,
       nickname: nickname || null,
@@ -258,7 +258,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
           email: p.email.toLowerCase(),
           is_member: p.is_member,
           club_id: clubId,
-          default_team_id: addTeamId, 
+          default_team_id: addTeamId === 'unassigned' ? null : addTeamId, 
         });
       } else {
         playersToInsert.push({ 
@@ -269,7 +269,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
           email: p.email ? p.email.toLowerCase() : null,
           is_member: p.is_member,
           club_id: clubId,
-          default_team_id: addTeamId, 
+          default_team_id: addTeamId === 'unassigned' ? null : addTeamId, 
         });
       }
     });
@@ -304,6 +304,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
     if (p.is_active === false && !showDeactivated) return false;
     
     if (!addTeamId) return true; // Show everyone if filter is empty
+    if (addTeamId === 'unassigned') return !p.default_team_id;
     if (teams.length === 1 && !p.default_team_id) return true; // Show unassigned if there's only 1 team
     return p.default_team_id === addTeamId;
   });
@@ -320,6 +321,7 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
         {teams.length > 1 && (
           <select value={addTeamId || ""} onChange={(e) => { setAddTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
             <option value="">-- View All Club Players --</option>
+            <option value="unassigned">- Unassigned Players -</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )}
@@ -535,6 +537,7 @@ function PlayerRow({
     // Convert empty strings to null for the database
     const payload = {
       ...editForm,
+      default_team_id: editForm.default_team_id === 'unassigned' ? null : editForm.default_team_id,
       nickname: editForm.nickname || null,
       mobile_number: editForm.mobile_number || null,
       email: editForm.email || null,
@@ -612,8 +615,9 @@ function PlayerRow({
     return (
       <div className="bg-white dark:bg-zinc-900 border-2 border-emerald-500 p-4 rounded-xl flex flex-col gap-3 shadow-md transition-colors animate-in fade-in">
         {teams.length > 1 && (
-          <select value={editForm.default_team_id || ""} onChange={(e) => setEditForm({...editForm, default_team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
+          <select value={editForm.default_team_id || "unassigned"} onChange={(e) => setEditForm({...editForm, default_team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
             <option value="" disabled>-- Select a valid team --</option>
+            <option value="unassigned">- Unassigned Players -</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )}
