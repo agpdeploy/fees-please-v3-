@@ -71,9 +71,28 @@ export default function Ledger() {
   }, [activeClubId]);
 
   useEffect(() => {
+    // Reset state on club change to prevent data leaking
+    setTeams([]);
+    setActiveTeamId("");
+    setTransactions([]);
+    setFixtures([]);
+    setIsWalletEnabled(null);
+  }, [activeClubId]);
+
+  useEffect(() => {
     async function fetchTeams() {
-      if (!profile) return;
+      if (!profile || !activeClubId) return;
       setIsLoading(true);
+
+      const { data: clubData } = await supabase.from('clubs').select('settings').eq('id', activeClubId).single();
+      const enabled = clubData?.settings?.enable_team_wallet !== false;
+      setIsWalletEnabled(enabled);
+
+      if (!enabled) {
+          setIsLoading(false);
+          return;
+      }
+
       let query = supabase.from("teams").select("*");
       
       const currentClubRole = roles?.find((r: any) => r.club_id === activeClubId)?.role;
@@ -520,6 +539,19 @@ export default function Ledger() {
   };
 
   if (!activeClubId) return <div className="p-4 text-center text-zinc-500 uppercase tracking-widest text-xs font-black">Loading Ledger...</div>;
+  if (isWalletEnabled === false) {
+    return (
+      <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl animate-in fade-in max-w-2xl mx-auto mt-10">
+        <div className="w-12 h-12 mx-auto bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-full flex items-center justify-center mb-4">
+          <i className="fa-solid fa-wallet text-xl"></i>
+        </div>
+        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-2">Wallet Disabled</h3>
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest max-w-sm mx-auto leading-relaxed">
+          The Ledger is currently disabled. Use the Team Wallet tab in settings to enable it if you wish to track individual player contributions into the kitty.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-300 space-y-6 pb-20 relative">

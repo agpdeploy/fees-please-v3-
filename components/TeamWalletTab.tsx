@@ -18,6 +18,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
   const [playerContributions, setPlayerContributions] = useState<any[]>([]);
   const [teamWalletInfo, setTeamWalletInfo] = useState({ totalKitty: 0, totalDebts: 0, netBalance: 0 });
   const [isSaving, setIsSaving] = useState(false);
+  const [isWalletEnabled, setIsWalletEnabled] = useState<boolean | null>(null);
   const [inlineAction, setInlineAction] = useState<{ playerId: string, type: 'expense' | 'reward' } | null>(null);
   const [inlineForm, setInlineForm] = useState<{ name: string, amount: string }>({ name: '', amount: '' });
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
@@ -34,9 +35,34 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
     }
   }, [manageableTeams]);
 
+  const handleToggleWallet = async () => {
+    setIsSaving(true);
+    const { data } = await supabase.from('clubs').select('settings').eq('id', clubId).single();
+    const currentSettings = data?.settings || {};
+    const newEnabled = isWalletEnabled === false ? true : false;
+    const newSettings = { ...currentSettings, enable_team_wallet: newEnabled };
+    await supabase.from('clubs').update({ settings: newSettings }).eq('id', clubId);
+    setIsWalletEnabled(newEnabled);
+    setIsSaving(false);
+    showToast(newEnabled ? "Team Wallet Enabled" : "Team Wallet Disabled", "success");
+    if (newEnabled) {
+        fetchData();
+    }
+  };
+
   const fetchData = async (silent = false) => {
-    if (!clubId || !selectedTeamId) return;
+    if (!clubId) return;
     if (!silent) setIsLoading(true);
+
+    const clubRes = await supabase.from('clubs').select('settings').eq('id', clubId).single();
+    const settings = clubRes.data?.settings || {};
+    const enabled = settings.enable_team_wallet !== false;
+    setIsWalletEnabled(enabled);
+
+    if (!enabled || !selectedTeamId) {
+        if (!silent) setIsLoading(false);
+        return;
+    }
 
     const [txRes, playersRes] = await Promise.all([
       supabase.from("transactions").select("*, players(first_name, last_name, nickname, is_active)").eq("club_id", clubId).eq("team_id", selectedTeamId),
@@ -239,19 +265,50 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
           <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Manage team kitty & surplus</p>
         </div>
         
-        {manageableTeams.length > 1 && (
-          <select 
-            value={selectedTeamId} 
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-900 dark:text-white outline-none font-bold transition-colors cursor-pointer min-w-[200px]"
-          >
-            {manageableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        )}
+        <div className="flex items-center gap-3">
+          {manageableTeams.length > 1 && isWalletEnabled !== false && (
+            <select 
+              value={selectedTeamId} 
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-900 dark:text-white outline-none font-bold transition-colors cursor-pointer min-w-[200px]"
+            >
+              {manageableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+          {isClubAdmin && (
+            <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-2.5 rounded-xl shadow-sm hover:border-emerald-500 transition-colors shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Enabled</span>
+                <div className="relative">
+                    <input type="checkbox" className="sr-only" checked={isWalletEnabled || false} onChange={handleToggleWallet} disabled={isSaving} />
+                    <div className={`block w-9 h-5 rounded-full transition-colors ${isWalletEnabled !== false ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}></div>
+                    <div className={`absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform ${isWalletEnabled !== false ? 'translate-x-4' : ''}`}></div>
+                </div>
+            </label>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
         <div className="p-10 flex justify-center"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>
+      ) : isWalletEnabled === false ? (
+        <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl animate-in fade-in">
+          <div className="w-12 h-12 mx-auto bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-full flex items-center justify-center mb-4">
+            <i className="fa-solid fa-wallet text-xl"></i>
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white mb-2">Wallet Disabled</h3>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6 max-w-sm mx-auto leading-relaxed">
+            The Team Wallet is currently disabled. Enable the Team Wallet if you wish to track individual player contributions into the kitty.
+          </p>
+          {isClubAdmin && (
+            <button 
+                onClick={handleToggleWallet}
+                disabled={isSaving}
+                className="mx-auto py-3 px-6 rounded-xl font-black uppercase tracking-widest text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-md transition-all flex items-center justify-center gap-2"
+            >
+                <i className="fa-solid fa-power-off"></i> Enable Team Wallet
+            </button>
+          )}
+        </div>
       ) : (
         <>
           {/* Top Section: The Big Picture */}
