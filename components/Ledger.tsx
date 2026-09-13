@@ -11,6 +11,7 @@ export default function Ledger() {
 
   const [teams, setTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string>("");
+  const [isWalletEnabled, setIsWalletEnabled] = useState<boolean | null>(null);
   
   const [allPlayers, setAllPlayers] = useState<any[]>([]); 
   const [fixtures, setFixtures] = useState<any[]>([]);
