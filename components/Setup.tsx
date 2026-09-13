@@ -1909,20 +1909,6 @@ export default function Setup({ activeTab }: SetupProps) {
                       </div>
                     </div>
                     
-                    <button onClick={() => {
-                      if (expandedRosterTeamId === t.id) {
-                        setExpandedRosterTeamId(null);
-                      } else {
-                        openRosterModal(t);
-                      }
-                    }} className="w-full py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-                      {expandedRosterTeamId === t.id ? (
-                        <><i className="fa-solid fa-chevron-up"></i> Close Roster</>
-                      ) : (
-                        <><i className="fa-solid fa-clipboard-user"></i> Assign Team Players</>
-                      )}
-                    </button>
-
                     {clubRecord?.club_cat === 'PlayHQ' && (
                       <div className="mt-3 bg-[#0051e5]/5 dark:bg-[#0051e5]/10 border border-[#0051e5]/20 dark:border-[#0051e5]/30 rounded-xl p-4 transition-colors">
                         <div className="flex items-center justify-between mb-3">
@@ -2068,6 +2054,22 @@ export default function Setup({ activeTab }: SetupProps) {
                       </div>
                     )}
 
+                    <button onClick={() => {
+                      if (expandedRosterTeamId === t.id) {
+                        setExpandedRosterTeamId(null);
+                      } else {
+                        openRosterModal(t);
+                      }
+                    }} className="w-full py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
+                      {expandedRosterTeamId === t.id ? (
+                        <><i className="fa-solid fa-chevron-up"></i> Close Roster</>
+                      ) : (
+                        <><i className="fa-solid fa-clipboard-user"></i> Assign Players</>
+                      )}
+                    </button>
+
+                    
+
                     {/* INLINE ROSTER ACCORDION */}
                     {expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
                       <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 animate-in slide-in-from-top-2">
@@ -2083,7 +2085,7 @@ export default function Setup({ activeTab }: SetupProps) {
                           {/* CURRENT TEAM */}
                           {currentTeamPlayers.length > 0 && (
                             <div>
-                              <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Current Lineup</h3>
+                              <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 mb-3">Available Roster</h3>
                               <div className="flex flex-wrap gap-2.5">
                                 {currentTeamPlayers.map(p => {
                                   const isSelected = rosterPlayerIds.includes(p.id);
