@@ -100,14 +100,13 @@ export default function Ledger() {
 
       const { data, error } = await query;
       if (!error && data) {
-        setTeams(data);
+        const activeTeams = data.filter((t: any) => t.is_active !== false);
+        setTeams(activeTeams);
         const savedTeam = localStorage.getItem('fp_selected_team_id');
-        if (savedTeam && data.find((t: any) => t.id === savedTeam)) {
+        if (savedTeam && activeTeams.find((t: any) => t.id === savedTeam)) {
           setActiveTeamId(savedTeam);
-        } else if (data.length === 1) {
-          setActiveTeamId(data[0].id);
-        } else if (data.length > 0 && !data.find((t: any) => t.id === activeTeamId)) {
-          setActiveTeamId(""); 
+        } else if (activeTeams.length > 0) {
+          setActiveTeamId(activeTeams[0].id);
         }
       }
       setIsLoading(false);

@@ -319,10 +319,9 @@ export default function PlayersTab({ clubId, teams, players, clubUsers = [], isS
         </div>
         
         {teams.length > 1 && (
-          <select value={addTeamId || ""} onChange={(e) => { setAddTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
-            <option value="">-- View All Club Players --</option>
+          <select value={addTeamId || "unassigned"} onChange={(e) => { setAddTeamId(e.target.value); localStorage.setItem('fp_selected_team_id', e.target.value); }} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
             <option value="unassigned">- Unassigned Players -</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_active === false ? ' (Deactivated)' : ''}</option>)}
           </select>
         )}
         
@@ -618,7 +617,7 @@ function PlayerRow({
           <select value={editForm.default_team_id || "unassigned"} onChange={(e) => setEditForm({...editForm, default_team_id: e.target.value})} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors">
             <option value="" disabled>-- Select a valid team --</option>
             <option value="unassigned">- Unassigned Players -</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_active === false ? ' (Deactivated)' : ''}</option>)}
           </select>
         )}
         
