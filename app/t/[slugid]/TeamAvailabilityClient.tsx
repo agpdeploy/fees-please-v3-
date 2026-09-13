@@ -455,12 +455,12 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
           {sponsors.length > 0 && (
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
-              <div className="flex w-full flex-wrap justify-center items-center gap-4 sm:gap-6 mb-5">
+              <div className="flex w-full justify-center items-center gap-3 sm:gap-6 mb-5 px-2">
                 {sponsors.slice(0, 4).map((s: any, i) => (
                 <a key={s.id || i} href={s.url || '#'} onClick={(e) => {
                   if (s.url) { e.preventDefault(); handleSponsorClick(s.id, s.url); }
-                }} className={`shrink-0 h-10 sm:h-12 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
-                  <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[100px] object-contain opacity-70 hover:opacity-100" />
+                }} className={`h-8 sm:h-12 flex justify-center items-center grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
+                  <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[75px] sm:max-w-[100px] object-contain opacity-70 hover:opacity-100" />
                   </a>
                 ))}
               </div>
