@@ -2060,7 +2060,7 @@ export default function Setup({ activeTab }: SetupProps) {
                       } else {
                         openRosterModal(t);
                       }
-                    }} className="w-full py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
+                    }} className="w-full py-3 mt-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
                       {expandedRosterTeamId === t.id ? (
                         <><i className="fa-solid fa-chevron-up"></i> Close Roster</>
                       ) : (
