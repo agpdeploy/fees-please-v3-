@@ -34,6 +34,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
   const [playerSearch, setPlayerSearch] = useState("");
   const [availabilities, setAvailabilities] = useState<Record<string, string>>({});
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [expandedFixtureId, setExpandedFixtureId] = useState<string | null>(null);
 
   const hasLoggedImpression = useRef(false);
 
@@ -247,7 +248,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
   if (isLoading) {
     return (
-      <div className={`${isEmbedded ? 'py-20' : 'min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] transition-colors'} flex flex-col items-center justify-center p-6`}>
+      <div className={`${isEmbedded ? 'py-20' : 'min-h-screen bg-transparent transition-colors'} flex flex-col items-center justify-center p-6`}>
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -255,7 +256,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
   if (!teamInfo) {
     return (
-      <div className={`${isEmbedded ? 'py-20' : 'min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] transition-colors'} flex flex-col items-center justify-center p-6`}>
+      <div className={`${isEmbedded ? 'py-20' : 'min-h-screen bg-transparent transition-colors'} flex flex-col items-center justify-center p-6`}>
         <h1 className="text-zinc-900 dark:text-white font-black uppercase text-xl">Team Not Found</h1>
         <p className="text-zinc-500 text-sm mt-2 text-center max-w-xs">Make sure the URL is correct, or ask your manager to hit 'Save' on the Team Settings.</p>
       </div>
@@ -263,7 +264,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
   }
 
   return (
-    <div className={`${isEmbedded ? 'pb-6 relative' : 'min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] pb-6 relative'} text-zinc-900 dark:text-white font-sans transition-colors`}>
+    <div className={`${isEmbedded ? 'pb-6 relative' : 'min-h-screen bg-transparent pb-6 relative'} text-zinc-900 dark:text-white font-sans transition-colors`}>
       {clubAnnouncement && (
         <div className="w-full bg-emerald-600 text-white px-4 py-2.5 text-center text-xs font-bold shadow-sm flex items-center justify-center gap-2 relative z-50">
           <i className="fa-solid fa-bullhorn"></i> {clubAnnouncement}
@@ -373,7 +374,9 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                     <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1">
                       <div className="flex justify-between items-center mb-3">
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
-                        <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{yesCount} / {involvedIds.size} Confirmed</span>
+                        <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors">
+                          {yesCount} / {involvedIds.size} Confirmed <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} ml-0.5`}></i>
+                        </button>
                       </div>
                       <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">
                         <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
@@ -387,6 +390,42 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                         <div><div className="text-sm font-black">{noCount}</div><div className="text-[8px] font-bold uppercase text-red-500 mt-0.5">Out</div></div>
                         <div><div className="text-sm font-black">{unconfirmedCount}</div><div className="text-[8px] font-bold uppercase text-zinc-400 mt-0.5">Unconf</div></div>
                       </div>
+
+                        {expandedFixtureId === fixture.id && (
+                          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 text-left space-y-4">
+                            {(() => {
+                              const availPlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'yes').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                              const maybePlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'maybe').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                              const outPlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'no').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                              const unconfPlayers = Array.from(involvedIds).filter(id => !responses.find(r => r.player_id === id)).map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+
+                              const renderGroup = (title: string, players: any[], colorClass: string) => {
+                                if (players.length === 0) return null;
+                                return (
+                                  <div>
+                                    <h5 className={`text-[9px] font-black uppercase tracking-widest mb-1.5 ${colorClass}`}>{title} ({players.length})</h5>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {players.map(p => (
+                                        <span key={p.id} className="text-[10px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-400">
+                                          {p.nickname || p.first_name} {p.last_name ? p.last_name.charAt(0) + '.' : ''}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              };
+
+                              return (
+                                <>
+                                  {renderGroup('Available', availPlayers, 'text-emerald-600')}
+                                  {renderGroup('Maybe', maybePlayers, 'text-amber-500')}
+                                  {renderGroup('Out', outPlayers, 'text-red-500')}
+                                  {renderGroup('Unconfirmed', unconfPlayers, 'text-zinc-400')}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
                     </div>
 
                     <div className="p-4 flex gap-2.5 bg-zinc-50 dark:bg-zinc-950/50 ml-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/50">
@@ -416,16 +455,14 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
           {sponsors.length > 0 && (
             <>
               <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-400 dark:text-zinc-600 text-center mb-3">Proudly Supported By</p>
-              <div className="flex w-full overflow-x-auto flex-nowrap items-center gap-6 sm:gap-8 mb-5 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <div className="ml-auto shrink-0"></div>
+              <div className="flex w-full flex-wrap justify-center items-center gap-4 sm:gap-6 mb-5">
                 {sponsors.slice(0, 4).map((s: any, i) => (
                 <a key={s.id || i} href={s.url || '#'} onClick={(e) => {
                   if (s.url) { e.preventDefault(); handleSponsorClick(s.id, s.url); }
-                }} className={`shrink-0 snap-center h-10 sm:h-12 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
+                }} className={`shrink-0 h-10 sm:h-12 flex grayscale hover:grayscale-0 transition-all ${!s.url ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:scale-105'}`}>
                   <img src={s.logo_url} alt={s.name || `Sponsor`} className="max-h-full max-w-[100px] object-contain opacity-70 hover:opacity-100" />
                   </a>
                 ))}
-                <div className="mr-auto shrink-0"></div>
               </div>
             </>
           )}
