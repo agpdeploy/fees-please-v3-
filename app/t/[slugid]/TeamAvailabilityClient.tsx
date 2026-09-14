@@ -336,7 +336,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                     <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all">
                       <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center w-full">
                         <div className="flex flex-col items-start gap-1">
-                          <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 tracking-widest leading-none shadow-sm">Upcoming</span>
+                          <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
                           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                             {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
                             {(fixture.start_time || fixture.location) && (
@@ -458,7 +458,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
                     <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-full">
                       <div className="flex flex-col items-start gap-1 pl-1">
-                        <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 tracking-widest leading-none shadow-sm">Upcoming</span>
+                        <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
                         <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                           {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
                           {(fixture.start_time || fixture.location) && (
