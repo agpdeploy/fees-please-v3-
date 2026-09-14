@@ -212,7 +212,7 @@ export default function Team() {
     const identifier = team?.slug || selectedTeamId;
     const shareUrl = `${window.location.origin}/t/${identifier}`;
     
-    const shareTextWithoutUrl = `≡ƒÅÅ Update your availability for ${team?.name || 'the team'} here:`;
+    const shareTextWithoutUrl = `🏏 Update your availability for ${team?.name || 'the team'} here:`;
     const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
 
     if (navigator.share) {
@@ -308,7 +308,7 @@ export default function Team() {
     const shareUrl = `${window.location.origin}/t/${teamSlug}`;
     const matchDate = new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
     
-    const shareTextWithoutUrl = `≡ƒÅÅ Game On! vs ${fixture.opponent}\n≡ƒôà ${matchDate} @ ${fixture.start_time || 'TBA'}\n≡ƒôì ${fixture.location || 'TBA'}\n\nUpdate your availability here:`;
+    const shareTextWithoutUrl = `🏏 Game On! vs ${fixture.opponent}\n📅 ${matchDate} @ ${fixture.start_time || 'TBA'}\n📍 ${fixture.location || 'TBA'}\n\nUpdate your availability here:`;
     const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
 
     if (navigator.share) {
@@ -652,7 +652,7 @@ export default function Team() {
                                      {date}
                                      {(f.start_time || f.location) && (
                                        <>
-                                         <span className="mx-1.5">ΓÇó</span>
+                                         <span className="mx-1.5">•</span>
                                          {f.start_time && `${f.start_time} `}
                                          {f.location && `@ ${f.location}`}
                                        </>
