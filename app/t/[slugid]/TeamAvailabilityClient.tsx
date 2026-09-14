@@ -285,11 +285,6 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
       )}
       <div className="max-w-md mx-auto space-y-6 mt-6 px-4">
           <div className="flex items-center gap-3 mb-6 px-2">
-              {!isEmbedded && isLoggedIn && (
-                <a href="/" className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm hover:scale-105 transition-transform" title="Back to App">
-                  <i className="fa-solid fa-arrow-left"></i>
-                </a>
-              )}
               <div className="w-12 h-12 shrink-0 rounded-xl bg-white border border-zinc-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden shadow-sm">
                {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover" /> : <i className="fa-solid fa-shield-halved text-zinc-300 dark:text-zinc-700 text-lg"></i>}
               </div>
@@ -297,6 +292,11 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                 <h1 className="text-xl font-black uppercase italic tracking-tight leading-none truncate text-zinc-900 dark:text-white">{teamInfo.team_name}</h1>
                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mt-1 truncate">Availability Hub</p>
               </div>
+              {!isEmbedded && isLoggedIn && (
+                <a href="/" className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm hover:scale-105 transition-transform" title="Close">
+                  <i className="fa-solid fa-xmark text-lg"></i>
+                </a>
+              )}
           </div>
 
           {!selectedPlayer && upcomingFixtures.length > 0 && (
@@ -335,10 +335,13 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                   return (
                     <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all">
                       <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
-                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-[calc(100%-4px)]">
+                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center ml-1 w-[calc(100%-4px)]">
                         <div className="flex flex-col items-start gap-1 pl-1">
-                          <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                          <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
+                              <span className="text-[11px] font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">vs {fixture.opponent}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
                             {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
                             {(fixture.start_time || fixture.location) && (
                               <>
@@ -349,19 +352,9 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             )}
                           </span>
                         </div>
-                      </div>
-                      <div className="p-4 flex items-center justify-between gap-2 ml-1 w-[calc(100%-4px)]">
-                          <div className="flex items-center gap-3 flex-1 pl-2">
-                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
-                                  {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover bg-white" /> : <span className="text-[10px] font-black">{teamInfo.team_name?.substring(0, 2).toUpperCase()}</span>}
-                              </div>
-                              <span className="font-black text-xs uppercase leading-tight">{teamInfo.team_name}</span>
-                          </div>
-                          <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic">VS</div>
-                          <div className="flex items-center justify-end gap-3 flex-1">
-                              <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center border border-zinc-200 dark:border-zinc-800 shrink-0"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
-                          </div>
+                        <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+                            <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
+                        </div>
                       </div>
                       <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
                         <div className="flex justify-between items-center mb-3">
@@ -464,10 +457,13 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                     {currentStatus === 'no' && <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>}
                     {currentStatus === 'maybe' && <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>}
 
-                    <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-full">
-                      <div className="flex flex-col items-start gap-1 pl-1">
-                        <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                    <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center ml-1 w-full">
+                        <div className="flex flex-col items-start gap-1 pl-1">
+                          <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
+                              <span className="text-[11px] font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">vs {fixture.opponent}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
                           {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
                           {(fixture.start_time || fixture.location) && (
                             <>
@@ -478,19 +474,9 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                           )}
                         </span>
                       </div>
-                    </div>
-                    <div className="p-4 flex items-center justify-between gap-2 ml-1">
-                        <div className="flex items-center gap-3 flex-1 pl-2">
-                            <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
-                                {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover bg-white" /> : <span className="text-[10px] font-black">{teamInfo.team_name?.substring(0, 2).toUpperCase()}</span>}
-                            </div>
-                            <span className="font-black text-xs uppercase leading-tight">{teamInfo.team_name}</span>
-                        </div>
-                        <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic">VS</div>
-                        <div className="flex items-center justify-end gap-3 flex-1">
-                            <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                            <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
-                        </div>
+                      <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+                          <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
+                      </div>
                     </div>
 
 
