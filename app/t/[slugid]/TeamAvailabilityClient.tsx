@@ -334,10 +334,9 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
                   return (
                     <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all">
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
-                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center ml-1 w-[calc(100%-4px)]">
-                        <div className="flex flex-col items-start gap-1 pl-1">
-                          <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
+                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center w-full">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 tracking-widest leading-none shadow-sm">Upcoming</span>
                           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                             {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
                             {(fixture.start_time || fixture.location) && (
@@ -356,7 +355,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             </div>
                         </div>
                       </div>
-                      <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
+                      <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 w-full">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
                           <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors">
@@ -459,7 +458,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
                     <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-full">
                       <div className="flex flex-col items-start gap-1 pl-1">
-                        <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
+                        <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 tracking-widest leading-none shadow-sm">Upcoming</span>
                         <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                           {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
                           {(fixture.start_time || fixture.location) && (
