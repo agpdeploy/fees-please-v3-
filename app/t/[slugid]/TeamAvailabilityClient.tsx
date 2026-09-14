@@ -16,6 +16,7 @@ interface ClientProps {
 
 export default function TeamAvailabilityClient({ teamId, clubId, teamName, initialPlayerId, isEmbedded = false }: ClientProps) {
   const [teamInfo, setTeamInfo] = useState<any>({ team_id: teamId, team_name: teamName });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -277,15 +278,15 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
         </div>
       )}
       <div className="max-w-md mx-auto space-y-6 mt-6 px-4">
-        <div className="flex flex-col items-center gap-2 mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center overflow-hidden">
-            {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-contain p-1" /> : <i className="fa-solid fa-shield-halved text-zinc-300 dark:text-zinc-700 text-2xl"></i>}
+        <div className="flex items-center gap-4 mb-6 px-2">
+            <div className="w-12 h-12 shrink-0 rounded-xl bg-white border border-zinc-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden shadow-sm">
+             {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-contain p-1" /> : <i className="fa-solid fa-shield-halved text-zinc-300 dark:text-zinc-700 text-lg"></i>}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <h1 className="text-xl font-black uppercase italic tracking-tight leading-none truncate text-emerald-600 dark:text-emerald-500">{teamInfo.team_name}</h1>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mt-1 truncate">Availability Hub</p>
+            </div>
           </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-black uppercase italic tracking-tighter leading-none">{teamInfo.team_name}</h1>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mt-1">Availability Hub</p>
-          </div>
-        </div>
 
         {!selectedPlayer ? (
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl">

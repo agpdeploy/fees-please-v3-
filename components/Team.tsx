@@ -64,7 +64,6 @@ export default function Team() {
   const [showPastFixtures, setShowPastFixtures] = useState(false);
 
   const [emailStats, setEmailStats] = useState<Record<string, number>>({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 });
-  const [isHubVisible, setIsHubVisible] = useState(false);
   const [emailLogDetails, setEmailLogDetails] = useState<any[]>([]);
   const [activeStatFilter, setActiveStatFilter] = useState<'sent' | 'delivered' | 'opened' | 'bounced' | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
@@ -549,12 +548,13 @@ export default function Team() {
               <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Team Hub</h2>
             </div>
             <div className="flex gap-2">
-               <button 
-                 onClick={() => setIsHubVisible(!isHubVisible)}
+               <a 
+                 href={`/t/${teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId}`} 
+                 target="_blank" rel="noopener noreferrer"
                  className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-2"
                >
-                 <i className={`fa-solid ${isHubVisible ? 'fa-eye-slash' : 'fa-eye'}`}></i> {isHubVisible ? 'Hide' : 'View'}
-               </button>
+                 <i className="fa-solid fa-arrow-up-right-from-square"></i> Open
+               </a>
                <button 
                  onClick={copyTeamLink}
                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
@@ -568,15 +568,7 @@ export default function Team() {
            Manage your players' availability and lock in match squads.
          </p>
 
-         {isHubVisible && selectedTeamId && (
-            <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden mb-6 relative bg-zinc-50 dark:bg-zinc-950 animate-in fade-in slide-in-from-top-2">
-               <div className="absolute top-0 w-full bg-zinc-200 dark:bg-zinc-800 text-[9px] font-black uppercase text-center py-1 tracking-widest text-zinc-500 z-10 pointer-events-none">Public Player View</div>
-               <iframe 
-                 src={`/t/${teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId}`} 
-                 className="w-full h-[650px] border-0 pt-6"
-               />
-            </div>
-         )}
+         
 
          {fixtureAvail.length === 0 ? (
             <p className="text-xs font-bold text-zinc-500 text-center py-6">No upcoming fixtures found.</p>
