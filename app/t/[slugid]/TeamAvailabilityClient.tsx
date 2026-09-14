@@ -335,7 +335,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                   return (
                     <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all">
                       <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
-                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-[calc(100%-4px)]">
+                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center ml-1 w-[calc(100%-4px)]">
                         <div className="flex flex-col items-start gap-1 pl-1">
                           <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
                           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
@@ -349,19 +349,12 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             )}
                           </span>
                         </div>
-                      </div>
-                      <div className="p-4 flex items-center justify-between gap-2 ml-1 w-[calc(100%-4px)]">
-                          <div className="flex items-center gap-3 flex-1 pl-2">
-                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
-                                  {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover bg-white" /> : <span className="text-[10px] font-black">{teamInfo.team_name?.substring(0, 2).toUpperCase()}</span>}
-                              </div>
-                              <span className="font-black text-xs uppercase leading-tight">{teamInfo.team_name}</span>
-                          </div>
-                          <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic">VS</div>
-                          <div className="flex items-center justify-end gap-3 flex-1">
-                              <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center border border-zinc-200 dark:border-zinc-800 shrink-0"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
-                          </div>
+                        <div className="flex items-center gap-3 pr-2">
+                            <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
+                            <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+                                <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
+                            </div>
+                        </div>
                       </div>
                       <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
                         <div className="flex justify-between items-center mb-3">
