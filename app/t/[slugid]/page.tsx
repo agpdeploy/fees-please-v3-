@@ -81,10 +81,7 @@ export default async function PublicTeamAvailabilityPage(props: { params: Promis
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
   
   // 2. Query the DB
-  const query = supabase.from('teams').select('id, club_id, name');
-  const { data: teamDataArr, error: teamError } = await (isUuid 
-    ? query.eq('id', identifier).limit(1) 
-    : query.eq('slug', identifier).limit(1));
+  const { data: teamDataArr, error: teamError } = await supabase.from('teams').select('id, club_id, name').or(`slug.eq.${identifier},id.eq.${isUuid ? identifier : '00000000-0000-0000-0000-000000000000'}`).limit(1);
     
   const teamData = teamDataArr?.[0] || null;
 
@@ -92,7 +89,7 @@ export default async function PublicTeamAvailabilityPage(props: { params: Promis
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-6">
         <h1 className="text-zinc-900 dark:text-white font-black uppercase text-xl">Team Not Found</h1>
-        <p className="text-zinc-500 text-sm mt-2 text-center max-w-xs">Could not find team in the database.</p>
+        <p className="text-zinc-500 text-sm mt-2 text-center max-w-xs">Could not find team in the database. DEBUG: {teamError?.message || "No data"} | {identifier} | {isUuid ? "UUID" : "SLUG"}</p>
       </div>
     );
   }

@@ -293,6 +293,80 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
               </div>
           </div>
 
+          {!selectedPlayer && upcomingFixtures.length > 0 && (
+            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl relative transition-all mb-8">
+                {(() => {
+                  const fixture = upcomingFixtures[0];
+                  const responses = fixtureResponses[fixture.id] || [];
+                  const yesCount = responses.filter(r => r.status === 'yes').length;
+                  const maybeCount = responses.filter(r => r.status === 'maybe').length;
+                  const noCount = responses.filter(r => r.status === 'no').length;
+                  const teamRosterIds = allClubPlayers.filter(p => p.default_team_id === teamId).map(p => p.id);
+                  const involvedIds = new Set([...teamRosterIds, ...responses.map(r => r.player_id)]);
+                  const totalPlayers = involvedIds.size || 1; 
+                  const unconfirmedCount = involvedIds.size - (yesCount + maybeCount + noCount);
+                  const yesPct = (yesCount / totalPlayers) * 100;
+                  const maybePct = (maybeCount / totalPlayers) * 100;
+                  const noPct = (noCount / totalPlayers) * 100;
+                  const unconfirmedPct = (unconfirmedCount / totalPlayers) * 100;
+
+                  return (
+                    <>
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
+                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-full">
+                        <div className="flex flex-col items-start gap-1 pl-1">
+                          <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                            {new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}
+                            {(fixture.start_time || fixture.location) && (
+                              <>
+                                <span className="mx-1.5">•</span>
+                                {fixture.start_time && `${fixture.start_time} `}
+                                {fixture.location && `@ ${fixture.location}`}
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-4 flex items-center justify-between gap-2 ml-1">
+                          <div className="flex items-center gap-3 flex-1 pl-2">
+                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                                  {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover bg-white" /> : <span className="text-[10px] font-black">{teamInfo.team_name?.substring(0, 2).toUpperCase()}</span>}
+                              </div>
+                              <span className="font-black text-xs uppercase leading-tight">{teamInfo.team_name}</span>
+                          </div>
+                          <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic">VS</div>
+                          <div className="flex items-center justify-end gap-3 flex-1">
+                              <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
+                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
+                          </div>
+                      </div>
+                      <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
+                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">
+                            {yesCount} / {involvedIds.size} Confirmed
+                          </span>
+                        </div>
+                        <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">
+                          <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
+                          <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
+                          <div style={{ width: `${noPct}%` }} className="bg-red-500 transition-all duration-500"></div>
+                          <div style={{ width: `${unconfirmedPct}%` }} className="bg-zinc-300 dark:bg-zinc-700 transition-all duration-500"></div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1 text-center">
+                          <div><div className="text-sm font-black">{yesCount}</div><div className="text-[8px] font-bold uppercase text-emerald-600 mt-0.5">Avail</div></div>
+                          <div><div className="text-sm font-black">{maybeCount}</div><div className="text-[8px] font-bold uppercase text-amber-500 mt-0.5">Maybe</div></div>
+                          <div><div className="text-sm font-black">{noCount}</div><div className="text-[8px] font-bold uppercase text-red-500 mt-0.5">Out</div></div>
+                          <div><div className="text-sm font-black">{unconfirmedCount}</div><div className="text-[8px] font-bold uppercase text-zinc-400 mt-0.5">Unconf</div></div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+            </div>
+          )}
+
         {!selectedPlayer ? (
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xl">
             <label className="text-[10px] text-zinc-500 uppercase font-black block mb-4 text-center">Who are you?</label>
