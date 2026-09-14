@@ -64,6 +64,7 @@ export default function Team() {
   const [showPastFixtures, setShowPastFixtures] = useState(false);
 
   const [emailStats, setEmailStats] = useState<Record<string, number>>({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 });
+  const [isHubVisible, setIsHubVisible] = useState(false);
   const [emailLogDetails, setEmailLogDetails] = useState<any[]>([]);
   const [activeStatFilter, setActiveStatFilter] = useState<'sent' | 'delivered' | 'opened' | 'bounced' | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
@@ -211,7 +212,7 @@ export default function Team() {
     const identifier = team?.slug || selectedTeamId;
     const shareUrl = `${window.location.origin}/t/${identifier}`;
     
-    const shareTextWithoutUrl = `🏏 Update your availability for ${team?.name || 'the team'} here:`;
+    const shareTextWithoutUrl = `≡ƒÅÅ Update your availability for ${team?.name || 'the team'} here:`;
     const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
 
     if (navigator.share) {
@@ -307,7 +308,7 @@ export default function Team() {
     const shareUrl = `${window.location.origin}/t/${teamSlug}`;
     const matchDate = new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
     
-    const shareTextWithoutUrl = `🏏 Game On! vs ${fixture.opponent}\n📅 ${matchDate} @ ${fixture.start_time || 'TBA'}\n📍 ${fixture.location || 'TBA'}\n\nUpdate your availability here:`;
+    const shareTextWithoutUrl = `≡ƒÅÅ Game On! vs ${fixture.opponent}\n≡ƒôà ${matchDate} @ ${fixture.start_time || 'TBA'}\n≡ƒôì ${fixture.location || 'TBA'}\n\nUpdate your availability here:`;
     const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
 
     if (navigator.share) {
@@ -568,7 +569,7 @@ export default function Team() {
            Manage your players' availability and lock in match squads.
          </p>
 
-         
+         {/* Iframe removed per user request */}
 
          {fixtureAvail.length === 0 ? (
             <p className="text-xs font-bold text-zinc-500 text-center py-6">No upcoming fixtures found.</p>
@@ -639,69 +640,75 @@ export default function Team() {
                          </div>
                        )}
                        {(!isPast || showPastFixtures) && (
-                         <div className="bg-white dark:bg-[#111] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm relative transition-all">
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
-                            
-                            <div className="pt-4 px-5 pb-3 ml-1 border-b border-zinc-100 dark:border-zinc-800/50">
-                               <div className="flex flex-wrap items-center gap-2">
-                                 {badgeText && <span className={`text-[9px] font-black uppercase px-2 py-1 rounded tracking-widest leading-none shadow-sm ${badgeColor}`}>{badgeText}</span>}
-                                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                                   {date}
-                                   {(f.start_time || f.location) && (
-                                     <>
-                                       <span className="mx-1.5">•</span>
-                                       {f.start_time && `${f.start_time} `}
-                                       {f.location && `@ ${f.location}`}
-                                     </>
-                                   )}
-                                 </span>
-                               </div>
-                            </div>
+                       <div className="bg-zinc-50 dark:bg-[#1A1A1A] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all">
+                          <button 
+                             onClick={() => handleExpandFixture(f.id)}
+                             className="w-full text-left p-4 focus:outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
+                          >
+                             <div className="flex justify-between items-start w-full mb-3">
+                                 <div className="flex flex-col items-start gap-1">
+                                   {badgeText && <span className={`text-[9px] font-black uppercase px-2 py-1 rounded tracking-widest leading-none shadow-sm ${badgeColor}`}>{badgeText}</span>}
+                                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                                     {date}
+                                     {(f.start_time || f.location) && (
+                                       <>
+                                         <span className="mx-1.5">ΓÇó</span>
+                                         {f.start_time && `${f.start_time} `}
+                                         {f.location && `@ ${f.location}`}
+                                       </>
+                                     )}
+                                   </span>
+                                 </div>
+                              </div>
 
-                            <div className="p-4 flex items-center justify-between gap-2 ml-1">
-                                <div className="flex items-center gap-3 flex-1 pl-2">
-                                    <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-                                      {clubInfo?.logo_url ? (
-                                        <img src={clubInfo.logo_url} alt="Account Logo" className="w-full h-full object-cover" />
-                                      ) : (
-                                        <span className="text-[10px] font-black text-zinc-500">{clubInfo?.name?.substring(0, 2).toUpperCase()}</span>
-                                      )}
-                                    </div>
-                                    <span className="font-black text-xs uppercase leading-tight break-words text-left">{teams.find(t => t.id === f.team_id)?.name || "Team"}</span>
+                              <div className="flex items-center justify-between gap-2 w-full mb-4">
+                                <div className="flex items-center gap-3 flex-1">
+                                  <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
+                                    {clubInfo?.logo_url ? (
+                                      <img src={clubInfo.logo_url} alt="Account Logo" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[10px] font-black text-zinc-500">{clubInfo?.name?.substring(0, 2).toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white leading-tight break-words text-left">
+                                    {teams.find(t => t.id === f.team_id)?.name || "Team"}
+                                  </span>
                                 </div>
-                                <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic uppercase tracking-widest">VS</div>
+
+                                <div className="shrink-0 px-2 text-center">
+                                  <span className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic uppercase tracking-widest">VS</span>
+                                </div>
+
                                 <div className="flex items-center justify-end gap-3 flex-1">
-                                    <span className="font-black text-xs uppercase text-right leading-tight break-words">{f.opponent}</span>
-                                    <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center shrink-0 overflow-hidden">
-                                      {f.opponent_logo_url ? (
-                                        <img src={f.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
-                                      ) : (
-                                        <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
-                                      )}
-                                    </div>
+                                  <span className="font-black text-xs uppercase tracking-wide text-zinc-900 dark:text-white text-right leading-tight break-words">
+                                    {f.opponent}
+                                  </span>
+                                  <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                    {f.opponent_logo_url ? (
+                                      <img src={f.opponent_logo_url} alt="Opponent Logo" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>
+                                    )}
+                                  </div>
                                 </div>
-                            </div>
-
-                            <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1">
-                              <div className="flex justify-between items-center mb-3">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
-                                <button onClick={() => handleExpandFixture(f.id)} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors">
-                                  {f.lists.yes.length} / {f.total} Confirmed <i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} ml-0.5`}></i>
-                                </button>
                               </div>
-                              <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">
-                                <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
-                                <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
-                                <div style={{ width: `${noPct}%` }} className="bg-red-500 transition-all duration-500"></div>
-                                <div style={{ width: `${f.total > 0 ? (f.lists.pending.length / f.total) * 100 : 0}%` }} className="bg-zinc-300 dark:bg-zinc-700 transition-all duration-500"></div>
-                              </div>
-                              <div className="grid grid-cols-4 gap-1 text-center">
-                                <div><div className="text-sm font-black">{f.lists.yes.length}</div><div className="text-[8px] font-bold uppercase text-emerald-600 mt-0.5">Avail</div></div>
-                                <div><div className="text-sm font-black">{f.lists.maybe.length}</div><div className="text-[8px] font-bold uppercase text-amber-500 mt-0.5">Maybe</div></div>
-                                <div><div className="text-sm font-black">{f.lists.no.length}</div><div className="text-[8px] font-bold uppercase text-red-500 mt-0.5">Out</div></div>
-                                <div><div className="text-sm font-black">{f.lists.pending.length}</div><div className="text-[8px] font-bold uppercase text-zinc-400 mt-0.5">Unconf</div></div>
-                              </div>
-                            </div>
+                          
+                          <div className="w-full h-3.5 bg-zinc-200 dark:bg-zinc-900 rounded-full overflow-hidden flex shadow-inner">
+                             <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 h-full transition-all"></div>
+                             <div style={{ width: `${maybePct}%` }} className="bg-amber-500 h-full transition-all"></div>
+                             <div style={{ width: `${noPct}%` }} className="bg-red-500 h-full transition-all"></div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center mt-2">
+                             <div className="flex gap-2 sm:gap-3 text-[9px] font-black uppercase tracking-widest">
+                                <span className="text-emerald-600 dark:text-emerald-500">{f.lists.yes.length} YES</span>
+                                <span className="text-amber-500">{f.lists.maybe.length} MAYBE</span>
+                                <span className="text-zinc-400 dark:text-zinc-500">{f.lists.pending.length} PENDING</span>
+                                <span className="text-red-500">{f.lists.no.length} NO</span>
+                             </div>
+                             <i className={`fa-solid fa-chevron-down text-zinc-400 text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
+                          </div>
+                       </button>
 
                        {/* Expanded Roster Lists & Manage Team */}
                        {isExpanded && (
