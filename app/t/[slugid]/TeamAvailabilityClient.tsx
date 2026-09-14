@@ -40,6 +40,12 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
   const hasLoggedImpression = useRef(false);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setIsLoggedIn(true);
+    });
+  }, []);
+
+  useEffect(() => {
     async function loadPublicData() {
       try {
         // 🚨 FIX: Use .limit(1) so it doesn't crash if the profile isn't saved yet or blocked by RLS
