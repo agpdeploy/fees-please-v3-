@@ -327,7 +327,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                   };
 
                   return (
-                    <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="w-full text-left bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all focus:outline-none">
+                    <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all">
                       <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
                       <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-[calc(100%-4px)]">
                         <div className="flex flex-col items-start gap-1 pl-1">
@@ -358,6 +358,12 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                           </div>
                       </div>
                       <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
+                          <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors">
+                            {yesCount} / {involvedIds.size} Confirmed <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} ml-0.5`}></i>
+                          </button>
+                        </div>
                         <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3 shadow-inner">
                           <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
                           <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
@@ -371,11 +377,10 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                                 <span className="text-zinc-400 dark:text-zinc-500">{unconfirmedCount} PENDING</span>
                                 <span className="text-red-500">{noCount} NO</span>
                              </div>
-                             <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} text-zinc-400 text-xs transition-transform ml-1`}></i>
                         </div>
                         
                         {expandedFixtureId === fixture.id && (
-                            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 text-left space-y-4 cursor-default" onClick={e => e.stopPropagation()}>
+                            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 text-left space-y-4">
                               {(() => {
                                 const availPlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'yes').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
                                 const maybePlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'maybe').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
@@ -393,7 +398,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             </div>
                         )}
                       </div>
-                    </button>
+                    </div>
                   );
                 })()}
             </div>
@@ -484,20 +489,25 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
 
 
                       <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
+                          <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors">
+                            {yesCount} / {involvedIds.size} Confirmed <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} ml-0.5`}></i>
+                          </button>
+                        </div>
                         <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3 shadow-inner">
                           <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
                           <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
                           <div style={{ width: `${noPct}%` }} className="bg-red-500 transition-all duration-500"></div>
                           <div style={{ width: `${unconfirmedPct}%` }} className="bg-zinc-300 dark:bg-zinc-700 transition-all duration-500"></div>
                         </div>
-                        <div onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="flex items-center justify-between mt-3 cursor-pointer">
+                        <div className="flex items-center justify-between mt-3">
                              <div className="flex gap-2 sm:gap-3 text-[9px] font-black uppercase tracking-widest">
                                 <span className="text-emerald-600 dark:text-emerald-500">{yesCount} YES</span>
                                 <span className="text-amber-500">{maybeCount} MAYBE</span>
                                 <span className="text-zinc-400 dark:text-zinc-500">{unconfirmedCount} PENDING</span>
                                 <span className="text-red-500">{noCount} NO</span>
                              </div>
-                             <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} text-zinc-400 text-xs transition-transform ml-1`}></i>
                         </div>
 
                         {expandedFixtureId === fixture.id && (
