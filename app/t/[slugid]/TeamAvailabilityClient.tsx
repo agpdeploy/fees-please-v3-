@@ -294,7 +294,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
           </div>
 
           {!selectedPlayer && upcomingFixtures.length > 0 && (
-            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl relative transition-all mb-8">
+            <div className="mb-8">
                 {(() => {
                   const fixture = upcomingFixtures[0];
                   const responses = fixtureResponses[fixture.id] || [];
@@ -310,10 +310,26 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                   const noPct = (noCount / totalPlayers) * 100;
                   const unconfirmedPct = (unconfirmedCount / totalPlayers) * 100;
 
+                  const renderGroup = (title: string, players: any[], colorClass: string) => {
+                    if (players.length === 0) return null;
+                    return (
+                      <div>
+                        <h5 className={`text-[9px] font-black uppercase tracking-widest mb-1.5 ${colorClass}`}>{title} ({players.length})</h5>
+                        <div className="flex flex-wrap gap-1.5">
+                          {players.map(p => (
+                            <span key={p.id} className="text-[10px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-400">
+                              {p.nickname || p.first_name} {p.last_name ? p.last_name.charAt(0) + '.' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  };
+
                   return (
-                    <>
+                    <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="w-full text-left bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl flex flex-col relative transition-all focus:outline-none">
                       <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
-                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-full">
+                      <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/50 flex justify-between items-start ml-1 w-[calc(100%-4px)]">
                         <div className="flex flex-col items-start gap-1 pl-1">
                           <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-600 text-white tracking-widest leading-none shadow-sm">Upcoming</span>
                           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
@@ -328,9 +344,9 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                           </span>
                         </div>
                       </div>
-                      <div className="p-4 flex items-center justify-between gap-2 ml-1">
+                      <div className="p-4 flex items-center justify-between gap-2 ml-1 w-[calc(100%-4px)]">
                           <div className="flex items-center gap-3 flex-1 pl-2">
-                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
                                   {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover bg-white" /> : <span className="text-[10px] font-black">{teamInfo.team_name?.substring(0, 2).toUpperCase()}</span>}
                               </div>
                               <span className="font-black text-xs uppercase leading-tight">{teamInfo.team_name}</span>
@@ -338,30 +354,46 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                           <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic">VS</div>
                           <div className="flex items-center justify-end gap-3 flex-1">
                               <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
+                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center border border-zinc-200 dark:border-zinc-800 shrink-0"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
                           </div>
                       </div>
-                      <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
-                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">
-                            {yesCount} / {involvedIds.size} Confirmed
-                          </span>
-                        </div>
-                        <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">
+                      <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
+                        <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3 shadow-inner">
                           <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
                           <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
                           <div style={{ width: `${noPct}%` }} className="bg-red-500 transition-all duration-500"></div>
                           <div style={{ width: `${unconfirmedPct}%` }} className="bg-zinc-300 dark:bg-zinc-700 transition-all duration-500"></div>
                         </div>
-                        <div className="grid grid-cols-4 gap-1 text-center">
-                          <div><div className="text-sm font-black">{yesCount}</div><div className="text-[8px] font-bold uppercase text-emerald-600 mt-0.5">Avail</div></div>
-                          <div><div className="text-sm font-black">{maybeCount}</div><div className="text-[8px] font-bold uppercase text-amber-500 mt-0.5">Maybe</div></div>
-                          <div><div className="text-sm font-black">{noCount}</div><div className="text-[8px] font-bold uppercase text-red-500 mt-0.5">Out</div></div>
-                          <div><div className="text-sm font-black">{unconfirmedCount}</div><div className="text-[8px] font-bold uppercase text-zinc-400 mt-0.5">Unconf</div></div>
+                        <div className="flex items-center justify-between mt-3">
+                             <div className="flex gap-2 sm:gap-3 text-[9px] font-black uppercase tracking-widest">
+                                <span className="text-emerald-600 dark:text-emerald-500">{yesCount} YES</span>
+                                <span className="text-amber-500">{maybeCount} MAYBE</span>
+                                <span className="text-zinc-400 dark:text-zinc-500">{unconfirmedCount} PENDING</span>
+                                <span className="text-red-500">{noCount} NO</span>
+                             </div>
+                             <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} text-zinc-400 text-xs transition-transform ml-1`}></i>
                         </div>
+                        
+                        {expandedFixtureId === fixture.id && (
+                            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 text-left space-y-4 cursor-default" onClick={e => e.stopPropagation()}>
+                              {(() => {
+                                const availPlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'yes').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                                const maybePlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'maybe').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                                const outPlayers = Array.from(involvedIds).filter(id => responses.find(r => r.player_id === id)?.status === 'no').map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                                const unconfPlayers = Array.from(involvedIds).filter(id => !responses.find(r => r.player_id === id)).map(id => allClubPlayers.find(p => p.id === id)).filter(Boolean);
+                                return (
+                                  <>
+                                    {renderGroup('Available', availPlayers, 'text-emerald-600')}
+                                    {renderGroup('Maybe', maybePlayers, 'text-amber-500')}
+                                    {renderGroup('Out', outPlayers, 'text-red-500')}
+                                    {renderGroup('Unconfirmed', unconfPlayers, 'text-zinc-400')}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                        )}
                       </div>
-                    </>
+                    </button>
                   );
                 })()}
             </div>
@@ -451,25 +483,22 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                     </div>
 
 
-                    <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lineup Status</h4>
-                        <button onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors">
-                          {yesCount} / {involvedIds.size} Confirmed <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} ml-0.5`}></i>
-                        </button>
-                      </div>
-                      <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">
-                        <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
-                        <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
-                        <div style={{ width: `${noPct}%` }} className="bg-red-500 transition-all duration-500"></div>
-                        <div style={{ width: `${unconfirmedPct}%` }} className="bg-zinc-300 dark:bg-zinc-700 transition-all duration-500"></div>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1 text-center">
-                        <div><div className="text-sm font-black">{yesCount}</div><div className="text-[8px] font-bold uppercase text-emerald-600 mt-0.5">Avail</div></div>
-                        <div><div className="text-sm font-black">{maybeCount}</div><div className="text-[8px] font-bold uppercase text-amber-500 mt-0.5">Maybe</div></div>
-                        <div><div className="text-sm font-black">{noCount}</div><div className="text-[8px] font-bold uppercase text-red-500 mt-0.5">Out</div></div>
-                        <div><div className="text-sm font-black">{unconfirmedCount}</div><div className="text-[8px] font-bold uppercase text-zinc-400 mt-0.5">Unconf</div></div>
-                      </div>
+                      <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 ml-1 w-[calc(100%-4px)]">
+                        <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3 shadow-inner">
+                          <div style={{ width: `${yesPct}%` }} className="bg-emerald-500 transition-all duration-500"></div>
+                          <div style={{ width: `${maybePct}%` }} className="bg-amber-500 transition-all duration-500"></div>
+                          <div style={{ width: `${noPct}%` }} className="bg-red-500 transition-all duration-500"></div>
+                          <div style={{ width: `${unconfirmedPct}%` }} className="bg-zinc-300 dark:bg-zinc-700 transition-all duration-500"></div>
+                        </div>
+                        <div onClick={() => setExpandedFixtureId(expandedFixtureId === fixture.id ? null : fixture.id)} className="flex items-center justify-between mt-3 cursor-pointer">
+                             <div className="flex gap-2 sm:gap-3 text-[9px] font-black uppercase tracking-widest">
+                                <span className="text-emerald-600 dark:text-emerald-500">{yesCount} YES</span>
+                                <span className="text-amber-500">{maybeCount} MAYBE</span>
+                                <span className="text-zinc-400 dark:text-zinc-500">{unconfirmedCount} PENDING</span>
+                                <span className="text-red-500">{noCount} NO</span>
+                             </div>
+                             <i className={`fa-solid fa-chevron-${expandedFixtureId === fixture.id ? 'up' : 'down'} text-zinc-400 text-xs transition-transform ml-1`}></i>
+                        </div>
 
                         {expandedFixtureId === fixture.id && (
                           <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 text-left space-y-4">
