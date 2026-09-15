@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getGoogleCalendarUrl } from "@/lib/calendar";
 import posthog from 'posthog-js'; // Ensure posthog is imported
 
 interface ClientProps {
