@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { getGoogleCalendarUrl } from '@/lib/calendar';
 
 export async function POST(req: Request) {
   try {

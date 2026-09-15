@@ -348,11 +348,21 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             )}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 pr-2">
-                            <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                            <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-                                <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
-                            </div>
+                        <div className="flex flex-col items-end gap-2 pr-2">
+                          <div className="flex items-center gap-3">
+                              <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
+                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+                                  <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
+                              </div>
+                          </div>
+                          <div className="flex gap-2">
+                             <a href={getGoogleCalendarUrl(fixture, teamInfo.team_name || 'Team')} target="_blank" rel="noopener noreferrer" className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Google Calendar">
+                               <i className="fa-brands fa-google text-[10px]"></i>
+                             </a>
+                             <a href={`/api/calendar/fixture/${fixture.id}`} className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Apple/Outlook Calendar">
+                               <i className="fa-regular fa-calendar-plus text-[10px]"></i>
+                             </a>
+                          </div>
                         </div>
                       </div>
                       <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 w-full">
@@ -469,9 +479,17 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             </>
                           )}
                         </span>
+                        <div className="flex gap-2 pr-2 mt-1">
+                           <a href={getGoogleCalendarUrl(fixture, teamInfo.team_name || 'Team')} target="_blank" rel="noopener noreferrer" className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Google Calendar">
+                             <i className="fa-brands fa-google text-xs"></i>
+                           </a>
+                           <a href={`/api/calendar/fixture/${fixture.id}`} className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Apple/Outlook Calendar">
+                             <i className="fa-regular fa-calendar-plus text-xs"></i>
+                           </a>
+                        </div>
                       </div>
                     </div>
-                    <div className="p-4 flex items-center justify-between gap-2 ml-1">
+                    <div className="p-4 flex items-center justify-between gap-2 ml-1 w-[calc(100%-4px)]">
                         <div className="flex items-center gap-3 flex-1 pl-2">
                             <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
                                 {teamInfo.club_logo_url ? <img src={teamInfo.club_logo_url} className="w-full h-full object-cover bg-white" /> : <span className="text-[10px] font-black">{teamInfo.team_name?.substring(0, 2).toUpperCase()}</span>}
