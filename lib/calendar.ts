@@ -14,10 +14,10 @@ function parseDateTime(dateStr: string, timeStr?: string): { start: Date, end: D
       const isPM = timeStr.toLowerCase().includes('pm');
       const isAM = timeStr.toLowerCase().includes('am');
       
-      const timeMatch = timeStr.match(/(\d+):(\d+)/);
+      const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
       if (timeMatch) {
         hours = parseInt(timeMatch[1], 10);
-        minutes = parseInt(timeMatch[2], 10);
+        minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
         
         if (isPM && hours < 12) hours += 12;
         if (isAM && hours === 12) hours = 0;

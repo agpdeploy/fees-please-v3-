@@ -4,7 +4,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getGoogleCalendarUrl } from "@/lib/calendar";
 import posthog from 'posthog-js'; // Ensure posthog is imported
 
 interface ClientProps {
@@ -356,14 +355,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                                   <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
                               </div>
                           </div>
-                          <div className="flex gap-2">
-                             <a href={getGoogleCalendarUrl(fixture, teamInfo.team_name || 'Team')} target="_blank" rel="noopener noreferrer" className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Google Calendar">
-                               <i className="fa-brands fa-google text-[10px]"></i>
-                             </a>
-                             <a href={`/api/calendar/fixture/${fixture.id}`} className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Apple/Outlook Calendar">
-                               <i className="fa-regular fa-calendar-plus text-[10px]"></i>
-                             </a>
-                          </div>
+
                         </div>
                       </div>
                       <div className="bg-zinc-50 dark:bg-zinc-950/50 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800/50 w-full">
@@ -480,12 +472,10 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             </>
                           )}
                         </span>
-                        <div className="flex gap-2 pr-2 mt-1">
-                           <a href={getGoogleCalendarUrl(fixture, teamInfo.team_name || 'Team')} target="_blank" rel="noopener noreferrer" className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Google Calendar">
-                             <i className="fa-brands fa-google text-xs"></i>
-                           </a>
-                           <a href={`/api/calendar/fixture/${fixture.id}`} className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500 flex items-center justify-center transition-colors" title="Add to Apple/Outlook Calendar">
-                             <i className="fa-regular fa-calendar-plus text-xs"></i>
+                        <div className="mt-2">
+                           <a href={`/api/calendar/fixture/${fixture.id}`} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500 transition-colors" title="Add to Calendar">
+                             <i className="fa-regular fa-calendar-plus text-[10px]"></i>
+                             <span className="text-[9px] font-bold uppercase tracking-widest">Add to Calendar</span>
                            </a>
                         </div>
                       </div>

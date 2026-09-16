@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getIcsData } from '@/lib/calendar';
 
-export async function GET(req: Request, { params }: { params: { fixtureId: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ fixtureId: string }> }) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -12,7 +12,8 @@ export async function GET(req: Request, { params }: { params: { fixtureId: strin
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const fixtureId = params.fixtureId;
+    const resolvedParams = await props.params;
+    const fixtureId = resolvedParams.fixtureId;
 
     const { data: fixture } = await supabase
       .from('fixtures')
