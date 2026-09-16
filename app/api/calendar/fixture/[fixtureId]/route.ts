@@ -17,7 +17,7 @@ export async function GET(req: Request, props: { params: Promise<{ fixtureId: st
 
     const { data: fixture } = await supabase
       .from('fixtures')
-      .select('*, teams(name, slug)')
+      .select('*, teams!fixtures_team_id_fkey(name, slug)')
       .eq('id', fixtureId)
       .single();
 
