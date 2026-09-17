@@ -120,9 +120,11 @@ export function getIcsData(fixture: any, teamName: string): string {
   const icsLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
+    'METHOD:PUBLISH',
     'PRODID:-//Fees Please//Team Availability//EN',
     'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
     `SUMMARY:${title}`,
     `DTSTART:${formatIcsDate(parsed.start)}`,
     `DTEND:${formatIcsDate(parsed.end)}`,
