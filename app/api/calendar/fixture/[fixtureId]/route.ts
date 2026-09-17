@@ -33,7 +33,8 @@ export async function GET(req: Request, props: { params: Promise<{ fixtureId: st
       return new NextResponse('Error generating ICS', { status: 500 });
     }
 
-    const filename = `${fixture.teams?.name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'team'}_${fixture.opponent?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'match'}.ics`;
+    const matchDate = fixture.match_date || 'date';
+    const filename = `${fixture.teams?.name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'team'}_${fixture.opponent?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'match'}_${matchDate}.ics`;
 
     return new NextResponse(icsContent, {
       headers: {
