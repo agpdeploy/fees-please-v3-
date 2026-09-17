@@ -327,7 +327,14 @@ export default function TeamListGraphicBuilder({
     await supabase.from('teams').update({ 
       settings: newSettings
     }).eq('id', team.id);
-    alert('Layout Configuration Saved!');
+    
+    // Also force save the fixture graphic state
+    if (fixture?.id) {
+      const stateObj = { orderedPlayers, playerRoles, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption, matchNotesOverride, matchNotesBg };
+      await supabase.from('fixtures').update({ graphic_state: stateObj }).eq('id', fixture.id);
+    }
+    
+    alert('Layout Configuration & Graphic Saved!');
   };
 
   const downloadImage = async () => {
