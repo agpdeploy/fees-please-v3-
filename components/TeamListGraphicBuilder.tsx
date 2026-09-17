@@ -708,10 +708,53 @@ export default function TeamListGraphicBuilder({
                           const file = e.target.files[0];
                           setIsUploadingPhoto(true);
                           try {
-                            const fileExt = file.name.split('.').pop();
-                            const fileName = `${fixture.id}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                            const { data, error } = await supabase.storage.from('graphic_uploads').upload(fileName, file, { cacheControl: '3600', upsert: true });
+                            // 1. Compress image via Canvas before upload
+                            const compressedBlob = await new Promise<Blob>((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                  const canvas = document.createElement('canvas');
+                                  const MAX_WIDTH = 1080;
+                                  const MAX_HEIGHT = 1920;
+                                  let width = img.width;
+                                  let height = img.height;
+                                  
+                                  if (width > height && width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                  } else if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                  }
+                                  
+                                  canvas.width = width;
+                                  canvas.height = height;
+                                  const ctx = canvas.getContext('2d');
+                                  ctx?.drawImage(img, 0, 0, width, height);
+                                  
+                                  canvas.toBlob((blob) => {
+                                    if (blob) resolve(blob);
+                                    else reject(new Error("Canvas to Blob failed"));
+                                  }, 'image/jpeg', 0.8);
+                                };
+                                img.onerror = () => reject(new Error("Failed to load image"));
+                                img.src = event.target?.result as string;
+                              };
+                              reader.onerror = () => reject(new Error("Failed to read file"));
+                              reader.readAsDataURL(file);
+                            });
+
+                            // 2. Upload compressed JPEG blob to Supabase Storage
+                            const fileName = `${fixture.id}-${Math.random().toString(36).substring(7)}.jpg`;
+                            const { data, error } = await supabase.storage.from('graphic_uploads').upload(fileName, compressedBlob, { 
+                              cacheControl: '3600', 
+                              upsert: true,
+                              contentType: 'image/jpeg'
+                            });
+                            
                             if (error) throw error;
+                            
                             const { data: { publicUrl } } = supabase.storage.from('graphic_uploads').getPublicUrl(fileName);
                             setCustomPhoto(publicUrl);
                           } catch (err) {
