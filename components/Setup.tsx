@@ -764,8 +764,22 @@ export default function Setup({ activeTab }: SetupProps) {
           team_id: savedTeamId,
           team_name: teamName,
           club_logo_url: logoUrl || clubRecord?.logo_url
-        });
-      }
+          });
+          
+          if (!editingTeamId) {
+             const activeSponsors = sponsors.filter(s => s.is_active && !String(s.id).startsWith('new-'));
+             if (activeSponsors.length > 0) {
+                 const newTeamSponsors = activeSponsors.map(s => ({
+                     team_id: savedTeamId,
+                     name: s.name,
+                     logo_url: s.logo_url,
+                     url: s.url,
+                     is_active: true
+                 }));
+                 await supabase.from('team_sponsors').insert(newTeamSponsors);
+             }
+          }
+        }
       showToast("Team saved successfully!"); 
       resetTeamForm(); 
       loadClubData(); 
