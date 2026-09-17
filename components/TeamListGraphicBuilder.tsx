@@ -59,6 +59,8 @@ export default function TeamListGraphicBuilder({
   const [nameFormat, setNameFormat] = useState<'full' | 'first_initial' | 'nickname'>('first_initial');
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const [orderedPlayers, setOrderedPlayers] = useState<string[]>([]);
+  const [playerRoles, setPlayerRoles] = useState<Record<string, string>>({});
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   // Accordion States
   const [heroImageExpanded, setHeroImageExpanded] = useState(true);
@@ -169,33 +171,45 @@ export default function TeamListGraphicBuilder({
       } catch (e) {}
     }
 
-    const savedFixture = localStorage.getItem(`graphic_builder_fixture_${fixture?.id}`);
-    if (savedFixture) {
-      try {
-        const fix = JSON.parse(savedFixture);
-        if (fix.orderedPlayers && fix.orderedPlayers.length > 0) {
-           const currentSquad = fixture?.lists?.squadIds || [];
-           if (currentSquad.length > 0) {
-             const validCached = fix.orderedPlayers.filter((id: string) => currentSquad.includes(id));
-             const newPlayers = currentSquad.filter((id: string) => !validCached.includes(id));
-             setOrderedPlayers([...validCached, ...newPlayers]);
-           } else {
-             setOrderedPlayers(fix.orderedPlayers);
-           }
-        }
-        if (fix.heroWidthPercent) setHeroWidthPercent(fix.heroWidthPercent);
-        if (fix.imageFit) setImageFit(fix.imageFit);
-        if (fix.imageZoom) setImageZoom(fix.imageZoom);
-        if (fix.imageX) setImageX(fix.imageX);
-        if (fix.imageY) setImageY(fix.imageY);
-        if (fix.imageRotation) setImageRotation(fix.imageRotation);
-        if (fix.customPhoto) setCustomPhoto(fix.customPhoto);
-        if (fix.imageCaption) setImageCaption(fix.imageCaption);
-        if (fix.matchNotesOverride !== undefined) setMatchNotesOverride(fix.matchNotesOverride);
-        if (fix.matchNotesBg) setMatchNotesBg(fix.matchNotesBg);
-      } catch (e) {}
-    } else if (fixture?.lists?.squadIds) {
-      setOrderedPlayers([...fixture.lists.squadIds]);
+    const savedState = fixture?.graphic_state;
+    if (savedState && Object.keys(savedState).length > 0) {
+      if (savedState.orderedPlayers && savedState.orderedPlayers.length > 0) {
+         const currentSquad = fixture?.lists?.squadIds || [];
+         if (currentSquad.length > 0) {
+           const validCached = savedState.orderedPlayers.filter((id: string) => currentSquad.includes(id));
+           const newPlayers = currentSquad.filter((id: string) => !validCached.includes(id));
+           setOrderedPlayers([...validCached, ...newPlayers]);
+         } else {
+           setOrderedPlayers(savedState.orderedPlayers);
+         }
+      }
+      if (savedState.playerRoles) setPlayerRoles(savedState.playerRoles);
+      if (savedState.heroWidthPercent !== undefined) setHeroWidthPercent(savedState.heroWidthPercent);
+      if (savedState.imageFit) setImageFit(savedState.imageFit);
+      if (savedState.imageZoom !== undefined) setImageZoom(savedState.imageZoom);
+      if (savedState.imageX !== undefined) setImageX(savedState.imageX);
+      if (savedState.imageY !== undefined) setImageY(savedState.imageY);
+      if (savedState.imageRotation !== undefined) setImageRotation(savedState.imageRotation);
+      if (savedState.customPhoto) setCustomPhoto(savedState.customPhoto);
+      if (savedState.imageCaption) setImageCaption(savedState.imageCaption);
+      if (savedState.matchNotesOverride !== undefined) setMatchNotesOverride(savedState.matchNotesOverride);
+      if (savedState.matchNotesBg) setMatchNotesBg(savedState.matchNotesBg);
+    } else {
+      // Fallback to legacy local storage if db is empty
+      const savedFixture = localStorage.getItem(`graphic_builder_fixture_${fixture?.id}`);
+      if (savedFixture) {
+        try {
+          const fix = JSON.parse(savedFixture);
+          if (fix.orderedPlayers && fix.orderedPlayers.length > 0) setOrderedPlayers(fix.orderedPlayers);
+          if (fix.heroWidthPercent) setHeroWidthPercent(fix.heroWidthPercent);
+          if (fix.imageFit) setImageFit(fix.imageFit);
+          if (fix.imageZoom) setImageZoom(fix.imageZoom);
+          if (fix.customPhoto) setCustomPhoto(fix.customPhoto);
+          if (fix.playerRoles) setPlayerRoles(fix.playerRoles);
+        } catch (e) {}
+      } else if (fixture?.lists?.squadIds) {
+        setOrderedPlayers([...fixture.lists.squadIds]);
+      }
     }
   }, [isOpen, mounted, team?.id, fixture?.id, fixture?.lists?.squadIds]);
 
@@ -237,15 +251,22 @@ export default function TeamListGraphicBuilder({
   }, [isOpen, mounted, clubId, team?.id, editMode, primaryColor, secondaryColor, headerBgColor, teamNamesFont, teamNamesColor, playerNamesFont, playerNamesColor, matchDetailsColor, matchNotesColor, sponsorScale, sponsorStyles, sponsorOrder]);
 
   useEffect(() => {
-    if (!isOpen || !mounted) return;
-    try {
-      localStorage.setItem(`graphic_builder_fixture_${fixture?.id}`, JSON.stringify({
-        orderedPlayers, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption, matchNotesOverride, matchNotesBg
-      }));
-    } catch (e) {
-      console.warn("Could not save fixture state. Image might be too large for localStorage.");
-    }
-  }, [isOpen, mounted, fixture?.id, orderedPlayers, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption]);
+    if (!isOpen || !mounted || !fixture?.id) return;
+    const saveState = async () => {
+      const stateObj = { orderedPlayers, playerRoles, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption, matchNotesOverride, matchNotesBg };
+      try {
+        localStorage.setItem(`graphic_builder_fixture_${fixture.id}`, JSON.stringify(stateObj));
+        // Auto-save to DB
+        await supabase.from('fixtures').update({ graphic_state: stateObj }).eq('id', fixture.id);
+      } catch (e) {
+        console.warn("Could not save fixture state.");
+      }
+    };
+    
+    // Debounce to prevent spamming the database
+    const timeout = setTimeout(saveState, 1500);
+    return () => clearTimeout(timeout);
+  }, [isOpen, mounted, fixture?.id, orderedPlayers, playerRoles, heroWidthPercent, imageFit, imageZoom, imageX, imageY, imageRotation, customPhoto, imageCaption, matchNotesOverride, matchNotesBg]);
 
   // Resize Observer for perfect scaling
   useEffect(() => {
@@ -597,7 +618,7 @@ export default function TeamListGraphicBuilder({
                  {orderedPlayers.map((pid: string, idx: number) => (
                    <div key={pid} className={`font-black uppercase tracking-tight flex items-start gap-3 md:gap-6 break-inside-avoid ${orientation === 'portrait' ? '' : 'mb-1.5'}`} style={{ fontSize: `${orientation === 'portrait' ? nameSize : Math.max(nameSize * 0.45, 12)}px`, letterSpacing: `${letterSpacing}px`, textShadow: '2px 2px 8px rgba(0,0,0,0.6)', fontFamily: `'${playerNamesFont}', sans-serif`, color: playerNamesColor }}>
                      {showNumbers && <span className="opacity-50 w-[2.5ch] text-right mt-[0.1em] shrink-0 inline-block">{idx + 1}.</span>}
-                     <span className="leading-none break-words pt-[0.1em]">{formatPlayerName(pid)}</span>
+                     <span className="leading-none break-words pt-[0.1em]">{formatPlayerName(pid)}{playerRoles[pid] ? ` (${playerRoles[pid]})` : ''}</span>
                    </div>
                  ))}
                </div>
@@ -675,39 +696,28 @@ export default function TeamListGraphicBuilder({
                   
                   {!customPhoto ? (
                     <div className="relative group rounded-xl border-2 border-dashed border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 transition-colors p-4 text-center cursor-pointer">
-                      <input type="file" accept="image/*" onChange={(e) => {
+                      <input type="file" accept="image/*" onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
                           const file = e.target.files[0];
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const img = new Image();
-                            img.onload = () => {
-                              const canvas = document.createElement('canvas');
-                              const MAX_WIDTH = 1080;
-                              const MAX_HEIGHT = 1920;
-                              let width = img.width;
-                              let height = img.height;
-                              
-                              if (width > height && width > MAX_WIDTH) {
-                                height *= MAX_WIDTH / width;
-                                width = MAX_WIDTH;
-                              } else if (height > MAX_HEIGHT) {
-                                width *= MAX_HEIGHT / height;
-                                height = MAX_HEIGHT;
-                              }
-                              
-                              canvas.width = width;
-                              canvas.height = height;
-                              const ctx = canvas.getContext('2d');
-                              ctx?.drawImage(img, 0, 0, width, height);
-                              setCustomPhoto(canvas.toDataURL('image/jpeg', 0.8));
-                            };
-                            img.src = event.target?.result as string;
-                          };
-                          reader.readAsDataURL(file);
+                          setIsUploadingPhoto(true);
+                          try {
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `${fixture.id}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                            const { data, error } = await supabase.storage.from('graphic_uploads').upload(fileName, file, { cacheControl: '3600', upsert: true });
+                            if (error) throw error;
+                            const { data: { publicUrl } } = supabase.storage.from('graphic_uploads').getPublicUrl(fileName);
+                            setCustomPhoto(publicUrl);
+                          } catch (err) {
+                            console.error("Error uploading photo:", err);
+                            alert("Failed to upload photo. Ensure you have the graphic_uploads bucket set up.");
+                          } finally {
+                            setIsUploadingPhoto(false);
+                          }
                         }
-                      }} className="absolute inset-0 opacity-0 cursor-pointer" />
-                      <div className="text-[10px] font-black uppercase text-zinc-400"><i className="fa-solid fa-upload mb-2 text-xl block"></i> Browse Image</div>
+                      }} className="absolute inset-0 opacity-0 cursor-pointer" disabled={isUploadingPhoto} />
+                      <div className="text-[10px] font-black uppercase text-zinc-400">
+                        {isUploadingPhoto ? <><i className="fa-solid fa-spinner fa-spin mb-2 text-xl block"></i> Uploading...</> : <><i className="fa-solid fa-upload mb-2 text-xl block"></i> Browse Image</>}
+                      </div>
                     </div>
                   ) : (
                     <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 space-y-5">
@@ -810,7 +820,15 @@ export default function TeamListGraphicBuilder({
                         <div className="text-xs font-bold text-zinc-300 flex items-center gap-3 truncate">
                           <span className="text-zinc-500 font-black w-4">{idx + 1}.</span>
                           <span className="truncate">{formatPlayerName(pid)}</span>
-                        </div>
+                            <input 
+                              type="text" 
+                              maxLength={3}
+                              placeholder="Role"
+                              value={playerRoles[pid] || ''}
+                              onChange={(e) => setPlayerRoles(prev => ({ ...prev, [pid]: e.target.value.toUpperCase() }))}
+                              className="w-12 bg-black border border-zinc-800 rounded px-1.5 py-0.5 text-[9px] font-bold text-emerald-500 text-center uppercase tracking-widest placeholder:text-zinc-700 outline-none focus:border-emerald-500"
+                            />
+                          </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <select 
                             value={idx + 1}
