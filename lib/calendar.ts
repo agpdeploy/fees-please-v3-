@@ -97,9 +97,16 @@ export function getIcsData(fixture: any, teamName: string): string {
   
   const title = `${teamName} vs ${fixture.opponent}`;
   const location = fixture.location || '';
-  const description = `Match: ${teamName} vs ${fixture.opponent}
-
-Manage your availability: ${(process.env.NEXT_PUBLIC_BASE_URL || 'https://feesplease.com')}/t/${fixture.team_slug || 'team'}`;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://feesplease.app';
+  const teamHubUrl = `${baseUrl}/t/${fixture.team_slug || 'team'}`;
+  
+  // In ICS files, newlines within a value must be explicitly escaped as \\n
+  // Do not use literal newlines in this string, or it will break the ICS format parser
+  const description = `Match: ${teamName} vs ${fixture.opponent}\\n` +
+    (fixture.start_time ? `Time: ${fixture.start_time}\\n` : '') +
+    (fixture.location ? `Location: ${fixture.location}\\n\\n` : '\\n') +
+    `Manage your availability:\\n${teamHubUrl}\\n\\n` +
+    `Powered By Fees Please\\nhttps://feesplease.app`;
   
   // Format as ICS standard
   const icsLines = [
