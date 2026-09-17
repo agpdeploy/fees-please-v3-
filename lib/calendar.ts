@@ -100,13 +100,21 @@ export function getIcsData(fixture: any, teamName: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://feesplease.app';
   const teamHubUrl = `${baseUrl}/t/${fixture.team_slug || 'team'}`;
   
-  // In ICS files, newlines within a value must be explicitly escaped as \\n
-  // Do not use literal newlines in this string, or it will break the ICS format parser
-  const description = `Match: ${teamName} vs ${fixture.opponent}\\n` +
-    (fixture.start_time ? `Time: ${fixture.start_time}\\n` : '') +
-    (fixture.location ? `Location: ${fixture.location}\\n\\n` : '\\n') +
-    `Manage your availability:\\n${teamHubUrl}\\n\\n` +
-    `Powered By Fees Please\\nhttps://feesplease.app`;
+  // Plain text description
+  const description = `Match: ${teamName} vs ${fixture.opponent}\n` +
+    (fixture.start_time ? `Time: ${fixture.start_time}\n` : '') +
+    (fixture.location ? `Location: ${fixture.location}\n\n` : '\n') +
+    `Manage your availability:\n${teamHubUrl}\n\n` +
+    `Powered By Fees Please\nhttps://feesplease.app`;
+
+  // HTML description for rich email/calendar clients
+  const htmlDescription = `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN"><HTML><BODY>` +
+    `<p><b>Match:</b> ${teamName} vs ${fixture.opponent}<br>` +
+    (fixture.start_time ? `<b>Time:</b> ${fixture.start_time}<br>` : '') +
+    (fixture.location ? `<b>Location:</b> ${fixture.location}</p>` : '</p>') +
+    `<p><b>Manage your availability:</b><br><a href="${teamHubUrl}">${teamHubUrl}</a></p>` +
+    `<p><em>Powered By Fees Please</em><br><a href="https://feesplease.app">https://feesplease.app</a></p>` +
+    `</BODY></HTML>`;
   
   // Format as ICS standard
   const icsLines = [
@@ -119,7 +127,9 @@ export function getIcsData(fixture: any, teamName: string): string {
     `DTSTART:${formatIcsDate(parsed.start)}`,
     `DTEND:${formatIcsDate(parsed.end)}`,
     `LOCATION:${location}`,
+    `URL:${teamHubUrl}`,
     `DESCRIPTION:${description}`,
+    `X-ALT-DESC;FMTTYPE=text/html:${htmlDescription}`,
     `UID:fixture-${fixture.id}@feesplease.com`,
     'STATUS:CONFIRMED',
     'SEQUENCE:0',
