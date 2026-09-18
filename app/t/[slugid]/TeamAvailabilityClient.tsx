@@ -91,11 +91,18 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
           .select("id, match_date, opponent, start_time, location")
           .eq("team_id", teamId)
           .gte("match_date", today)
+          .order("match_date",const today = new Date().toISOString();
+        const { data: fixtureData } = await supabase
+          .from("fixtures")
+          .select("id, match_date, opponent, start_time, location, status")
+          .eq("team_id", teamId)
+          .gte("match_date", today.split('T')[0])
           .order("match_date", { ascending: true });
         
         if (fixtureData) {
-          setUpcomingFixtures(fixtureData);
-          const fixtureIds = fixtureData.map(f => f.id);
+          const activeFixtures = fixtureData.filter(f => !['completed', 'forfeited', 'abandoned'].includes(f.status));
+          setUpcomingFixtures(activeFixtures);
+          const fixtureIds = activeFixtures.map(f => f.id);
           
           if (fixtureIds.length > 0) {
             const { data: globalAvail } = await supabase
