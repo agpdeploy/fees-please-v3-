@@ -24,11 +24,25 @@ function parseDateTime(dateStr: string, timeStr?: string): { start: Date, end: D
       }
     }
     
-    // Parse the date components
-    const [year, month, day] = dateStr.split('-').map(Number);
+    // SAFE PARSING OF DATE
+    const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    let year, month, day;
+    
+    if (dateMatch) {
+      year = parseInt(dateMatch[1], 10);
+      month = parseInt(dateMatch[2], 10);
+      day = parseInt(dateMatch[3], 10);
+    } else {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      year = d.getFullYear();
+      month = d.getMonth() + 1;
+      day = d.getDate();
+    }
     
     // Create Date object in local time
     const start = new Date(year, month - 1, day, hours, minutes);
+    if (isNaN(start.getTime())) return null;
     
     // Default duration: 2 hours
     const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
@@ -101,11 +115,11 @@ export function getIcsData(fixture: any, teamName: string): string {
   const teamHubUrl = `${baseUrl}/t/${fixture.team_slug || 'team'}`;
   
   // Plain text description
-  const description = `Match: ${teamName} vs ${fixture.opponent}\n` +
-    (fixture.start_time ? `Time: ${fixture.start_time}\n` : '') +
-    (fixture.location ? `Location: ${fixture.location}\n\n` : '\n') +
-    `Manage your availability:\n${teamHubUrl}\n\n` +
-    `Powered By Fees Please\nhttps://feesplease.app`;
+  const description = `Match: ${teamName} vs ${fixture.opponent}\\n` +
+    (fixture.start_time ? `Time: ${fixture.start_time}\\n` : '') +
+    (fixture.location ? `Location: ${fixture.location}\\n\\n` : '\\n') +
+    `Manage your availability:\\n${teamHubUrl}\\n\\n` +
+    `Powered By Fees Please\\nhttps://feesplease.app`;
 
   // HTML description for rich email/calendar clients
   const htmlDescription = `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN"><HTML><BODY>` +
