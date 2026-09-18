@@ -88,12 +88,6 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
         const today = new Date().toISOString();
         const { data: fixtureData } = await supabase
           .from("fixtures")
-          .select("id, match_date, opponent, start_time, location")
-          .eq("team_id", teamId)
-          .gte("match_date", today)
-          .order("match_date",const today = new Date().toISOString();
-        const { data: fixtureData } = await supabase
-          .from("fixtures")
           .select("id, match_date, opponent, start_time, location, status")
           .eq("team_id", teamId)
           .gte("match_date", today.split('T')[0])
