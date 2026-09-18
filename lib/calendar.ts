@@ -103,7 +103,7 @@ Manage your availability: ${(process.env.NEXT_PUBLIC_BASE_URL || 'https://feespl
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-export function getIcsData(fixture: any, teamName: string): string {
+export function getIcsData(fixture: any, teamName: string, tzid?: string): string {
   if (!fixture || !fixture.match_date) return '';
   
   const parsed = parseDateTime(fixture.match_date, fixture.start_time);

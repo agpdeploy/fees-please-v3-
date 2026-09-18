@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { getIcsData } from '@/lib/calendar';
 
 export async function GET(req: Request, props: { params: Promise<{ fixtureId: string }> }) {
+  const url = new URL(req.url);
+  const tzid = url.searchParams.get('tzid') || undefined;
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,7 +30,7 @@ export async function GET(req: Request, props: { params: Promise<{ fixtureId: st
     // Pass team slug along so the URL works
     fixture.team_slug = fixture.teams?.slug;
 
-    const icsContent = getIcsData(fixture, fixture.teams?.name || 'Your Team');
+    const icsContent = getIcsData(fixture, fixture.teams?.name || 'Your Team', tzid);
     if (!icsContent) {
       return new NextResponse('Error generating ICS', { status: 500 });
     }

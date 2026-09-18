@@ -350,7 +350,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                             )}
                           </span>
                           <div className="mt-2">
-                             <a href={`/api/calendar/fixture/${fixture.id}`} onClick={() => { setDownloadingCalendarId(fixture.id); setTimeout(() => setDownloadingCalendarId(null), 2000); }} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${downloadingCalendarId === fixture.id ? 'bg-emerald-600 text-white shadow-md' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500'}`} title="Add to Calendar">
+                             <a href={`/api/calendar/fixture/${fixture.id}?tzid=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`} onClick={() => { setDownloadingCalendarId(fixture.id); setTimeout(() => setDownloadingCalendarId(null), 2000); }} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${downloadingCalendarId === fixture.id ? 'bg-emerald-600 text-white shadow-md' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500'}`} title="Add to Calendar">
                                <i className="fa-regular fa-calendar-plus text-[10px]"></i>
                                <span className="text-[9px] font-bold uppercase tracking-widest">Add to Calendar</span>
                              </a>
@@ -481,7 +481,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                           )}
                         </span>
                         <div className="mt-2">
-                           <a href={`/api/calendar/fixture/${fixture.id}`} onClick={() => { setDownloadingCalendarId(fixture.id); setTimeout(() => setDownloadingCalendarId(null), 2000); }} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${downloadingCalendarId === fixture.id ? 'bg-emerald-600 text-white shadow-md' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500'}`} title="Add to Calendar">
+                           <a href={`/api/calendar/fixture/${fixture.id}?tzid=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`} onClick={() => { setDownloadingCalendarId(fixture.id); setTimeout(() => setDownloadingCalendarId(null), 2000); }} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${downloadingCalendarId === fixture.id ? 'bg-emerald-600 text-white shadow-md' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-500'}`} title="Add to Calendar">
                              <i className="fa-regular fa-calendar-plus text-[10px]"></i>
                              <span className="text-[9px] font-bold uppercase tracking-widest">Add to Calendar</span>
                            </a>
