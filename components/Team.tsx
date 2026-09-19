@@ -549,13 +549,25 @@ export default function Team() {
               <h2 className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">Team Hub</h2>
             </div>
             <div className="flex gap-2">
-               <a 
-                 href={`/t/${teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId}`} 
-                 target="_blank" rel="noopener noreferrer"
-                 className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-2"
-               >
-                 <i className="fa-solid fa-arrow-up-right-from-square"></i> Open
-               </a>
+                 <button 
+                   onClick={async () => {
+                     const url = `/t/${teams.find(t => t.id === selectedTeamId)?.slug || selectedTeamId}`;
+                     try {
+                       const { Capacitor } = await import('@capacitor/core');
+                       if (Capacitor.isNativePlatform()) {
+                         const { Browser } = await import('@capacitor/browser');
+                         await Browser.open({ url: window.location.origin + url });
+                         return;
+                       }
+                     } catch (e) {
+                       // fallback
+                     }
+                     window.open(url, '_blank');
+                   }}
+                   className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-2"
+                 >
+                   <i className="fa-solid fa-arrow-up-right-from-square"></i> Open
+                 </button>
                <button 
                  onClick={copyTeamLink}
                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
