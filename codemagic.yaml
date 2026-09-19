@@ -1,4 +1,4 @@
-workflows:
+﻿workflows:
   ios-app-store:
     name: iOS App Store Build
     instance_type: mac_mini_m1
@@ -35,7 +35,7 @@ workflows:
         script: keychain initialize
       - name: Set up Provisioning Profile
         script: |
-          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILES_HOME="`$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           PROFILE_PATH="$(mktemp "$PROFILES_HOME"/$(uuidgen).mobileprovision)"
           echo $CM_PROVISIONING_PROFILE | base64 --decode > "$PROFILE_PATH"
@@ -56,3 +56,20 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+  android-debug-build:
+    name: Android Debug APK
+    instance_type: mac_mini_m1
+    environment:
+      node: latest
+    scripts:
+      - name: Install Node modules
+        script: npm install
+      - name: Update Capacitor
+        script: npx cap sync android
+      - name: Build Android debug APK
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/apk/debug/app-debug.apk
