@@ -8,6 +8,7 @@
       groups:
         - ios_certs
       node: latest
+      java: 21
       xcode: latest
     scripts:
       - name: Install Node modules
@@ -61,6 +62,7 @@
     instance_type: mac_mini_m1
     environment:
       node: latest
+      java: 21
     scripts:
       - name: Install Node modules
         script: npm install
