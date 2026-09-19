@@ -11,14 +11,20 @@ export function CapacitorListener() {
     if (!Capacitor.isNativePlatform()) return;
 
     const listener = CapacitorApp.addListener('appUrlOpen', (event) => {
-      // event.url will be something like https://fees-please-v3.../auth/callback#access_token=...
-      const url = new URL(event.url);
-      
-      // If it's a callback URL from our App Link
-      if (url.pathname.includes('/auth/callback')) {
-        // Construct the relative path with hash
-        const path = ${url.pathname};
-        router.push(path);
+      try {
+        const url = new URL(event.url);
+        
+        // Handle both https://.../auth/callback and feesplease://callback
+        if (url.pathname.includes('/auth/callback') || url.host === 'callback') {
+          // Construct the relative path with search params and hash
+          const search = url.search || '';
+          const hash = url.hash || '';
+          const path = '/auth/callback' + search + hash;
+          
+          router.push(path);
+        }
+      } catch (err) {
+        console.error('Failed to parse appUrlOpen', err);
       }
     });
 

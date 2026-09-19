@@ -26,7 +26,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="fees-please-v3-oi5f-git-staging-agpdeploys-projects.vercel.app" />
+                <data android:scheme="feesplease" android:host="callback" />
             </intent-filter>
 
         </activity>

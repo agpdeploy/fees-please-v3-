@@ -28,10 +28,16 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
 
   const handleGoogleLogin = async () => {
     document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
+    
+    // Use custom URL scheme for Android so it bypasses Android 12+ App Links security blocks
+    const redirectUrl = Capacitor.isNativePlatform() 
+      ? 'feesplease://callback' 
+      : `${window.location.origin}/auth/callback`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
         // FIX: This query parameter forces Google to prompt the user to select an account
         // instead of automatically logging them in with a cached session.
         queryParams: {
