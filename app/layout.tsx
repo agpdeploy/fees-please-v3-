@@ -3,8 +3,13 @@ import { Manrope } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { PostHogProvider } from '@/components/PostHogProvider'
-import { CapacitorListener } from '@/components/CapacitorListener'
+import dynamic from 'next/dynamic'
 import "@/app/globals.css"
+
+const CapacitorListener = dynamic(
+  () => import('@/components/CapacitorListener').then(mod => mod.CapacitorListener),
+  { ssr: false }
+)
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
