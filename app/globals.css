@@ -24,6 +24,18 @@ body {
   background: var(--background);
   color: var(--foreground);
   transition: background-color 0.3s ease, color 0.3s ease;
+  
+  /* Native App Polish */
+  -webkit-touch-callout: none; /* Disable native callout menu */
+  -webkit-user-select: none;   /* Disable text selection */
+  user-select: none;           
+  overscroll-behavior-y: none; /* Disable bouncy scroll & pull-to-refresh */
+}
+
+/* Allow selection in inputs */
+input, textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 .dark {

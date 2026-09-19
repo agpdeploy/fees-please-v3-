@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Inter, Roboto_Mono } from 'next/font/google';
+import { Capacitor } from '@capacitor/core';
+import { SignInWithApple } from '@capacitor-community/apple-sign-in';
 
 const interItalic = Inter({ subsets: ['latin'], style: 'italic' });
 const robotoMono = Roboto_Mono({ subsets: ['latin'] });
@@ -38,6 +40,48 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
       },
     });
     if (error) setError(error.message);
+  };
+
+  const handleAppleLogin = async () => {
+    document.cookie = `fp_next_url=${redirectTo}; path=/; max-age=300`;
+    setLoading(true);
+    setError("");
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { response } = await SignInWithApple.authorize({
+          clientId: 'app.feesplease.app',
+          redirectURI: 'https://jmayrdgouacskgarwltv.supabase.co/auth/v1/callback',
+          scopes: 'email name',
+        });
+        
+        if (response && response.identityToken) {
+          const { error } = await supabase.auth.signInWithIdToken({
+            provider: 'apple',
+            token: response.identityToken,
+          });
+          if (error) throw error;
+          
+          // Native auth complete, redirect
+          window.location.assign(redirectTo || '/');
+        } else {
+          throw new Error("Apple Sign-In was cancelled or failed.");
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'apple',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to sign in with Apple");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFacebookLogin = async () => {
@@ -160,6 +204,14 @@ export default function Login({ redirectTo = '/' }: { redirectTo?: string }) {
             >
               <i className="fa-brands fa-google text-base"></i>
               Continue with Google
+            </button>
+
+            <button
+              onClick={handleAppleLogin}
+              className="w-full bg-white hover:bg-gray-100 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs active:scale-95 transition-all shadow-lg flex items-center justify-center gap-3"
+            >
+              <i className="fa-brands fa-apple text-base"></i>
+              Continue with Apple
             </button>
 
             {isLocalhost && (
