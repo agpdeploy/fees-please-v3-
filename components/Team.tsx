@@ -212,8 +212,23 @@ export default function Team() {
     const identifier = team?.slug || selectedTeamId;
     const shareUrl = `${window.location.origin}/t/${identifier}`;
     
-    const shareTextWithoutUrl = `🏏 Update your availability for ${team?.name || 'the team'} here:`;
+    const shareTextWithoutUrl = `🏆 Update your availability for ${team?.name || 'the team'} here:`;
     const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
+
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          text: shareTextWithoutUrl,
+          url: shareUrl,
+          dialogTitle: 'Share Team Hub'
+        });
+        return;
+      }
+    } catch (e) {
+      // fallback
+    }
 
     if (navigator.share) {
       try {
@@ -226,7 +241,7 @@ export default function Team() {
       }
     } else {
       await navigator.clipboard.writeText(shareText);
-      showToast("Link copied to clipboard!");
+      showToast("Link copied to clipboard!", "success");
     }
   };
 
@@ -308,8 +323,24 @@ export default function Team() {
     const shareUrl = `${window.location.origin}/t/${teamSlug}`;
     const matchDate = new Date(fixture.match_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
     
-    const shareTextWithoutUrl = `🏏 Game On! vs ${fixture.opponent}\n📅 ${matchDate} @ ${fixture.start_time || 'TBA'}\n📍 ${fixture.location || 'TBA'}\n\nUpdate your availability here:`;
+    const shareTextWithoutUrl = `🏆 Game On! vs ${fixture.opponent}\n📅 ${matchDate} @ ${fixture.start_time || 'TBA'}\n📍 ${fixture.location || 'TBA'}\n\nUpdate your availability here:`;
     const shareText = `${shareTextWithoutUrl}\n${shareUrl}`;
+
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: `Match Reminder: vs ${fixture.opponent}`,
+          text: shareTextWithoutUrl,
+          url: shareUrl,
+          dialogTitle: 'Share Match Reminder'
+        });
+        return;
+      }
+    } catch (e) {
+      // fallback
+    }
 
     if (navigator.share) {
       try {
@@ -323,7 +354,7 @@ export default function Team() {
       }
     } else {
       await navigator.clipboard.writeText(shareText);
-      showToast("Reminder copied to clipboard!");
+      showToast("Reminder copied to clipboard!", "success");
     }
   };
 

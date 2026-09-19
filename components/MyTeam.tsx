@@ -64,14 +64,43 @@ export default function MyTeam() {
     await loadRoster(tid);
   };
 
-  const copyTeamLink = () => {
+  const copyTeamLink = async () => {
     if (!selectedTeamId) return;
     const team = teams.find(t => t.id === selectedTeamId);
     const identifier = team?.slug || selectedTeamId;
     const link = `${window.location.origin}/t/${identifier}`;
-    navigator.clipboard.writeText(link);
-    setToast("Public Link Copied!");
-    setTimeout(() => setToast(null), 2000);
+    const shareTextWithoutUrl = `🏆 Update your availability for ${team?.name || 'the team'} here:`;
+    const shareText = `${shareTextWithoutUrl}\n${link}`;
+
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          text: shareTextWithoutUrl,
+          url: link,
+          dialogTitle: 'Share Team Hub'
+        });
+        return;
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          text: shareTextWithoutUrl,
+          url: link,
+        });
+      } catch (err) {
+        console.error("Share failed", err);
+      }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      setToast("Public Link Copied!");
+      setTimeout(() => setToast(null), 2000);
+    }
   };
 
   const formatName = (p: any) => p.nickname ? p.nickname : `${p.first_name} ${p.last_name?.charAt(0) || ''}.`;
