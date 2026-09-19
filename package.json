@@ -16,6 +16,8 @@
     "@ai-sdk/react": "^3.0.170",
     "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
     "@capacitor/camera": "^8.2.4",
     "@capacitor/core": "^8.5.2",
     "@capacitor/ios": "^8.5.2",
