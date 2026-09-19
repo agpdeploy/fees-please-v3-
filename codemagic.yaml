@@ -1,4 +1,4 @@
-﻿workflows:
+workflows:
   ios-app-store:
     name: iOS App Store Build
     instance_type: mac_mini_m1
@@ -36,7 +36,7 @@
         script: keychain initialize
       - name: Set up Provisioning Profile
         script: |
-          PROFILES_HOME="`$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           PROFILE_PATH="$(mktemp "$PROFILES_HOME"/$(uuidgen).mobileprovision)"
           echo $CM_PROVISIONING_PROFILE | base64 --decode > "$PROFILE_PATH"
@@ -75,3 +75,4 @@
           ./gradlew assembleDebug
     artifacts:
       - android/app/build/outputs/apk/debug/app-debug.apk
+
