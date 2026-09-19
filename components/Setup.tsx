@@ -1410,12 +1410,25 @@ export default function Setup({ activeTab }: SetupProps) {
                     <p className="text-xs text-zinc-600 dark:text-zinc-400">
                       Connect your Square account to process card payments directly via your club page. Don't have a Square account? <a href="https://squareup.com/signup" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">Create one for free</a>.
                     </p>
-                    <a 
-                      href={`/api/pay/square/connect?clubId=${clubId}`}
-                      className="w-full flex items-center justify-center gap-2 bg-[#3D3A3B] hover:bg-black text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm"
-                    >
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" fillRule="evenodd" clipRule="evenodd"><path d="M19 2H5C3.3 2 2 3.3 2 5V19C2 20.7 3.3 22 5 22H19C20.7 22 22 20.7 22 19V5C22 3.3 20.7 2 19 2ZM16 16H8V8H16V16Z" /></svg> Connect Square
-                    </a>
+                      <button 
+                        onClick={async () => {
+                          const url = `/api/pay/square/connect?clubId=${clubId}`;
+                          try {
+                            const { Capacitor } = await import('@capacitor/core');
+                            if (Capacitor.isNativePlatform()) {
+                              const { Browser } = await import('@capacitor/browser');
+                              await Browser.open({ url: window.location.origin + url });
+                              return;
+                            }
+                          } catch (e) {
+                            // ignore, fallback to web
+                          }
+                          window.location.href = url;
+                        }}
+                        className="w-full flex items-center justify-center gap-2 bg-[#3D3A3B] hover:bg-black text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm"
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" fillRule="evenodd" clipRule="evenodd"><path d="M19 2H5C3.3 2 2 3.3 2 5V19C2 20.7 3.3 22 5 22H19C20.7 22 22 20.7 22 19V5C22 3.3 20.7 2 19 2ZM16 16H8V8H16V16Z" /></svg> Connect Square
+                      </button>
                   </div>
                 )}
               </div>

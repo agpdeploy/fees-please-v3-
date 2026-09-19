@@ -6,8 +6,6 @@ export function CapacitorListener() {
   const router = useRouter();
 
   useEffect(() => {
-    // Dynamically import Capacitor only on the client inside useEffect
-    // This prevents Vercel Server-Side Rendering (SSR) from crashing
     import('@capacitor/core').then(({ Capacitor }) => {
       if (!Capacitor.isNativePlatform()) return;
 
@@ -16,20 +14,24 @@ export function CapacitorListener() {
           try {
             const url = new URL(event.url);
             
-            // Handle both https://.../auth/callback and feesplease://callback
+            // Supabase OAuth Callback
             if (url.pathname.includes('/auth/callback') || url.host === 'callback') {
               const search = url.search || '';
               const hash = url.hash || '';
               const path = '/auth/callback' + search + hash;
-              
               router.push(path);
+            }
+            // Any other intercepted App Link (like Square OAuth)
+            else {
+              import('@capacitor/browser').then(({ Browser }) => Browser.close().catch(() => {}));
+              // Navigate the internal WebView to process the route (e.g. API callbacks)
+              window.location.href = url.pathname + url.search + url.hash;
             }
           } catch (err) {
             console.error('Failed to parse appUrlOpen', err);
           }
         });
 
-        // Cleanup when unmounted
         return () => {
           listener.then(l => l.remove());
         };
