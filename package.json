@@ -17,6 +17,7 @@
     "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor/camera": "^8.2.4",
     "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@capacitor/push-notifications": "^8.1.2",
     "@ducanh2912/next-pwa": "^10.2.6",
     "@google/generative-ai": "^0.24.1",
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
+    "@capacitor/configure": "^2.0.10",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
