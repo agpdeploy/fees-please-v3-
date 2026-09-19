@@ -39,10 +39,28 @@
             <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
             <key>UISceneStoryboardFile</key>
             <string>Main</string>
-        </dict>
+          <key>NSCameraUsageDescription</key>
+  <string>To take photos of receipts and documents.</string>
+  <key>NSPhotoLibraryAddUsageDescription</key>
+  <string>To save photos of receipts and documents.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>To select photos of receipts and documents.</string>
+</dict>
       </array>
-    </dict>
-	</dict>
+      <key>NSCameraUsageDescription</key>
+  <string>To take photos of receipts and documents.</string>
+  <key>NSPhotoLibraryAddUsageDescription</key>
+  <string>To save photos of receipts and documents.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>To select photos of receipts and documents.</string>
+</dict>
+	  <key>NSCameraUsageDescription</key>
+  <string>To take photos of receipts and documents.</string>
+  <key>NSPhotoLibraryAddUsageDescription</key>
+  <string>To save photos of receipts and documents.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>To select photos of receipts and documents.</string>
+</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -66,5 +84,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+  <key>NSCameraUsageDescription</key>
+  <string>To take photos of receipts and documents.</string>
+  <key>NSPhotoLibraryAddUsageDescription</key>
+  <string>To save photos of receipts and documents.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>To select photos of receipts and documents.</string>
 </dict>
 </plist>
