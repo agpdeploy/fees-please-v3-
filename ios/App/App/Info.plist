@@ -90,5 +90,16 @@
   <string>To save photos of receipts and documents.</string>
   <key>NSPhotoLibraryUsageDescription</key>
   <string>To select photos of receipts and documents.</string>
+
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>feesplease</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
+
