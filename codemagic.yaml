@@ -76,3 +76,26 @@ workflows:
     artifacts:
       - android/app/build/outputs/apk/debug/app-debug.apk
 
+  android-app-store:
+    name: Android App Store Build
+    instance_type: mac_mini_m1
+    environment:
+      node: latest
+      java: 21
+      android_signing:
+        - feesplease
+    scripts:
+      - name: Install Node modules
+        script: npm install
+      - name: Update Capacitor
+        script: npx cap sync android
+      - name: Build Android App Bundle
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+      - name: Sign App Bundle
+        script: |
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore $CM_KEYSTORE_PATH -storepass $CM_KEYSTORE_PASSWORD -keypass $CM_KEY_PASSWORD android/app/build/outputs/bundle/release/app-release.aab $CM_KEY_ALIAS
+    artifacts:
+      - android/app/build/outputs/bundle/release/app-release.aab
