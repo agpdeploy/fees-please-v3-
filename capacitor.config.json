@@ -1,1 +1,1 @@
-﻿{   "appId": "app.feesplease.app",   "appName": "Fees Please",   "webDir": "www",   "server": {     "url": "https://fees-please-v3-oi5f-git-staging-agpdeploys-projects.vercel.app",     "cleartext": true   } }
+{   "appId": "app.feesplease.app",   "appName": "Fees Please",   "webDir": "www",   "server": {     "url": "https://app.feesplease.app",     "cleartext": true   } }
