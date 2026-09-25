@@ -995,7 +995,7 @@ export default function GameDay() {
     try {
       const parts = fullName.trim().split(' ');
       const firstName = parts[0];
-      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : null;
+      const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
 
       const { data: newPlayer, error: playerError } = await supabase
         .from('players')
