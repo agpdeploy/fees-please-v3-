@@ -25,6 +25,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="feesplease" android:host="callback" />
             </intent-filter>
+
+            <!-- Universal Deep Linking (App Links) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.feesplease.app" />
+            </intent-filter>
         </activity>
 
         <provider
