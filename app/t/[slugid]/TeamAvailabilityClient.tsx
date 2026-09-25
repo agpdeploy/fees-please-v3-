@@ -210,43 +210,67 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
     if (!activePlayerId) return;
     
     setIsUpdating(fixtureId);
-    setAvailabilities(prev => ({ ...prev, [fixtureId]: status }));
-    setFixtureResponses(prev => {
-      const currentResponses = prev[fixtureId] || [];
-      const filteredResponses = currentResponses.filter(r => r.player_id !== activePlayerId);
-      return { ...prev, [fixtureId]: [...filteredResponses, { player_id: activePlayerId, status }] };
-    });
-    await supabase.from("availability").upsert({ player_id: activePlayerId, fixture_id: fixtureId, status: status }, { onConflict: 'player_id, fixture_id' });
     
-    // --- TRIGGER INSTANT AVAILABILITY NOTIFICATION ---
-    try {
-      fetch('/api/admin/send-availability-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fixtureId,
-          teamId,
-          playerId: activePlayerId,
-          status,
-        })
+    const currentStatus = availabilities[fixtureId];
+    
+    if (currentStatus === status && !overridePlayerId) {
+      // Toggle off (un-select)
+      setAvailabilities(prev => {
+        const next = { ...prev };
+        delete next[fixtureId];
+        return next;
       });
-    } catch (e) {
-      console.error('Instant notification trigger failed', e);
+      setFixtureResponses(prev => {
+        const currentResponses = prev[fixtureId] || [];
+        const filteredResponses = currentResponses.filter(r => r.player_id !== activePlayerId);
+        return { ...prev, [fixtureId]: filteredResponses };
+      });
+      await supabase.from("availability").delete().eq('player_id', activePlayerId).eq('fixture_id', fixtureId);
+    } else {
+      // Set new status
+      setAvailabilities(prev => ({ ...prev, [fixtureId]: status }));
+      setFixtureResponses(prev => {
+        const currentResponses = prev[fixtureId] || [];
+        const filteredResponses = currentResponses.filter(r => r.player_id !== activePlayerId);
+        return { ...prev, [fixtureId]: [...filteredResponses, { player_id: activePlayerId, status }] };
+      });
+      await supabase.from("availability").upsert({ player_id: activePlayerId, fixture_id: fixtureId, status: status }, { onConflict: 'player_id, fixture_id' });
+      
+      // If the player explicitly says 'no' (Unavailable), ensure they are automatically removed from the match squad
+      if (status === 'no') {
+        await supabase.from("match_squads").delete().eq('player_id', activePlayerId).eq('fixture_id', fixtureId);
+      }
+
+      // --- TRIGGER INSTANT AVAILABILITY NOTIFICATION ---
+      try {
+        fetch('/api/admin/send-availability-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fixtureId,
+            teamId,
+            playerId: activePlayerId,
+            status,
+          })
+        });
+      } catch (e) {
+        console.error('Instant notification trigger failed', e);
+      }
+      
+      // --- POSTHOG TRACKING EVENT ---
+      try {
+        if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+          posthog.capture('player_availability_set', {
+            team_name: teamName,
+            status: status,
+            is_public_link: true
+          });
+        }
+      } catch (e) {
+        console.error('Posthog tracking failed', e)
+      }
     }
     
-    // --- POSTHOG TRACKING EVENT ---
-    try {
-      if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-        posthog.capture('player_availability_set', {
-          team_name: teamName,
-          status: status,
-          is_public_link: true
-        });
-      }
-    } catch (e) {
-        console.error('Posthog tracking failed', e)
-    }
-
     setIsUpdating(null);
   }
 
