@@ -1246,7 +1246,7 @@ export default function GameDay() {
         />
       )}
 
-      {profile && (!profile.onboarding_completed || (typeof window !== 'undefined' && (sessionStorage.getItem('creating_team') === 'true' || sessionStorage.getItem('creating_team') === activeClubId))) && (profile.role !== 'super_admin' || (typeof window !== 'undefined' && (sessionStorage.getItem('creating_team') === 'true' || sessionStorage.getItem('creating_team') === activeClubId))) && (!roles || roles.length === 0 || isClubAdmin || (typeof window !== 'undefined' && (sessionStorage.getItem('creating_team') === 'true' || sessionStorage.getItem('creating_team') === activeClubId))) && (
+      {profile && (!profile.has_onboarded || (typeof window !== 'undefined' && (sessionStorage.getItem('creating_team') === 'true' || sessionStorage.getItem('creating_team') === activeClubId))) && (profile.role !== 'super_admin' || (typeof window !== 'undefined' && (sessionStorage.getItem('creating_team') === 'true' || sessionStorage.getItem('creating_team') === activeClubId))) && (!roles || roles.length === 0 || isClubAdmin || (typeof window !== 'undefined' && (sessionStorage.getItem('creating_team') === 'true' || sessionStorage.getItem('creating_team') === activeClubId))) && (
           <SetupChecklist 
             key={activeClubId || 'new'}
             user={profile}
@@ -1260,7 +1260,7 @@ export default function GameDay() {
                sessionStorage.removeItem('creating_team');
                sessionStorage.removeItem('created_team_id');
                if (profile?.id) {
-                 supabase.from('profiles').update({ onboarding_completed: true }).eq('id', profile.id).then(() => {
+                 supabase.from('profiles').update({ has_onboarded: true }).eq('id', profile.id).then(() => {
                    window.location.reload();
                  });
                } else {
@@ -1277,7 +1277,7 @@ export default function GameDay() {
           />
       )}
 
-      {(!profile || (profile.role === 'super_admin' && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId))) || ((profile.onboarding_completed === true || (roles && roles.length > 0 && !isClubAdmin)) && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId)))) && (
+      {(!profile || (profile.role === 'super_admin' && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId))) || ((profile.has_onboarded === true || (roles && roles.length > 0 && !isClubAdmin)) && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId)))) && (
         <>
           {isClubOrSuperAdmin && teams.filter(t => t.is_active !== false).length > 1 && (
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
