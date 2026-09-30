@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 
@@ -54,7 +54,7 @@ export function SystemStatusProvider({ children }: { children: ReactNode }) {
       
       try {
         // Ping the root REST endpoint which is lightweight and requires no specific table permissions
-        const res = await window.fetch(${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/, {
+        const res = await window.fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`, {
           method: 'GET',
           headers: { 
             'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
