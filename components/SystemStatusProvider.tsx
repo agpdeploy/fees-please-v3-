@@ -85,14 +85,25 @@ export function SystemStatusProvider({ children }: { children: ReactNode }) {
         <div className="w-20 h-20 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
           <i className="fa-solid fa-server text-3xl animate-pulse"></i>
         </div>
-        <h1 className="text-2xl font-black uppercase tracking-widest mb-3">Waking up the Server</h1>
+        <h1 className="text-2xl font-black uppercase tracking-widest mb-3">System Unavailable</h1>
         <p className="text-zinc-400 max-w-md leading-relaxed mb-8">
-          Our database was taking a quick nap and is currently spinning back up. This usually takes about <strong className="text-emerald-400">60 to 90 seconds</strong>.
+          We are currently unable to connect to our servers. We might be performing routine maintenance or experiencing a temporary outage. The app will automatically resume once the connection is restored.
         </p>
         
-        <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-lg">
-          <i className="fa-solid fa-circle-notch fa-spin"></i>
-          Waiting for connection...
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-5 py-3 rounded-xl border border-emerald-500/20">
+            <i className="fa-solid fa-circle-notch fa-spin"></i>
+            Trying to reconnect...
+          </div>
+          
+          <a 
+            href="https://feesplease.app/contact" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white underline decoration-zinc-800 hover:decoration-zinc-500 underline-offset-4 transition-all mt-4"
+          >
+            Contact Support
+          </a>
         </div>
       </div>
     );
