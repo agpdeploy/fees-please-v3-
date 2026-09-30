@@ -87,13 +87,13 @@ export function SystemStatusProvider({ children }: { children: ReactNode }) {
         </div>
         <h1 className="text-2xl font-black uppercase tracking-widest mb-3">System Unavailable</h1>
         <p className="text-zinc-400 max-w-md leading-relaxed mb-8">
-          We are currently unable to connect to our servers. We might be performing routine maintenance or experiencing a temporary outage. The app will automatically resume once the connection is restored.
+          We are currently unable to connect to our servers. The app will automatically resume once the connection is restored.
         </p>
         
         <div className="flex flex-col items-center gap-4">
           <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-5 py-3 rounded-xl border border-emerald-500/20">
             <i className="fa-solid fa-circle-notch fa-spin"></i>
-            Trying to reconnect...
+            Waiting for connection...
           </div>
           
           <a 
