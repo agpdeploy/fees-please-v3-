@@ -96,6 +96,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
         kitty_expenses: 0,
         kitty_rewards: 0,
         write_offs: 0,
+        manual_credits: 0,
         surplus: 0,
         nkc: 0
       };
@@ -113,7 +114,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
           balances[tx.player_id] = { 
             id: tx.player_id, 
             name: tx.players.nickname || `${tx.players.first_name} ${tx.players.last_name?.charAt(0) || ''}.`.trim(), 
-            real_paid: 0, expected_cost: 0, games_played: 0, match_cost_share: 0, kitty_expenses: 0, kitty_rewards: 0, write_offs: 0, surplus: 0, nkc: 0
+            real_paid: 0, expected_cost: 0, games_played: 0, match_cost_share: 0, kitty_expenses: 0, kitty_rewards: 0, write_offs: 0, manual_credits: 0, surplus: 0, nkc: 0
           };
         }
         
@@ -137,7 +138,8 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
         if (tx.transaction_type === 'payment') {
             if (tx.payment_method === 'kitty') b.kitty_rewards += Number(tx.amount);
             else if (tx.payment_method === 'write_off') b.write_offs += Number(tx.amount);
-            else if (tx.payment_method !== 'credit') b.real_paid += Number(tx.amount);
+            else if (tx.payment_method === 'credit') b.manual_credits += Number(tx.amount);
+            else b.real_paid += Number(tx.amount);
         }
 
         if (tx.transaction_type === 'expense' && tx.payment_method === 'kitty') {
@@ -148,7 +150,7 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
 
     let totalDebts = 0;
     Object.values(balances).forEach(b => {
-      b.surplus = (b.real_paid + b.kitty_rewards + b.write_offs) - b.expected_cost;
+      b.surplus = (b.real_paid + b.kitty_rewards + b.write_offs + b.manual_credits) - b.expected_cost;
       b.nkc = b.real_paid - b.match_cost_share - b.kitty_expenses;
       if (b.surplus < 0) totalDebts += Math.abs(b.surplus);
     });
@@ -406,6 +408,12 @@ export default function TeamWalletTab({ clubId, teams, showToast, planTier }: Te
                                       <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
                                           <span>Kitty Rewards (Credit)</span>
                                           <span className="text-emerald-500">+${p.kitty_rewards.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {p.manual_credits > 0 && (
+                                      <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-bold">
+                                          <span>Manual Credits</span>
+                                          <span className="text-emerald-500">+${p.manual_credits.toFixed(2)}</span>
                                       </div>
                                     )}
                                     {p.kitty_expenses > 0 && (
