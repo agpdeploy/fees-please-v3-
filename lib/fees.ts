@@ -18,8 +18,8 @@ export const calculateFeeDeductions = (chargeAmount: number, club?: any) => {
   if (hasOverride) {
     platformFee = 0;
   } else if (planTier === 'free') {
-    // Free Tier: 2.8% platform clip
-    platformFee = Math.round((chargeAmount * 0.028) * 100) / 100;
+    // Free Tier: 30c flat platform clip
+    platformFee = 0.30;
   } else if (planTier === 'plus' || planTier === 'pro') {
     // Paid Tiers: 0% platform clip
     platformFee = 0;
