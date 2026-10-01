@@ -18,7 +18,7 @@ export function SystemStatusProvider({ children }: { children: ReactNode }) {
     
     window.fetch = async (...args) => {
       try {
-        const response = await originalFetch(...args);
+        const response = await originalFetch.call(window, ...args);
         
         // Supabase returns 503 when the project is paused
         if (!response.ok && response.status === 503) {
