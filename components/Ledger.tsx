@@ -47,6 +47,7 @@ export default function Ledger() {
   // Global Manual Log State
   const [isGlobalManualFormOpen, setIsGlobalManualFormOpen] = useState(false);
   const [globalSelectedPlayerId, setGlobalSelectedPlayerId] = useState("team");
+  const [manualPlayerSearch, setManualPlayerSearch] = useState("");
   
   // Form States
   const [manualType, setManualType] = useState<'payment' | 'fee' | 'credit'>('payment');
