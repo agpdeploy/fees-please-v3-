@@ -1156,54 +1156,53 @@ export default function Ledger() {
                      <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Money Out (-)</button>
                    </div>
 
-                   <div className="space-y-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                    <div className="relative">
-                      <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"></i>
-                      <input 
-                        type="text" 
-                        placeholder="Search players..." 
-                        value={manualPlayerSearch} 
-                        onChange={(e) => setManualPlayerSearch(e.target.value)}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg pl-9 pr-4 py-2.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-emerald-500 font-bold transition-colors"
-                      />
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto custom-scrollbar p-1">
-                      <button
-                        type="button"
-                        onClick={() => setGlobalSelectedPlayerId("team")}
-                        className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
-                          globalSelectedPlayerId === "team"
-                            ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-zinc-900'
-                            : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                        }`}
-                      >
-                        <i className={`fa-solid ${globalSelectedPlayerId === 'team' ? 'fa-check' : 'fa-users'}`}></i> No Player (Team)
-                      </button>
+                   <div className="space-y-4">
+                      <div className="relative">
+                        <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"></i>
+                        <input 
+                          type="text" 
+                          placeholder="Search players or type a new name..." 
+                          value={manualPlayerSearch} 
+                          onChange={(e) => setManualPlayerSearch(e.target.value)}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl pl-10 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 font-medium transition-colors shadow-sm"
+                        />
+                      </div>
                       
-                      {allPlayers
-                        .filter(p => !manualPlayerSearch || p.first_name.toLowerCase().includes(manualPlayerSearch.toLowerCase()) || (p.last_name && p.last_name.toLowerCase().includes(manualPlayerSearch.toLowerCase())))
-                        .map(p => {
-                          const isSelected = globalSelectedPlayerId === p.id;
-                          const formattedName = p.nickname || (p.last_name ? `${p.first_name} ${p.last_name.charAt(0)}.` : p.first_name);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => setGlobalSelectedPlayerId(p.id)}
-                              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
-                                isSelected
-                                  ? 'bg-zinc-800 dark:bg-white text-white dark:text-zinc-900 shadow-sm ring-2 ring-zinc-800 dark:ring-white ring-offset-1 dark:ring-offset-zinc-900'
-                                  : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'
-                              }`}
-                            >
-                              {isSelected && <i className="fa-solid fa-check"></i>}
-                              {formattedName}
-                            </button>
-                          );
-                      })}
+                      <div className="flex flex-wrap gap-2.5 max-h-56 overflow-y-auto custom-scrollbar pb-2">
+                        <button
+                          type="button"
+                          onClick={() => setGlobalSelectedPlayerId("team")}
+                          className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                            globalSelectedPlayerId === "team"
+                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                              : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600 shadow-sm'
+                          }`}
+                        >
+                          TEAM (NO PLAYER)
+                        </button>
+                        
+                        {allPlayers
+                          .filter(p => !manualPlayerSearch || p.first_name.toLowerCase().includes(manualPlayerSearch.toLowerCase()) || (p.last_name && p.last_name.toLowerCase().includes(manualPlayerSearch.toLowerCase())))
+                          .map(p => {
+                            const isSelected = globalSelectedPlayerId === p.id;
+                            const formattedName = p.nickname || (p.last_name ? `${p.first_name} ${p.last_name.charAt(0)}.` : p.first_name);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => setGlobalSelectedPlayerId(p.id)}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                  isSelected
+                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                                    : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600 shadow-sm'
+                                }`}
+                              >
+                                {formattedName}
+                              </button>
+                            );
+                        })}
+                      </div>
                     </div>
-                  </div>
 
                    <select value={manualFixtureId} onChange={e => setManualFixtureId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
                      <option value="">-- Optional: Assign to Match --</option>
