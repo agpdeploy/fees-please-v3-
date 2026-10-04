@@ -1168,14 +1168,14 @@ export default function Ledger() {
                         />
                       </div>
                       
-                      <div className="flex flex-wrap gap-2.5 max-h-56 overflow-y-auto custom-scrollbar pb-2">
+                      <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto custom-scrollbar pb-2">
                         <button
                           type="button"
                           onClick={() => setGlobalSelectedPlayerId("team")}
-                          className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                          className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border ${
                             globalSelectedPlayerId === "team"
-                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                              : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600 shadow-sm'
+                              ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent'
+                              : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
                           }`}
                         >
                           TEAM (NO PLAYER)
@@ -1191,10 +1191,10 @@ export default function Ledger() {
                                 key={p.id}
                                 type="button"
                                 onClick={() => setGlobalSelectedPlayerId(p.id)}
-                                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border ${
                                   isSelected
-                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                                    : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600 shadow-sm'
+                                    ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent'
+                                    : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
                                 }`}
                               >
                                 {formattedName}
