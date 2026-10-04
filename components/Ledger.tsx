@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, Fragment } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import { useActiveClub } from "@/contexts/ClubContext";
-import ManualTransactionModal from "./ManualTransactionModal";
 
 export default function Ledger() {
   const { profile, roles } = useProfile();
@@ -55,8 +54,6 @@ export default function Ledger() {
   const [manualAmount, setManualAmount] = useState<number | "">("");
   const [manualNote, setManualNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [manualModalPreselect, setManualModalPreselect] = useState<string>("team");
 
   const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -126,41 +123,6 @@ export default function Ledger() {
     }
     fetchTeams();
   }, [profile, roles, activeClubId]);
-
-
-  const handleManualModalSave = async (payload: { type: 'payment' | 'credit' | 'fee', playerId: string, fixtureId: string, amount: number, note: string }) => {
-    if (!activeClubId) return;
-    const { type, playerId, fixtureId, amount, note } = payload;
-    const pId = playerId === 'team' || !playerId ? null : playerId;
-    
-    const txType = type === 'credit' ? 'fee' : (!pId && type === 'fee' ? 'expense' : type);
-    const txAmount = type === 'credit' ? -Math.abs(amount) : amount;
-
-    const txPayload: any = {
-      player_id: pId,
-      team_id: activeTeamId,
-      club_id: activeClubId,
-      fixture_id: fixtureId || null,
-      amount: txAmount,
-      transaction_type: txType,
-      payment_method: type === 'credit' ? 'credit' : (txType === 'payment' ? (note.toLowerCase().includes('card') ? 'card' : 'cash') : null),
-      description: note || (type === 'credit' ? 'Credit Applied' : `Manual ${txType}`),
-      season_name: activeSeasonName || null
-    };
-
-    if (type === 'credit') {
-      txPayload.status = 'paid';
-    }
-
-    const { error } = await supabase.from("transactions").insert([txPayload]);
-    if (error) {
-      showToast("Error saving transaction: " + error.message, 'error');
-    } else {
-      await fetchLedger();
-      setVisibleFeedCount(10); 
-      showToast("Transaction Recorded!", "success");
-    }
-  };
 
   async function fetchLedger() {
     if (!activeTeamId || !activeClubId) return;
@@ -1019,7 +981,7 @@ export default function Ledger() {
                             </form>
                           ) : (
                             <div className="space-y-3">
-                              <button onClick={() => { setManualModalPreselect(player.id); setIsManualModalOpen(true); }} className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mb-2">
+                              <button onClick={() => { setIsInlineManualFormOpen(true); setManualAmount(""); setManualNote(""); setManualFixtureId(""); }} className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mb-2">
                                 <i className="fa-solid fa-plus text-sm"></i> Add Manual Transaction
                               </button>
                               
@@ -1157,23 +1119,53 @@ export default function Ledger() {
             
             <button
               onClick={() => {
-                setManualModalPreselect("team");
-                setIsManualModalOpen(true);
+                setIsGlobalManualFormOpen(!isGlobalManualFormOpen);
+                setManualType('payment');
+                setManualAmount("");
+                setManualNote("");
+                setManualFixtureId("");
+                setGlobalSelectedPlayerId("team");
               }}
               className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
             >
-              <i className="fa-solid fa-plus text-sm"></i> Add Manual Transaction
+              <i className={`fa-solid ${isGlobalManualFormOpen ? 'fa-chevron-up' : 'fa-plus'} text-sm`}></i>
+              {isGlobalManualFormOpen ? 'Hide Manual Transaction' : 'Log Manual Transaction'}
             </button>
 
-            {/* MANUAL TRANSACTION MODAL */}
-            <ManualTransactionModal 
-              isOpen={isManualModalOpen}
-              onClose={() => setIsManualModalOpen(false)}
-              onSave={handleManualModalSave}
-              players={allPlayers}
-              fixtures={fixtures}
-              preselectedPlayerId={manualModalPreselect}
-            />
+            {/* INLINE GLOBAL MANUAL FORM */}
+            {isGlobalManualFormOpen && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm animate-in slide-in-from-top-2 fade-in">
+                <form onSubmit={(e) => handleManualSave(e, globalSelectedPlayerId, true)} className="space-y-4">
+                   <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
+                     <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Money In (+)</button>
+                     <button type="button" onClick={() => setManualType('credit')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'credit' ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-sm' : 'text-zinc-500'}`}>Credit</button>
+                     <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Money Out (-)</button>
+                   </div>
+
+                   <select value={globalSelectedPlayerId} onChange={e => setGlobalSelectedPlayerId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+                     <option value="team">-- No Player (Team Expense / Revenue) --</option>
+                     {allPlayers.map(p => {
+                       const formattedName = p.nickname || (p.last_name ? `${p.first_name} ${p.last_name.charAt(0)}.` : p.first_name);
+                       return <option key={p.id} value={p.id}>{formattedName}</option>;
+                     })}
+                   </select>
+
+                   <select value={manualFixtureId} onChange={e => setManualFixtureId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
+                     <option value="">-- Optional: Assign to Match --</option>
+                     {fixtures.map(f => (
+                       <option key={f.id} value={f.id}>vs {f.opponent} ({new Date(f.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})</option>
+                     ))}
+                   </select>
+
+                   <input type="number" placeholder="Amount ($)" value={manualAmount} onChange={e => setManualAmount(Number(e.target.value))} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-4 text-center text-xl font-black text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" required />
+                   <input type="text" placeholder="Method / Note (e.g. Bunnings Sausage Sizzle, Cash)" value={manualNote} onChange={e => setManualNote(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 transition-colors" />
+                   
+                   <button type="submit" disabled={isSaving} className="w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 mt-2">
+                     {isSaving ? 'Saving...' : 'Confirm Transaction'}
+                   </button>
+                </form>
+              </div>
+            )}
 
             <div className="flex justify-between items-end px-1 pt-2 border-t border-zinc-200 dark:border-zinc-800">
               <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 italic">Recent Activity</h2>
