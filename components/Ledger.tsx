@@ -47,6 +47,7 @@ export default function Ledger() {
   // Global Manual Log State
   const [isGlobalManualFormOpen, setIsGlobalManualFormOpen] = useState(false);
   const [globalSelectedPlayerId, setGlobalSelectedPlayerId] = useState("team");
+  const [manualPlayerSearch, setManualPlayerSearch] = useState("");
   
   // Form States
   const [manualType, setManualType] = useState<'payment' | 'fee' | 'credit'>('payment');
@@ -1117,24 +1118,37 @@ export default function Ledger() {
           {/* --- RECENT TRANSACTIONS (PAGINATED & CONDENSED) --- */}
           <div className="space-y-4">
             
-            <button
-              onClick={() => {
-                setIsGlobalManualFormOpen(!isGlobalManualFormOpen);
-                setManualType('payment');
-                setManualAmount("");
-                setManualNote("");
-                setManualFixtureId("");
-                setGlobalSelectedPlayerId("team");
-              }}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
-            >
-              <i className={`fa-solid ${isGlobalManualFormOpen ? 'fa-chevron-up' : 'fa-plus'} text-sm`}></i>
-              {isGlobalManualFormOpen ? 'Hide Manual Transaction' : 'Log Manual Transaction'}
-            </button>
+            {!isGlobalManualFormOpen && (
+              <button
+                onClick={() => {
+                  setIsGlobalManualFormOpen(true);
+                  setManualType('payment');
+                  setManualAmount("");
+                  setManualNote("");
+                  setManualFixtureId("");
+                  setGlobalSelectedPlayerId("team");
+                  setManualPlayerSearch("");
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
+              >
+                <i className="fa-solid fa-plus text-sm"></i>
+                Log Manual Transaction
+              </button>
+            )}
 
             {/* INLINE GLOBAL MANUAL FORM */}
             {isGlobalManualFormOpen && (
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm animate-in slide-in-from-top-2 fade-in">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm animate-in slide-in-from-top-2 fade-in mt-2 relative">
+                
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white flex items-center gap-2">
+                    <i className="fa-solid fa-file-invoice-dollar text-emerald-500"></i> ADD MANUAL TRANSACTION
+                  </h3>
+                  <button type="button" onClick={() => setIsGlobalManualFormOpen(false)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
                 <form onSubmit={(e) => handleManualSave(e, globalSelectedPlayerId, true)} className="space-y-4">
                    <div className="flex bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 transition-colors">
                      <button type="button" onClick={() => setManualType('payment')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'payment' ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm' : 'text-zinc-500'}`}>Money In (+)</button>
@@ -1142,13 +1156,53 @@ export default function Ledger() {
                      <button type="button" onClick={() => setManualType('fee')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${manualType === 'fee' ? 'bg-white dark:bg-zinc-700 text-red-500 shadow-sm' : 'text-zinc-500'}`}>Money Out (-)</button>
                    </div>
 
-                   <select value={globalSelectedPlayerId} onChange={e => setGlobalSelectedPlayerId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
-                     <option value="team">-- No Player (Team Expense / Revenue) --</option>
-                     {allPlayers.map(p => {
-                       const formattedName = p.nickname || (p.last_name ? `${p.first_name} ${p.last_name.charAt(0)}.` : p.first_name);
-                       return <option key={p.id} value={p.id}>{formattedName}</option>;
-                     })}
-                   </select>
+                   <div className="space-y-4">
+                      <div className="relative">
+                        <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"></i>
+                        <input 
+                          type="text" 
+                          placeholder="Search players or type a new name..." 
+                          value={manualPlayerSearch} 
+                          onChange={(e) => setManualPlayerSearch(e.target.value)}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl pl-10 pr-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 font-medium transition-colors shadow-sm"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto custom-scrollbar pb-2">
+                        <button
+                          type="button"
+                          onClick={() => setGlobalSelectedPlayerId("team")}
+                          className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border ${
+                            globalSelectedPlayerId === "team"
+                              ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent'
+                              : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
+                          }`}
+                        >
+                          TEAM (NO PLAYER)
+                        </button>
+                        
+                        {allPlayers
+                          .filter(p => !manualPlayerSearch || p.first_name.toLowerCase().includes(manualPlayerSearch.toLowerCase()) || (p.last_name && p.last_name.toLowerCase().includes(manualPlayerSearch.toLowerCase())))
+                          .map(p => {
+                            const isSelected = globalSelectedPlayerId === p.id;
+                            const formattedName = p.nickname || (p.last_name ? `${p.first_name} ${p.last_name.charAt(0)}.` : p.first_name);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => setGlobalSelectedPlayerId(p.id)}
+                                className={`px-4 py-3 rounded-xl font-black text-[11px] uppercase transition-all relative border ${
+                                  isSelected
+                                    ? 'text-white bg-emerald-600 dark:bg-emerald-500 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.3)] border-transparent'
+                                    : 'bg-white dark:bg-[#1A1A1A] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600'
+                                }`}
+                              >
+                                {formattedName}
+                              </button>
+                            );
+                        })}
+                      </div>
+                    </div>
 
                    <select value={manualFixtureId} onChange={e => setManualFixtureId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none font-bold transition-colors">
                      <option value="">-- Optional: Assign to Match --</option>
