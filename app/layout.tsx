@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Manrope } from 'next/font/google'
 import { ClubProvider } from '@/contexts/ClubContext'
+import { SystemStatusProvider } from '@/components/SystemStatusProvider'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import { CapacitorListener } from '@/components/CapacitorListener'
@@ -42,11 +43,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {/* Wrap ClubProvider with PostHogProvider */}
+          <SystemStatusProvider>
           <PostHogProvider>
             <ClubProvider>
               {children}
             </ClubProvider>
           </PostHogProvider>
+          </SystemStatusProvider>
         </ThemeProvider>
       </body>
     </html>

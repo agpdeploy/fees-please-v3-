@@ -1129,7 +1129,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 1 Team Limit</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Financial Ledger</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Team Hub (Public share link)</li>
-                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 2.5% platform fee + Square processing (if integrated)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 30c platform fee + Square processing (if integrated)</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Cash & Bank transfer tracking (0% fee)</li>
                   </ul>
                 </div>
@@ -1168,7 +1168,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <li className="flex gap-2 font-bold text-zinc-800 dark:text-zinc-200"><i className="fa-solid fa-plus text-emerald-500 mt-0.5"></i> Everything on Free, plus:</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Unlimited teams (billed per team)</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Team Hub (Email reminders & pre-pay)</li>
-                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 30c platform fee + Square processing (if integrated)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 0c platform fee (Square processing only)</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Cash & Bank transfer tracking (0% fee)</li>
                   </ul>
                 </div>
@@ -1199,7 +1199,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     <li className="flex gap-2 font-bold text-zinc-800 dark:text-zinc-200"><i className="fa-solid fa-plus text-emerald-500 mt-0.5"></i> Everything on Plus, plus:</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Up to 5 teams included</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Team Hub (SMS allowance included)</li>
-                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 15c platform fee + Square processing (if integrated)</li>
+                    <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> 0c platform fee (Square processing only)</li>
                     <li className="flex gap-2"><i className="fa-solid fa-check text-emerald-500 mt-0.5"></i> Cash & Bank transfer tracking (0% fee)</li>
                   </ul>
                 </div>
@@ -1449,7 +1449,7 @@ export default function Setup({ activeTab }: SetupProps) {
                     </div>
                     <div>
                       <span className="text-sm font-bold text-emerald-800 dark:text-emerald-400 block">Override Platform Fee</span>
-                      <span className="text-xs text-emerald-600/80 dark:text-emerald-500/80">Disable the 1.4% platform clip for this account. Square wholesale fees still apply.</span>
+                      <span className="text-xs text-emerald-600/80 dark:text-emerald-500/80">Disable the 30c platform clip for this account. Square wholesale fees still apply.</span>
                     </div>
                   </label>
                 </div>

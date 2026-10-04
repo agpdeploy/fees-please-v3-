@@ -87,7 +87,28 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       console.error("Square API Error:", data);
-      return NextResponse.json({ error: data.errors?.[0]?.detail || "Payment failed at Square" }, { status: 400 });
+      
+      let errorMessage = "Payment failed at Square";
+      const squareErrorDetail = data.errors?.[0]?.detail || "";
+      
+      if (squareErrorDetail.includes("GENERIC_DECLINE")) {
+        errorMessage = "Card declined. Please try another card.";
+      } else if (squareErrorDetail.includes("INSUFFICIENT_FUNDS")) {
+        errorMessage = "Insufficient funds. Please try another card.";
+      } else if (squareErrorDetail.includes("CVV_FAILURE")) {
+        errorMessage = "Invalid CVV. Please check the code on your card.";
+      } else if (squareErrorDetail.includes("EXPIRATION_FAILURE")) {
+        errorMessage = "This card has expired. Please try another card.";
+      } else if (squareErrorDetail.includes("ADDRESS_VERIFICATION_FAILURE")) {
+        errorMessage = "Postcode mismatch. Please check your details.";
+      } else if (squareErrorDetail.includes("PAN_FAILURE")) {
+        errorMessage = "Invalid card number.";
+      } else if (squareErrorDetail) {
+        // Fallback for any other technical error
+        errorMessage = "Card declined. Please check your details.";
+      }
+
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
     // 1. Mark existing checkout_link as paid and link to square payment

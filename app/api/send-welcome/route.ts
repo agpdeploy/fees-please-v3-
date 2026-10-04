@@ -94,7 +94,7 @@ export async function POST(req: Request) {
           <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">Firstly, it's all about tracking money. You can now assign your players to games and track their payments. We highly recommend setting up the <strong>Square integration</strong>—it provides the best outcome for seamless payments. (Square charges a small transaction fee, but most users find the convenience well worth it).</p>
           <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">Managing availability is also key. Head over to the <strong>Team Hub</strong> to start tracking who can play each week.</p>
           <p style="color: #3f3f46; line-height: 1.6; font-size: 14px; font-weight: bold; margin-top: 24px;">Ready to level up?</p>
-          <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">If you want to manage availability directly via email, pay reduced Square fees, use automated team list generators, highlight your sponsors, and access advanced reporting—you can trial <strong>Plus</strong> for 14 days with no credit card required.</p>
+          <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">If you want to manage availability directly via email, pay 0c platform fees (just Square wholesale), use automated team list generators, highlight your sponsors, and access advanced reporting—you can trial <strong>Plus</strong> for 14 days with no credit card required.</p>
           <p style="color: #3f3f46; line-height: 1.6; font-size: 14px;">If you have 2 or more teams to manage, we recommend taking a look at our <strong>Pro</strong> plan.</p>
         `;
       }
