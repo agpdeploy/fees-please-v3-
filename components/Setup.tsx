@@ -100,6 +100,7 @@ export default function Setup({ activeTab }: SetupProps) {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   
   const [expandedRosterTeamId, setExpandedRosterTeamId] = useState<string | null>(null);
+  const [expandedMatchesTeamId, setExpandedMatchesTeamId] = useState<string | null>(null);
   const [activeRosterTeam, setActiveRosterTeam] = useState<any>(null);
   const [rosterPlayerIds, setRosterPlayerIds] = useState<string[]>([]);
 
@@ -1936,169 +1937,65 @@ export default function Setup({ activeTab }: SetupProps) {
                       </div>
                     </div>
                     
-                    {clubRecord?.club_cat === 'PlayHQ' && (
-                      <div className="mt-3 bg-[#0051e5]/5 dark:bg-[#0051e5]/10 border border-[#0051e5]/20 dark:border-[#0051e5]/30 rounded-xl p-4 transition-colors">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-[10px] font-black uppercase italic text-[#0051e5] flex items-center gap-2">
-                            <i className="fa-solid fa-rotate-right"></i> PlayHQ Import
-                          </h3>
-                        </div>
-                        <div className="flex gap-2">
-                          <input type="text" defaultValue={t.settings?.playhq_url || ""} placeholder="https://www.playhq.com/.../teams/..." id={`playhq-sync-${t.id}`} className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-[#0051e5] transition-colors" />
-                          <button onClick={async () => {
-                            const url = (document.getElementById(`playhq-sync-${t.id}`) as HTMLInputElement)?.value;
-                            if (!url) return showToast('Please enter a PlayHQ Team URL', 'error');
-                            setSyncingPlayhqTeamId(t.id);
-                            try {
-                              const res = await fetch('/api/playhq-sync', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ url })
-                              });
-                              if (!res.ok) throw new Error(await res.text());
-                              const data = await res.json();
-                              
-                              let targetSeasonName = clubRecord?.season_name;
-                              if (!targetSeasonName && data.seasonName) {
-                                await supabase.from('clubs').update({
-                                  season_name: data.seasonName,
-                                  season_start: data.seasonStart || null,
-                                  season_end: data.seasonEnd || null
-                                }).eq('id', activeClubId);
-                                targetSeasonName = data.seasonName;
-                              }
+                    
 
-                              if (data.orgDetails) {
-                                const currentClubSettings = clubRecord?.settings || {};
-                                const newPublicEmail = currentClubSettings.public_email || data.orgDetails.email;
-                                const newPublicWebsite = currentClubSettings.public_website || data.orgDetails.website;
-                                const newPublicAddress = currentClubSettings.public_address || data.orgDetails.address;
-                                
-                                if (newPublicEmail !== currentClubSettings.public_email || newPublicWebsite !== currentClubSettings.public_website || newPublicAddress !== currentClubSettings.public_address) {
-                                  const updatedClubSettings = {
-                                    ...currentClubSettings,
-                                    public_email: newPublicEmail,
-                                    public_website: newPublicWebsite,
-                                    public_address: newPublicAddress,
-                                  };
-                                  await supabase.from('clubs').update({ settings: updatedClubSettings }).eq('id', activeClubId);
-                                  if (clubRecord) clubRecord.settings = updatedClubSettings;
-                                  setPublicEmail(newPublicEmail || "");
-                                  setPublicWebsite(newPublicWebsite || "");
-                                  setPublicAddress(newPublicAddress || "");
-                                }
-                              }
-
-                              // Save the URL to teams.settings
-                              const currentSettings = typeof t.settings === 'object' && t.settings !== null ? t.settings : {};
-                              await supabase.from('teams').update({ settings: { ...currentSettings, playhq_url: url } }).eq('id', t.id);
-
-                              if (data.fixtures && data.fixtures.length > 0) {
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-
-                                const futureOnly = (document.getElementById(`playhq-future-only-${t.id}`) as HTMLInputElement)?.checked;
-                                let fixturesToImport = data.fixtures;
-                                if (futureOnly) {
-                                  fixturesToImport = fixturesToImport.filter((f: any) => {
-                                    if (!f.match_date) return true;
-                                    return new Date(f.match_date) >= today;
-                                  });
-                                }
-
-                                const payload = fixturesToImport.map((f: any) => {
-                                  const isPast = f.match_date ? new Date(f.match_date) < today : false;
-                                  return { 
-                                    ...f, 
-                                    team_id: t.id, 
-                                    umpire_fee: clubRecord?.default_umpire_fee || 0,
-                                    status: isPast ? 'completed' : 'upcoming',
-                                    is_active: true,
-                                    season_name: data.seasonName || targetSeasonName || null
-                                  };
-                                });
-
-                                  const { data: existingFixtures } = await supabase
-                                    .from('fixtures')
-                                    .select('id, opponent, match_date, start_time')
-                                    .eq('team_id', t.id);
-
-                                  const newFixtures: any[] = [];
-                                  const updatePromises: any[] = [];
-
-                                  payload.forEach((newFix: any) => {
-                                    const sameDateMatches = existingFixtures?.filter(ef => ef.match_date === newFix.match_date) || [];
-                                    let existing = null;
-                                    
-                                    if (sameDateMatches.length === 1) {
-                                      existing = sameDateMatches[0];
-                                    } else if (sameDateMatches.length > 1) {
-                                      existing = sameDateMatches.find(ef => ef.opponent === newFix.opponent) || sameDateMatches[0];
-                                    }
-
-                                    if (existing) {
-                                      updatePromises.push(
-                                        supabase.from("fixtures").update({
-                                          opponent: newFix.opponent,
-                                          opponent_logo_url: newFix.opponent_logo_url,
-                                          start_time: newFix.start_time,
-                                          location: newFix.location,
-                                          status: newFix.status,
-                                          season_name: newFix.season_name
-                                        }).eq('id', existing.id)
-                                      );
-                                    } else {
-                                      newFixtures.push(newFix);
-                                    }
-                                  });
-
-                                  if (newFixtures.length > 0) {
-                                    await supabase.from("fixtures").insert(newFixtures);
-                                  }
-                                  if (updatePromises.length > 0) {
-                                    await Promise.all(updatePromises);
-                                  }
-                              }
-
-                              showToast('PlayHQ Team Synced Successfully! Reloading...');
-                              setTimeout(() => window.location.reload(), 1500);
-                            } catch (e: any) {
-                              showToast(e.message, 'error');
-                              setSyncingPlayhqTeamId(null);
-                            }
-                          }} disabled={syncingPlayhqTeamId !== null} className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#0051e5] hover:bg-blue-600 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
-                            {syncingPlayhqTeamId === t.id ? (
-                              <><i className="fa-solid fa-spinner fa-spin"></i> IMPORTING...</>
-                            ) : (
-                              <>Import</>
-                            )}
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 mt-3 px-1">
-                          <input type="checkbox" id={`playhq-future-only-${t.id}`} defaultChecked className="accent-[#0051e5] w-3.5 h-3.5 rounded shrink-0" />
-                          <label htmlFor={`playhq-future-only-${t.id}`} className="text-[10px] font-bold text-zinc-500 cursor-pointer select-none leading-tight">Only import future fixtures</label>
-                        </div>
-                      </div>
-                    )}
-
-                    <button onClick={() => {
-                      if (expandedRosterTeamId === t.id) {
-                        setExpandedRosterTeamId(null);
-                      } else {
-                        openRosterModal(t);
-                      }
-                    }} className="w-full py-3 mt-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
-                      {expandedRosterTeamId === t.id ? (
-                        <><i className="fa-solid fa-chevron-up"></i> Close Roster</>
-                      ) : (
-                        <><i className="fa-solid fa-clipboard-user"></i> Assign Players</>
-                      )}
-                    </button>
+                    
+<div className="flex gap-2 mt-3">
+  <button onClick={() => {
+    if (expandedMatchesTeamId === t.id) {
+      setExpandedMatchesTeamId(null);
+    } else {
+      setExpandedMatchesTeamId(t.id);
+      setExpandedRosterTeamId(null);
+    }
+  }} className="flex-1 py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
+    {expandedMatchesTeamId === t.id ? (
+      <><i className="fa-solid fa-chevron-up"></i> Close Matches</>
+    ) : (
+      <><i className="fa-solid fa-calendar-days"></i> Manage Matches</>
+    )}
+  </button>
+  <button onClick={() => {
+    if (expandedRosterTeamId === t.id) {
+      setExpandedRosterTeamId(null);
+    } else {
+      openRosterModal(t);
+      setExpandedMatchesTeamId(null);
+    }
+  }} className="flex-1 py-3 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center justify-center gap-2 transition-colors">
+    {expandedRosterTeamId === t.id ? (
+      <><i className="fa-solid fa-chevron-up"></i> Close Roster</>
+    ) : (
+      <><i className="fa-solid fa-clipboard-user"></i> Assign Players</>
+    )}
+  </button>
+</div>
 
                     
 
                     {/* INLINE ROSTER ACCORDION */}
-                    {expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
+                    {expandedMatchesTeamId === t.id && (
+  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in fade-in slide-in-from-top-2">
+    <FixturesTab 
+      clubId={clubId} 
+      teams={[t]} 
+      fixtures={fixtures.filter(f => f.team_id === t.id)} 
+      defaultUmpireFee={defaultUmpireFee}
+      expenseLabel={expenseLabel}
+      loadClubData={loadClubData} 
+      showToast={showToast} 
+      clubPlayers={players}
+      profile={profile}
+      clubLogoUrl={logoUrl}
+      activeSeasonName={clubRecord?.season_name || null}
+      hasPlusFeatures={clubRecord?.plan_tier === "pro" || clubRecord?.plan_tier === "plus" || (clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === "free")}
+      clubRecord={clubRecord}
+      isEmbedded={true}
+    />
+  </div>
+)}
+
+{expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
                       <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 animate-in slide-in-from-top-2">
                         <input 
                           type="text" 
@@ -2286,6 +2183,7 @@ export default function Setup({ activeTab }: SetupProps) {
         const hasPlusFeatures = clubRecord?.plan_tier === 'pro' || clubRecord?.plan_tier === 'plus' || (clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === 'free');
         return (
           <FixturesTab 
+            clubRecord={clubRecord}
             clubId={clubId} 
             teams={teams} 
             fixtures={fixtures} 

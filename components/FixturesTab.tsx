@@ -26,9 +26,10 @@ interface DraftFixture {
   notes: string;
 }
 
-export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl, activeSeasonName, hasPlusFeatures }: FixturesTabProps) {
+export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee, expenseLabel, loadClubData, showToast, clubPlayers, profile, clubLogoUrl, activeSeasonName, hasPlusFeatures, clubRecord, isEmbedded }: FixturesTabProps) {
   const [isBulkMode, setIsBulkMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [syncingPlayhqTeamId, setSyncingPlayhqTeamId] = useState<string | null>(null);
 
   // Single Fixture State
   const [fixtureTeamId, setFixtureTeamId] = useState("");
@@ -308,13 +309,163 @@ export default function FixturesTab({ clubId, teams, fixtures, defaultUmpireFee,
   return (
     <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm relative transition-colors">
-        <div className="flex justify-between items-center mb-4">
+        
+      {clubRecord?.club_cat === 'PlayHQ' && fixtureTeamId && (
+        <div className="mb-6 bg-[#0051e5]/5 dark:bg-[#0051e5]/10 border border-[#0051e5]/20 dark:border-[#0051e5]/30 rounded-xl p-4 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[10px] font-black uppercase italic text-[#0051e5] flex items-center gap-2">
+              <i className="fa-solid fa-rotate-right"></i> PlayHQ Import
+            </h3>
+          </div>
+          <div className="flex gap-2">
+            <input type="text" defaultValue={teams.find(t => t.id === fixtureTeamId)?.settings?.playhq_url || ""} placeholder="https://www.playhq.com/.../teams/..." id={`playhq-sync-${fixtureTeamId}`} className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white outline-none focus:border-[#0051e5] transition-colors" />
+            <button onClick={async () => {
+              const url = (document.getElementById(`playhq-sync-${fixtureTeamId}`) as HTMLInputElement)?.value;
+              if (!url) return showToast('Please enter a PlayHQ Team URL', 'error');
+              setSyncingPlayhqTeamId(fixtureTeamId);
+              try {
+                const res = await fetch('/api/playhq-sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                
+                let targetSeasonName = activeSeasonName;
+                if (!targetSeasonName && data.seasonName) {
+                  await supabase.from('clubs').update({
+                    season_name: data.seasonName,
+                    season_start: data.seasonStart || null,
+                    season_end: data.seasonEnd || null
+                  }).eq('id', clubId);
+                  targetSeasonName = data.seasonName;
+                }
+
+                if (data.orgDetails) {
+                  const currentClubSettings = clubRecord?.settings || {};
+                  const newPublicEmail = currentClubSettings.public_email || data.orgDetails.email;
+                  const newPublicWebsite = currentClubSettings.public_website || data.orgDetails.website;
+                  const newPublicAddress = currentClubSettings.public_address || data.orgDetails.address;
+                  
+                  if (newPublicEmail !== currentClubSettings.public_email || newPublicWebsite !== currentClubSettings.public_website || newPublicAddress !== currentClubSettings.public_address) {
+                    const updatedClubSettings = {
+                      ...currentClubSettings,
+                      public_email: newPublicEmail,
+                      public_website: newPublicWebsite,
+                      public_address: newPublicAddress,
+                    };
+                    await supabase.from('clubs').update({ settings: updatedClubSettings }).eq('id', clubId);
+                  }
+                }
+
+                // Save the URL to teams.settings
+                const currentTeam = teams.find(t => t.id === fixtureTeamId);
+                const currentSettings = typeof currentTeam?.settings === 'object' && currentTeam?.settings !== null ? currentTeam.settings : {};
+                await supabase.from('teams').update({ settings: { ...currentSettings, playhq_url: url } }).eq('id', fixtureTeamId);
+
+                if (data.fixtures && data.fixtures.length > 0) {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  const futureOnly = (document.getElementById(`playhq-future-only-${fixtureTeamId}`) as HTMLInputElement)?.checked;
+                  let fixturesToImport = data.fixtures;
+                  if (futureOnly) {
+                    fixturesToImport = fixturesToImport.filter((f: any) => {
+                      if (!f.match_date) return true;
+                      return new Date(f.match_date) >= today;
+                    });
+                  }
+
+                  const payload = fixturesToImport.map((f: any) => {
+                    const isPast = f.match_date ? new Date(f.match_date) < today : false;
+                    return { 
+                      ...f, 
+                      team_id: fixtureTeamId, 
+                      umpire_fee: defaultUmpireFee || 0,
+                      status: isPast ? 'completed' : 'upcoming',
+                      is_active: true,
+                      season_name: targetSeasonName || data.seasonName || null
+                    };
+                  });
+
+                    const { data: existingFixtures } = await supabase
+                      .from('fixtures')
+                      .select('id, opponent, match_date, start_time')
+                      .eq('team_id', fixtureTeamId);
+
+                    const newFixtures: any[] = [];
+                      const updatePromises: any[] = [];
+                      const processedExistingIds = new Set();
+
+                      payload.forEach((newFix: any) => {
+                        const sameDateMatches = existingFixtures?.filter(ef => ef.match_date === newFix.match_date && !processedExistingIds.has(ef.id)) || [];
+                        let existing = null;
+                        
+                        if (sameDateMatches.length === 1) {
+                          existing = sameDateMatches[0];
+                        } else if (sameDateMatches.length > 1) {
+                          existing = sameDateMatches.find(ef => {
+                              if (!ef.opponent || !newFix.opponent) return false;
+                              const efLower = ef.opponent.toLowerCase();
+                              const newLower = newFix.opponent.toLowerCase();
+                              return efLower.includes(newLower) || newLower.includes(efLower);
+                          }) || sameDateMatches[0];
+                        }
+
+                      if (existing) {
+                          processedExistingIds.add(existing.id);
+                          updatePromises.push(
+                            supabase.from("fixtures").update({
+                            opponent: newFix.opponent,
+                            opponent_logo_url: newFix.opponent_logo_url,
+                            start_time: newFix.start_time,
+                            location: newFix.location,
+                            status: newFix.status,
+                            season_name: targetSeasonName || newFix.season_name
+                          }).eq('id', existing.id)
+                        );
+                      } else {
+                        newFixtures.push(newFix);
+                      }
+                    });
+
+                    if (newFixtures.length > 0) {
+                      await supabase.from("fixtures").insert(newFixtures);
+                    }
+                    if (updatePromises.length > 0) {
+                      await Promise.all(updatePromises);
+                    }
+                }
+
+                showToast('PlayHQ Team Synced Successfully! Reloading...');
+                setTimeout(() => window.location.reload(), 1500);
+              } catch (e: any) {
+                showToast(e.message, 'error');
+                setSyncingPlayhqTeamId(null);
+              }
+            }} disabled={syncingPlayhqTeamId !== null} className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#0051e5] hover:bg-blue-600 rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50">
+              {syncingPlayhqTeamId === fixtureTeamId ? (
+                <><i className="fa-solid fa-spinner fa-spin"></i> IMPORTING...</>
+              ) : (
+                <>Import</>
+              )}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-3 px-1">
+            <input type="checkbox" id={`playhq-future-only-${fixtureTeamId}`} defaultChecked className="accent-[#0051e5] w-3.5 h-3.5 rounded shrink-0" />
+            <label htmlFor={`playhq-future-only-${fixtureTeamId}`} className="text-[10px] font-bold text-zinc-500 cursor-pointer select-none leading-tight">Only import future fixtures</label>
+          </div>
+        </div>
+      )}
+
+<div className="flex justify-between items-center mb-4">
           <h2 className="text-[11px] font-black uppercase italic text-emerald-600 dark:text-emerald-500">
             {isBulkMode ? 'Add Matches' : 'Manual Entry'}
           </h2>
         </div>
         
-        {teams.length > 1 && (
+        {!isEmbedded && teams.length > 1 && (
           <select value={fixtureTeamId || ""} onChange={(e) => setFixtureTeamId(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 mb-4 transition-colors font-bold">
             <option value="">-- Select Team to Add Matches --</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
