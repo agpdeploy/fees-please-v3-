@@ -1186,7 +1186,25 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 <button
                   onClick={() => {
                     setDismissedSteps(prev => ({ ...prev, [step.id]: true }));
-                    if (expandedStep === step.id) setExpandedStep(null);
+                      if (expandedStep === step.id) {
+                        const currentIndex = visibleSteps.findIndex(s => s.id === step.id);
+                        let nextId = null;
+                        for (let i = currentIndex + 1; i < visibleSteps.length; i++) {
+                           if (!visibleSteps[i].completed && visibleSteps[i].id !== step.id) {
+                             nextId = visibleSteps[i].id;
+                             break;
+                           }
+                        }
+                        if (!nextId) {
+                           for (let i = 0; i < currentIndex; i++) {
+                             if (!visibleSteps[i].completed && visibleSteps[i].id !== step.id) {
+                               nextId = visibleSteps[i].id;
+                               break;
+                             }
+                           }
+                        }
+                        setExpandedStep(nextId);
+                      }
                   }}
                   title="Dismiss step"
                   className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${step.completed ? 'text-emerald-100 hover:text-white hover:bg-emerald-700' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
