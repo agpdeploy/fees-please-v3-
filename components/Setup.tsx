@@ -2014,7 +2014,7 @@ export default function Setup({ activeTab }: SetupProps) {
                                     umpire_fee: clubRecord?.default_umpire_fee || 0,
                                     status: isPast ? 'completed' : 'upcoming',
                                     is_active: true,
-                                    season_name: data.seasonName || targetSeasonName || null
+                                    season_name: targetSeasonName || data.seasonName || null
                                   };
                                 });
 
@@ -2052,7 +2052,7 @@ export default function Setup({ activeTab }: SetupProps) {
                                           start_time: newFix.start_time,
                                           location: newFix.location,
                                           status: newFix.status,
-                                          season_name: newFix.season_name
+                                          season_name: targetSeasonName || newFix.season_name
                                         }).eq('id', existing.id)
                                       );
                                     } else {
