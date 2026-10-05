@@ -1988,7 +1988,7 @@ export default function Setup({ activeTab }: SetupProps) {
       profile={profile}
       clubLogoUrl={logoUrl}
       activeSeasonName={clubRecord?.season_name || null}
-      hasPlusFeatures={hasPlusFeatures}
+      hasPlusFeatures={clubRecord?.plan_tier === "pro" || clubRecord?.plan_tier === "plus" || (clubRecord?.trial_ends_at && new Date(clubRecord.trial_ends_at) > new Date() && clubRecord?.plan_tier === "free")}
       clubRecord={clubRecord}
       isEmbedded={true}
     />
