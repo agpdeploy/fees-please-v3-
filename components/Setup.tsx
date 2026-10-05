@@ -1974,7 +1974,28 @@ export default function Setup({ activeTab }: SetupProps) {
                     
 
                     {/* INLINE ROSTER ACCORDION */}
-                    {expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
+                    {expandedMatchesTeamId === t.id && (
+  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-in fade-in slide-in-from-top-2">
+    <FixturesTab 
+      clubId={clubId} 
+      teams={[t]} 
+      fixtures={fixtures.filter(f => f.team_id === t.id)} 
+      defaultUmpireFee={defaultUmpireFee}
+      expenseLabel={expenseLabel}
+      loadClubData={loadClubData} 
+      showToast={showToast} 
+      clubPlayers={players}
+      profile={profile}
+      clubLogoUrl={logoUrl}
+      activeSeasonName={clubRecord?.season_name || null}
+      hasPlusFeatures={hasPlusFeatures}
+      clubRecord={clubRecord}
+      isEmbedded={true}
+    />
+  </div>
+)}
+
+{expandedRosterTeamId === t.id && activeRosterTeam?.id === t.id && (
                       <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 animate-in slide-in-from-top-2">
                         <input 
                           type="text" 
