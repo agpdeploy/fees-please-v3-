@@ -2024,21 +2024,29 @@ export default function Setup({ activeTab }: SetupProps) {
                                     .eq('team_id', t.id);
 
                                   const newFixtures: any[] = [];
-                                  const updatePromises: any[] = [];
-
-                                  payload.forEach((newFix: any) => {
-                                    const sameDateMatches = existingFixtures?.filter(ef => ef.match_date === newFix.match_date) || [];
-                                    let existing = null;
-                                    
-                                    if (sameDateMatches.length === 1) {
-                                      existing = sameDateMatches[0];
-                                    } else if (sameDateMatches.length > 1) {
-                                      existing = sameDateMatches.find(ef => ef.opponent === newFix.opponent) || sameDateMatches[0];
-                                    }
+                                    const updatePromises: any[] = [];
+                                    const processedExistingIds = new Set();
+  
+                                    payload.forEach((newFix: any) => {
+                                      const sameDateMatches = existingFixtures?.filter(ef => ef.match_date === newFix.match_date && !processedExistingIds.has(ef.id)) || [];
+                                      let existing = null;
+                                      
+                                      if (sameDateMatches.length === 1) {
+                                        existing = sameDateMatches[0];
+                                      } else if (sameDateMatches.length > 1) {
+                                        // Fuzzy match opponent names to prevent bad overwrites
+                                        existing = sameDateMatches.find(ef => {
+                                            if (!ef.opponent || !newFix.opponent) return false;
+                                            const efLower = ef.opponent.toLowerCase();
+                                            const newLower = newFix.opponent.toLowerCase();
+                                            return efLower.includes(newLower) || newLower.includes(efLower);
+                                        }) || sameDateMatches[0];
+                                      }
 
                                     if (existing) {
-                                      updatePromises.push(
-                                        supabase.from("fixtures").update({
+                                        processedExistingIds.add(existing.id);
+                                        updatePromises.push(
+                                          supabase.from("fixtures").update({
                                           opponent: newFix.opponent,
                                           opponent_logo_url: newFix.opponent_logo_url,
                                           start_time: newFix.start_time,
