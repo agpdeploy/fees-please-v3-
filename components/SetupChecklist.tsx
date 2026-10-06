@@ -22,7 +22,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const [hasFixtures, setHasFixtures] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expandedStep, setExpandedStep] = useState<string | null>(activeClubId ? null : 'club');
-  const [dismissedSteps, setDismissedSteps] = useState<Record<string, boolean>>({});
+  const [skippedSteps, setSkippedSteps] = useState<Record<string, boolean>>({});
 
   // Club Creation State
   const [ownerFirstName, setOwnerFirstName] = useState(user?.full_name ? user.full_name.split(' ')[0] : "");
@@ -181,12 +181,14 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
   const hasFinancials = !!clubInfo?.pay_id_value || !!clubInfo?.square_access_token;
 
   const steps = [
+
     { id: 'club', title: 'Create Your Team', icon: 'fa-flag', completed: !!activeClubId, required: true },
-    { id: 'logo', title: 'Upload Account Logo', icon: 'fa-image', completed: !!clubInfo?.logo, required: false },
+    { id: 'logo', title: 'Upload Account Logo', icon: 'fa-image', completed: !!clubInfo?.logo || skippedSteps['logo'], required: false },
     { id: 'players', title: 'Add Players', icon: 'fa-users', completed: hasPlayers, required: true },
     { id: 'season', title: 'Season Setup', icon: 'fa-calendar', completed: hasSeason, required: true },
-    { id: 'fixtures', title: 'Add Fixtures', icon: 'fa-list-ol', completed: hasFixtures, required: false },
+    { id: 'fixtures', title: 'Add Fixtures', icon: 'fa-list-ol', completed: hasFixtures || skippedSteps['fixtures'], required: false },
     { id: 'financials', title: 'Payment Methods', icon: 'fa-sack-dollar', completed: hasFinancials, required: true }
+  
   ];
 
   const visibleSteps = steps.filter(s => {
@@ -198,8 +200,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
        return true;
     } else {
        if (!activeClubId && s.id !== 'club') return false;
-       if (s.id === 'logo' && dismissedSteps['logo']) return false;
-       if (s.id === 'fixtures' && dismissedSteps['fixtures']) return false;
+       
        return true;
     }
   });
@@ -1183,16 +1184,41 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <button
+                {!step.required && (
+                  <button
                   onClick={() => {
+<<<<<<< Updated upstream
                     setDismissedSteps(prev => ({ ...prev, [step.id]: true }));
                     if (expandedStep === step.id) setExpandedStep(null);
+=======
+                    setSkippedSteps(prev => ({ ...prev, [step.id]: true }));
+                      if (expandedStep === step.id) {
+                        const currentIndex = visibleSteps.findIndex(s => s.id === step.id);
+                        let nextId = null;
+                        for (let i = currentIndex + 1; i < visibleSteps.length; i++) {
+                           if (!visibleSteps[i].completed && visibleSteps[i].id !== step.id) {
+                             nextId = visibleSteps[i].id;
+                             break;
+                           }
+                        }
+                        if (!nextId) {
+                           for (let i = 0; i < currentIndex; i++) {
+                             if (!visibleSteps[i].completed && visibleSteps[i].id !== step.id) {
+                               nextId = visibleSteps[i].id;
+                               break;
+                             }
+                           }
+                        }
+                        setExpandedStep(nextId);
+                      }
+>>>>>>> Stashed changes
                   }}
-                  title="Dismiss step"
+                  title="Skip for now"
                   className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${step.completed ? 'text-emerald-100 hover:text-white hover:bg-emerald-700' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
                 >
                   <i className="fa-solid fa-xmark text-sm"></i>
                 </button>
+                  )}
                 <button 
                   onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
                   title={expandedStep === step.id ? "Collapse" : "Expand"}

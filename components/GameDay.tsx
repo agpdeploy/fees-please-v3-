@@ -1074,7 +1074,7 @@ export default function GameDay() {
     return !(isSquareEnabled && method === 'card');
   }).length;
 
-  if (loading || isFixturesLoading) return <div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading Match Hub...</div>;
+  
 
   if (isFinaliseModalOpen && activeFixture) {
     return (
@@ -2055,6 +2055,9 @@ isPendingOnline ? 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-
       )}
 
 
+
+      </>
+      )}
 
       {/* --- DIGITAL TRANSFER / PAYID MODAL --- */}
       {isPayIdModalOpen && activePayIdPlayer && (
