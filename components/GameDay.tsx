@@ -1278,7 +1278,7 @@ export default function GameDay() {
       )}
 
       {(!profile || (profile.role === 'super_admin' && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId))) || ((profile.onboarding_completed === true || (roles && roles.length > 0 && !isClubAdmin)) && (typeof window === 'undefined' || (sessionStorage.getItem('creating_team') !== 'true' && sessionStorage.getItem('creating_team') !== activeClubId)))) && (
-        <>
+        (loading || isFixturesLoading) ? (<div className="text-center p-6 text-zinc-500 text-xs font-black animate-pulse uppercase tracking-widest">Loading Match Hub...</div>) : (<>
           {isClubOrSuperAdmin && teams.filter(t => t.is_active !== false).length > 1 && (
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm transition-colors">
           <label className="text-[10px] uppercase font-black tracking-widest text-emerald-600 dark:text-emerald-500 block mb-2 ml-1">Manager View</label>
@@ -2056,7 +2056,7 @@ isPendingOnline ? 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-
 
 
 
-      </>
+      </>)
       )}
 
       {/* --- DIGITAL TRANSFER / PAYID MODAL --- */}
@@ -2178,8 +2178,6 @@ isPendingOnline ? 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-
         </div>
       )}
 
-        </>
-      )}
-    </div>
+        </div>
   );
 }

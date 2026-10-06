@@ -1187,11 +1187,7 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                 {!step.required && (
                   <button
                   onClick={() => {
-<<<<<<< Updated upstream
-                    setDismissedSteps(prev => ({ ...prev, [step.id]: true }));
-                    if (expandedStep === step.id) setExpandedStep(null);
-=======
-                    setSkippedSteps(prev => ({ ...prev, [step.id]: true }));
+setSkippedSteps(prev => ({ ...prev, [step.id]: true }));
                       if (expandedStep === step.id) {
                         const currentIndex = visibleSteps.findIndex(s => s.id === step.id);
                         let nextId = null;
@@ -1211,7 +1207,6 @@ export default function SetupChecklist({ user, activeClubId, clubInfo, onUpdateC
                         }
                         setExpandedStep(nextId);
                       }
->>>>>>> Stashed changes
                   }}
                   title="Skip for now"
                   className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${step.completed ? 'text-emerald-100 hover:text-white hover:bg-emerald-700' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
