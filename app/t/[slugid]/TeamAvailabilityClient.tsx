@@ -88,7 +88,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
         const today = new Date().toISOString();
         const { data: fixtureData } = await supabase
           .from("fixtures")
-          .select("id, match_date, opponent, start_time, location, status")
+          .select("id, match_date, opponent, start_time, location, status, opponent_logo_url")
           .eq("team_id", teamId)
           .gte("match_date", today.split('T')[0])
           .order("match_date", { ascending: true });
@@ -402,8 +402,8 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                         <div className="flex flex-col items-end gap-2 pr-2">
                           <div className="flex items-center gap-3">
                               <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-                                  <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>
+                              <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                  {fixture.opponent_logo_url ? <img src={fixture.opponent_logo_url} className="w-full h-full object-cover bg-white" /> : <i className="fa-solid fa-shield text-[10px] text-zinc-400"></i>}
                               </div>
                           </div>
 
@@ -560,7 +560,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                         <div className="shrink-0 px-2 text-[10px] font-black text-zinc-300 dark:text-zinc-700 italic">VS</div>
                         <div className="flex items-center justify-end gap-3 flex-1">
                             <span className="font-black text-xs uppercase text-right leading-tight">{fixture.opponent}</span>
-                            <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center"><i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i></div>
+                            <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center overflow-hidden">{fixture.opponent_logo_url ? <img src={fixture.opponent_logo_url} className="w-full h-full object-cover bg-white" /> : <i className="fa-solid fa-shield text-zinc-300 dark:text-zinc-700 text-xs"></i>}</div>
                         </div>
                     </div>
 
