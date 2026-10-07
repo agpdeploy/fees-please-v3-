@@ -6,6 +6,12 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import posthog from 'posthog-js'; // Ensure posthog is imported
 
+const getDisplayName = (p: any) => {
+  if (p.nickname) return p.nickname;
+  return `${p.first_name} ${p.last_name ? p.last_name.charAt(0) + '.' : ''}`.trim();
+};
+
+
 interface ClientProps {
   teamId: string;
   clubId: string;
@@ -350,7 +356,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                         <div className="flex flex-wrap gap-1.5">
                           {players.map(p => (
                             <span key={p.id} className="text-[10px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-400">
-                              {p.nickname || p.first_name} {p.last_name ? p.last_name.charAt(0) + '.' : ''}
+                              {getDisplayName(p)}
                             </span>
                           ))}
                         </div>
@@ -465,7 +471,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
             <div className="flex flex-wrap gap-2.5 justify-center max-h-[45vh] overflow-y-auto">
               {displayedPlayers.map(p => (
                 <button key={p.id} onClick={() => setSelectedPlayer(p)} className="px-5 py-3.5 rounded-xl font-black text-[11px] uppercase bg-zinc-50 dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400">
-                  {p.nickname || `${p.first_name} ${p.last_name?.charAt(0)}.`}
+                  {getDisplayName(p)}
                 </button>
               ))}
             </div>
@@ -603,7 +609,7 @@ export default function TeamAvailabilityClient({ teamId, clubId, teamName, initi
                                     <div className="flex flex-wrap gap-1.5">
                                       {players.map(p => (
                                         <span key={p.id} className="text-[10px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-400">
-                                          {p.nickname || p.first_name} {p.last_name ? p.last_name.charAt(0) + '.' : ''}
+                                          {getDisplayName(p)}
                                         </span>
                                       ))}
                                     </div>
