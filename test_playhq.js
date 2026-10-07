@@ -1,58 +1,16 @@
-const url = 'https://www.playhq.com/cricket-australia/org/ferny-districts-cricket-club/462e4428/senior-competition-winter-2026/teams/ferny-districts-sun-a3n/ddf73203';
-const { URL } = require('url');
-const parsed = new URL(url);
-const pathParts = parsed.pathname.split('/').filter(Boolean);
-const teamIdIndex = pathParts.indexOf('teams') + 2;
-const teamId = pathParts[teamIdIndex];
-const tenant = pathParts[0];
-
 const TEAM_FIXTURE_QUERY = `
 query teamFixture($teamID: ID!) {
   discoverTeamFixture(teamID: $teamID) {
-    id
-    name
     fixture {
       games {
-        id
         date
-        allocation {
-          time
-          court {
-            id
-            name
-            venue {
-              id
-              name
-            }
-          }
-        }
         home {
-          ... on ProvisionalTeam {
-            name
-          }
-          ... on DiscoverTeam {
-            id
-            name
-            logo {
-              sizes {
-                url
-              }
-            }
-          }
+          ... on ProvisionalTeam { name }
+          ... on DiscoverTeam { id name }
         }
         away {
-          ... on ProvisionalTeam {
-            name
-          }
-          ... on DiscoverTeam {
-            id
-            name
-            logo {
-              sizes {
-                url
-              }
-            }
-          }
+          ... on ProvisionalTeam { name }
+          ... on DiscoverTeam { id name }
         }
       }
     }
@@ -61,26 +19,27 @@ query teamFixture($teamID: ID!) {
 `;
 
 async function run() {
-  const payload = {
-    query: TEAM_FIXTURE_QUERY,
-    variables: { teamID: teamId }
-  };
+  const teamId = '9bc7a3b3';
+  const tenant = 'ca';
 
-  try {
-    const res = await fetch("https://api.playhq.com/graphql", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'tenant': tenant,
-        'Origin': 'https://www.playhq.com'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-    console.log(JSON.stringify(data, null, 2));
-  } catch (e) {
-    console.error(e);
-  }
+  const response = await fetch("https://api.playhq.com/graphql", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "tenant": tenant,
+      "Origin": "https://www.playhq.com"
+    },
+    body: JSON.stringify({
+      query: TEAM_FIXTURE_QUERY,
+      variables: { teamID: teamId }
+    })
+  });
+  
+  const data = await response.json();
+  const games = data.data.discoverTeamFixture.flatMap(r => r.fixture?.games || []);
+  console.log("Total games:", games.length);
+  games.forEach(g => {
+     console.log(g.date, "vs", g.home?.id === teamId ? g.away?.name : g.home?.name);
+  });
 }
 run();
